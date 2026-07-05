@@ -2,6 +2,7 @@
 
 #include <cmath>
 
+#include "../../main.h"
 #include "../LevelEditorManager.h"
 #include "../../Scene/SceneManager.h"
 #include "../../GameObject/Camera/EditorCamera/EditorCamera.h"

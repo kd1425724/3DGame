@@ -1,5 +1,7 @@
 ﻿#include "EditorCamera.h"
 
+#include "../../../main.h"
+
 void EditorCamera::Init()
 {
 	CameraBase::Init();
