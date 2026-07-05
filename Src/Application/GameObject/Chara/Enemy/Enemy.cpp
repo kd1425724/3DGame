@@ -14,9 +14,15 @@ void Enemy::Init()
 
 	// Playerと同じ比率で縮小
 	SetScale(Math::Vector3(0.5f, 0.5f, 0.5f));
+}
 
+void Enemy::Update()
+{
 	// 追従対象が未設定なら、シーン内のPlayerを自動で探す
 	// (レベルエディタ配置など、外部からSetTarget()を呼ばれない経路のため)
+	// ※ Init()の時点ではSceneManagerのシングルトン初期化(=GameScene::Init())が
+	//    完了していない場合があり、ここでSceneManager::Instance()を呼ぶと
+	//    自己再入でフリーズするため、Update()まで遅延させている
 	if (m_wpTarget.expired())
 	{
 		for (auto& obj : SceneManager::Instance().GetObjList())
@@ -29,10 +35,7 @@ void Enemy::Init()
 			}
 		}
 	}
-}
 
-void Enemy::Update()
-{
 	std::shared_ptr<KdGameObject> spTarget = m_wpTarget.lock();
 	if (!spTarget) { return; }
 

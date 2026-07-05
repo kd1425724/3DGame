@@ -13,6 +13,17 @@ public :
 		Game,
 	};
 
+	// マネージャーの初期化
+	// ※ コンストラクタからは呼ばない。Application::Init()などシングルトン初期化が
+	//    確実に完了した後の場所で明示的に呼び出すこと。
+	//    (コンストラクタ内で呼ぶと、初期化処理の中でSceneManager::Instance()を
+	//     再帰的に呼んだ瞬間、static変数の初期化待ちで自己デッドロックするため)
+	void Init()
+	{
+		// 開始シーンに切り替え
+		ChangeScene(m_currentSceneType);
+	}
+
 	void PreUpdate();
 	void Update();
 	void PostUpdate();
@@ -39,14 +50,6 @@ public :
 
 private :
 
-	// マネージャーの初期化
-	// インスタンス生成(アプリ起動)時にコンストラクタで自動実行
-	void Init()
-	{
-		// 開始シーンに切り替え
-		ChangeScene(m_currentSceneType);
-	}
-
 	// シーン切り替え関数
 	void ChangeScene(SceneType _sceneType);
 
@@ -61,7 +64,7 @@ private :
 
 private:
 
-	SceneManager() { Init(); }
+	SceneManager() = default;
 	~SceneManager() {}
 
 public:
