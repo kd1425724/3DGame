@@ -35,4 +35,10 @@ void GameScene::Init()
 	spCamera->SetTarget(spPlayer);
 	spCamera->RegistHitObject(spGround);
 	AddObject(spCamera);
+
+	// GameSceneからもカメラを参照できるように保持
+	m_wpCamera = spCamera;
+
+	// プレイヤーの移動をカメラの水平方向の向き基準にする
+	spPlayer->SetCameraReference(spCamera);
 }

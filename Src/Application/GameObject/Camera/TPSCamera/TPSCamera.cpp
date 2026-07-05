@@ -21,8 +21,11 @@ void TPSCamera::PostUpdate()
 		_targetMat = Math::Matrix::CreateTranslation(_spTarget->GetPos());
 	}
 
-	// カメラの回転
-	UpdateRotateByMouse();
+	// カメラの回転(Ctrlを押している間はマウスを中央に固定しない。ImGui操作等のため)
+	if (!(GetAsyncKeyState(VK_CONTROL) & 0x8000))
+	{
+		UpdateRotateByMouse();
+	}
 	m_mRotation = GetRotationMatrix();
 	m_mWorld = m_mLocalPos * m_mRotation * _targetMat;
 

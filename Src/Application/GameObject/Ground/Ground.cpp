@@ -5,7 +5,9 @@ void Ground::Init()
 	SetAsset("Asset/Models/Test/Block/Block.gltf");
 
 	// 地面らしく大きく・薄く潰す
-	SetScale(Math::Vector3(20.0f, 0.2f, 20.0f));
+	// ※ 影生成エリアは既定で25x25(KdAmbientController::Init参照)とそこまで広くなく、
+	//    カメラ位置を中心に追従する仕組みなので、大きすぎると影が生成されなくなる。
+	SetScale(Math::Vector3(6.0f, 0.2f, 6.0f));
 
 	//当てられる側の処理＝＝＝＝＝＝＝＝＝＝
 	//当たり判定をつけたいから実体化
