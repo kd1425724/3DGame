@@ -1,6 +1,7 @@
 ﻿#include "BaseScene.h"
 
 #include "../../LevelEditor/LevelEditorManager.h"
+#include "../../GameObject/Camera/EditorCamera/EditorCamera.h"
 
 void BaseScene::PreUpdate()
 {
