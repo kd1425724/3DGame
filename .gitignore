@@ -1,6 +1,6 @@
 #共通無視フォルダ
-[Dd]ebug/
-[Rr]elease/
+/[Dd]ebug/
+/[Rr]elease/
 packages/
 Library/
 Project/
