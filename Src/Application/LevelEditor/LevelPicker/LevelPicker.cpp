@@ -151,7 +151,7 @@ void LevelPicker::Update()
 		}
 
 		// ---- 2. 軸を掴んでいなければ、選択中オブジェクト本体を掴んだかどうかを判定する ----
-		if (selected && ClosestDistanceRayToPoint(rayPos, rayDir, selected->GetPos()) < mgr.m_grabRadius)
+		if (selected && ClosestDistanceRayToPoint(rayPos, rayDir, selected->GetPos()) < m_grabRadius)
 		{
 			// カメラに正対する平面上での自由ドラッグ開始
 			m_dragMode = DragMode::FreePlane;
@@ -165,7 +165,7 @@ void LevelPicker::Update()
 		m_dragMode = DragMode::None;
 
 		std::shared_ptr<KdGameObject> nearestObj;
-		float nearestDist = mgr.m_pickRadius;
+		float nearestDist = m_pickRadius;
 
 		for (auto& obj : SceneManager::Instance().GetObjList())
 		{
