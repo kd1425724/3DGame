@@ -2,6 +2,8 @@
 
 #include "../../../main.h"
 #include "../../../API/MathAPI/MathAPI.h"
+#include "../../../Scene/SceneManager.h"
+#include "../Player/Player.h"
 
 void Enemy::Init()
 {
@@ -12,6 +14,21 @@ void Enemy::Init()
 
 	// Playerと同じ比率で縮小
 	SetScale(Math::Vector3(0.5f, 0.5f, 0.5f));
+
+	// 追従対象が未設定なら、シーン内のPlayerを自動で探す
+	// (レベルエディタ配置など、外部からSetTarget()を呼ばれない経路のため)
+	if (m_wpTarget.expired())
+	{
+		for (auto& obj : SceneManager::Instance().GetObjList())
+		{
+			std::shared_ptr<Player> spPlayer = std::dynamic_pointer_cast<Player>(obj);
+			if (spPlayer)
+			{
+				m_wpTarget = spPlayer;
+				break;
+			}
+		}
+	}
 }
 
 void Enemy::Update()

@@ -5,6 +5,8 @@
 #include "Debug/DebugFlags/DebugFlags.h"
 #include "LevelEditor/LevelEditorManager.h"
 #include "GameObject/Block/Block.h"
+#include "GameObject/Ground/Ground.h"
+#include "GameObject/Chara/Enemy/Enemy.h"
 
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
 // エントリーポイント
@@ -231,6 +233,18 @@ bool Application::Init(int w, int h)
 	// レベルエディタで配置できるオブジェクトの登録
 	LevelEditorManager::Instance().RegisterCreatable("Block", []() {
 		auto obj = std::make_shared<Block>();
+		obj->Init();
+		return obj;
+	});
+
+	LevelEditorManager::Instance().RegisterCreatable("Ground", []() {
+		auto obj = std::make_shared<Ground>();
+		obj->Init();
+		return obj;
+	});
+
+	LevelEditorManager::Instance().RegisterCreatable("Enemy", []() {
+		auto obj = std::make_shared<Enemy>();
 		obj->Init();
 		return obj;
 	});
