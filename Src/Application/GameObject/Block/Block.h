@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 // テスト用：Block.gltfを表示するだけの簡易オブジェクト
 class Block : public KdGameObject

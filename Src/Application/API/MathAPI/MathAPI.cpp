@@ -1,4 +1,4 @@
-#include "MathAPI.h"
+﻿#include "MathAPI.h"
 
 namespace MathAPI
 {
