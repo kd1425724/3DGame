@@ -79,6 +79,9 @@
     <Filter Include="Src\Application\GameObject">
       <UniqueIdentifier>{362e80f9-8c3b-4a87-9e83-f0e4b6d570f6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Application\GameObject\Block">
+      <UniqueIdentifier>{a1e2c3d4-5f6a-4b7c-8d9e-0f1a2b3c4d5e}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\Application\GameObject\Camera">
       <UniqueIdentifier>{cedad702-e70f-4d1b-9fdc-88426f7f436b}</UniqueIdentifier>
     </Filter>
@@ -339,6 +342,9 @@
     <ClInclude Include="Src\Application\GameObject\Camera\EditorCamera\EditorCamera.h">
       <Filter>Src\Application\GameObject\Camera\EditorCamera</Filter>
     </ClInclude>
+    <ClInclude Include="Src\Application\GameObject\Block\Block.h">
+      <Filter>Src\Application\GameObject\Block</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Pch.cpp">
@@ -523,6 +529,9 @@
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Camera\EditorCamera\EditorCamera.cpp">
       <Filter>Src\Application\GameObject\Camera\EditorCamera</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\GameObject\Block\Block.cpp">
+      <Filter>Src\Application\GameObject\Block</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

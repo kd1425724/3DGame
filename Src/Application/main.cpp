@@ -3,6 +3,7 @@
 #include "Scene/SceneManager.h"
 #include "Debug/DebugManager.h"
 #include "LevelEditor/LevelEditorManager.h"
+#include "GameObject/Block/Block.h"
 
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
 // エントリーポイント
@@ -222,6 +223,13 @@ bool Application::Init(int w, int h)
 	//===================================================================
 	// 例えばカーソルを消したい場合
 	//ShowCursor(false);
+
+	// レベルエディタで配置できるオブジェクトの登録
+	LevelEditorManager::Instance().RegisterCreatable("Block", []() {
+		auto obj = std::make_shared<Block>();
+		obj->Init();
+		return obj;
+	});
 
 	return true;
 }
