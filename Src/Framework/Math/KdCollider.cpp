@@ -187,6 +187,17 @@ bool KdCollider::Intersects(const RayInfo& targetShape, const Math::Matrix& owne
 }
 
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
+// 登録済みの全形状をワイヤーフレームに追加する(デバッグ表示用)
+// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
+void KdCollider::AddDebugWire(KdDebugWireFrame& wireFrame, const Math::Matrix& ownerMatrix) const
+{
+	for (auto& collisionShape : m_collisionShapes)
+	{
+		collisionShape.second->AddDebugWire(wireFrame, ownerMatrix);
+	}
+}
+
+// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
 // 任意のCollisionShapeを検索して有効/無効を切り替える
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
 void KdCollider::SetEnable(std::string_view name, bool flag)
@@ -427,6 +438,20 @@ bool KdSphereCollision::Intersects(const KdCollider::RayInfo& target, const Math
 	return isHit;
 }
 
+// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
+// デバッグ表示用：自身の球形状をワイヤーフレームに追加する
+// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
+void KdSphereCollision::AddDebugWire(KdDebugWireFrame& wireFrame, const Math::Matrix& world) const
+{
+	if (!m_enable) { return; }
+
+	DirectX::BoundingSphere myShape;
+
+	m_shape.Transform(myShape, world);
+
+	wireFrame.AddDebugSphere(myShape.Center, myShape.Radius, kGreenColor);
+}
+
 // ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### #####
 // BOXCollision
 // BOXの形状
@@ -559,6 +584,23 @@ bool KdBoxCollision::Intersects(const KdCollider::RayInfo& target, const Math::M
 
 	// 即結果を返す(HITしたかどうかだけが知れる)
 	return isHit;
+}
+
+// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
+// デバッグ表示用：自身のBOX形状をワイヤーフレームに追加する
+// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
+void KdBoxCollision::AddDebugWire(KdDebugWireFrame& wireFrame, const Math::Matrix& world) const
+{
+	if (!m_enable) { return; }
+
+	if (!m_IsOriented)
+	{
+		wireFrame.AddDebugBox(world, m_Abox.Extents, Math::Vector3(m_Abox.Center), false, kGreenColor);
+	}
+	else
+	{
+		wireFrame.AddDebugBox(world, m_Obox.Extents, Math::Vector3(m_Obox.Center), true, kGreenColor);
+	}
 }
 
 // ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### ##### #####

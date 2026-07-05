@@ -2,6 +2,13 @@
 
 void KdGameObject::DrawDebug()
 {
+	if (s_showColliderDebug && m_pCollider)
+	{
+		if (!m_pDebugWire) { m_pDebugWire = std::make_unique<KdDebugWireFrame>(); }
+
+		m_pCollider->AddDebugWire(*m_pDebugWire, m_mWorld);
+	}
+
 	// 早期リターン
 	if (!m_pDebugWire)return;
 

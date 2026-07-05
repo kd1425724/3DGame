@@ -2,6 +2,7 @@
 
 #include "Scene/SceneManager.h"
 #include "Debug/DebugManager.h"
+#include "Debug/DebugFlags/DebugFlags.h"
 #include "LevelEditor/LevelEditorManager.h"
 #include "GameObject/Block/Block.h"
 
@@ -49,6 +50,9 @@ void Application::KdBeginUpdate()
 
 	// デバッグ用ImGui機能の更新開始(DebugWatchの前フレーム情報クリアなど)
 	DebugManager::Instance().BeginFrame();
+
+	// 当たり判定デバッグ表示の切り替え(全GameObject共通)
+	KdGameObject::s_showColliderDebug = DebugFlags::Instance().Get(U8("当たり判定/AABB表示"));
 
 	// レベルエディタの更新(3Dビューのクリック選択など)
 	LevelEditorManager::Instance().Update();

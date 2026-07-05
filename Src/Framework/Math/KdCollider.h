@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 class KdCollisionShape;
+class KdDebugWireFrame;
 
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
 // 当たり判定を内部で実行し判定結果を返してくれるクラス
@@ -171,6 +172,9 @@ public:
 	void SetEnable(int type, bool flag);
 	void SetEnableAll(bool flag);
 
+	// 登録済みの全形状をワイヤーフレームに追加する(デバッグ表示用)
+	void AddDebugWire(KdDebugWireFrame& wireFrame, const Math::Matrix& ownerMatrix) const;
+
 private:
 	std::unordered_map<std::string, std::unique_ptr<KdCollisionShape>> m_collisionShapes;
 
@@ -197,6 +201,9 @@ public:
 	virtual bool Intersects(const DirectX::BoundingBox& target, const Math::Matrix& world, KdCollider::CollisionResult* pRes) = 0;
 	virtual bool Intersects(const DirectX::BoundingOrientedBox& target, const Math::Matrix& world, KdCollider::CollisionResult* pRes) = 0;
 	virtual bool Intersects(const KdCollider::RayInfo& target, const Math::Matrix& world, KdCollider::CollisionResult* pRes) = 0;
+
+	// デバッグ表示用：自身の形状をワイヤーフレームに追加する(対応していない形状はデフォルトで何もしない)
+	virtual void AddDebugWire(KdDebugWireFrame& wireFrame, const Math::Matrix& world) const {}
 
 	void SetEnable(bool flag) { m_enable = flag; }
 
@@ -228,6 +235,8 @@ public:
 	bool Intersects(const DirectX::BoundingBox& target, const Math::Matrix& world, KdCollider::CollisionResult* pRes) override;
 	bool Intersects(const DirectX::BoundingOrientedBox& target, const Math::Matrix& world, KdCollider::CollisionResult* pRes) override;
 	bool Intersects(const KdCollider::RayInfo& target, const Math::Matrix& world, KdCollider::CollisionResult* pRes) override;
+
+	void AddDebugWire(KdDebugWireFrame& wireFrame, const Math::Matrix& world) const override;
 
 private:
 	DirectX::BoundingSphere m_shape;
@@ -268,6 +277,8 @@ public:
 	bool Intersects(const DirectX::BoundingBox& target, const Math::Matrix& world, KdCollider::CollisionResult* pRes) override;
 	bool Intersects(const DirectX::BoundingOrientedBox& target, const Math::Matrix& world, KdCollider::CollisionResult* pRes) override;
 	bool Intersects(const KdCollider::RayInfo& target, const Math::Matrix& world, KdCollider::CollisionResult* pRes) override;
+
+	void AddDebugWire(KdDebugWireFrame& wireFrame, const Math::Matrix& world) const override;
 
 private:
 	DirectX::BoundingBox			m_Abox;

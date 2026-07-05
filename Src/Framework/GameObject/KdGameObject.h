@@ -116,6 +116,10 @@ public:
 	}
 	void SetHitFlg(bool flg) { m_hitflg = flg; }
 
+	// 全GameObject共通の当たり判定デバッグ表示ON/OFF
+	// (Application側から切り替える想定。Frameworkはこの値を読むだけでImGui等には依存しない)
+	static inline bool s_showColliderDebug = false;
+
 protected:
 
 	void Release() {}
