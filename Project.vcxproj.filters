@@ -103,6 +103,9 @@
     <Filter Include="Src\Application\GameObject\Chara\Player">
       <UniqueIdentifier>{c3a7f2b1-7d4e-4b3f-8a2c-4f7e8d9b0c21}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Application\GameObject\Chara\Enemy">
+      <UniqueIdentifier>{a4b8c2d3-1e5f-4a6b-9c7d-8e9f0a1b2c3d}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\Application\GameObject\Ground">
       <UniqueIdentifier>{d4b8a3c2-8e5f-4c40-9b3d-5a8f9e0c1d32}</UniqueIdentifier>
     </Filter>
@@ -327,6 +330,9 @@
     <ClInclude Include="Src\Application\GameObject\Chara\Player\Player.h">
       <Filter>Src\Application\GameObject\Chara\Player</Filter>
     </ClInclude>
+    <ClInclude Include="Src\Application\GameObject\Chara\Enemy\Enemy.h">
+      <Filter>Src\Application\GameObject\Chara\Enemy</Filter>
+    </ClInclude>
     <ClInclude Include="Src\Application\GameObject\Ground\Ground.h">
       <Filter>Src\Application\GameObject\Ground</Filter>
     </ClInclude>
@@ -529,6 +535,9 @@
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Chara\Player\Player.cpp">
       <Filter>Src\Application\GameObject\Chara\Player</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\GameObject\Chara\Enemy\Enemy.cpp">
+      <Filter>Src\Application\GameObject\Chara\Enemy</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Ground\Ground.cpp">
       <Filter>Src\Application\GameObject\Ground</Filter>

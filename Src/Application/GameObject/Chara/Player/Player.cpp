@@ -40,7 +40,10 @@ void Player::Update()
 		pos += move * m_moveSpeed * Application::Instance().GetDeltaTime();
 		SetPos(pos);
 	}
+}
 
+void Player::PostUpdate()
+{
 	// 地面(KdCollider::TypeGround)に立つ
 	GroundCheck();
 }

@@ -3,6 +3,7 @@
 
 #include "../../GameObject/Ground/Ground.h"
 #include "../../GameObject/Chara/Player/Player.h"
+#include "../../GameObject/Chara/Enemy/Enemy.h"
 #include "../../GameObject/Camera/TPSCamera/TPSCamera.h"
 
 void GameScene::Event()
@@ -41,4 +42,11 @@ void GameScene::Init()
 
 	// プレイヤーの移動をカメラの水平方向の向き基準にする
 	spPlayer->SetCameraReference(spCamera);
+
+	// 敵(プレイヤーにゆっくり追従し、接触すると消滅する)
+	std::shared_ptr<Enemy> spEnemy = std::make_shared<Enemy>();
+	spEnemy->Init();
+	spEnemy->SetPos(Math::Vector3(3.0f, 1.0f, 3.0f));
+	spEnemy->SetTarget(spPlayer);
+	AddObject(spEnemy);
 }

@@ -19,8 +19,9 @@ public:
 	Player()				{}
 	~Player()	override	{}
 
-	void Init()		override;
-	void Update()	override;
+	void Init()			override;
+	void Update()		override;
+	void PostUpdate()	override;
 
 	// 移動方向の基準にするカメラを設定する(未設定ならワールド座標軸のまま移動する)
 	void SetCameraReference(const std::shared_ptr<CameraBase>& camera) { m_wpCamera = camera; }
