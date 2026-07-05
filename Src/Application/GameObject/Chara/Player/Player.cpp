@@ -9,6 +9,9 @@ void Player::Init()
 
 	// 他のオブジェクトと見分けが付くように水色にする
 	m_color = Math::Color(0.4f, 0.8f, 1.0f, 1.0f);
+
+	// 縮小したGroundとの比率に合わせて小さくする
+	SetScale(Math::Vector3(0.5f, 0.5f, 0.5f));
 }
 
 void Player::Update()

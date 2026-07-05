@@ -49,8 +49,9 @@ void CharaBase::GroundCheck()
 	if (hit)
 	{
 		// 見た目のモデル(単位立方体想定)の半分だけ持ち上げて、地面に埋まらず立たせる
+		// ※ Scaleを変えても比率が崩れないよう、高さはGetScale().yを基準に計算する
 		Math::Vector3 pos = GetPos();
-		pos.y = hitPos.y + 0.5f;
+		pos.y = hitPos.y + (GetScale().y * 0.5f);
 		SetPos(pos);
 	}
 }

@@ -5,8 +5,8 @@ void TPSCamera::Init()
 	// 親クラスの初期化呼び出し
 	CameraBase::Init();
 
-	// 注視点
-	m_mLocalPos = Math::Matrix::CreateTranslation(0, 1.5f, -10.0f);
+	// 注視点(ターゲットが縮小されたのに合わせてカメラも近づける)
+	m_mLocalPos = Math::Matrix::CreateTranslation(0, 0.75f, -4.0f);
 
 	SetCursorPos(m_FixMousePos.x, m_FixMousePos.y);
 }

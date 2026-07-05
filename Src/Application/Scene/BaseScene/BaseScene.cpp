@@ -34,17 +34,27 @@ void BaseScene::Update()
 	// シーン毎のイベント処理
 	Event();
 
+	// フリーカメラ使用中はエディタカメラ以外のゲーム進行を止める(自由に見渡せるようにするため)
+	std::shared_ptr<KdGameObject> spEditorCamera = LevelEditorManager::Instance().GetEditorCamera();
+
 	// KdGameObjectを継承した全てのオブジェクトの更新 (ポリモーフィズム)
 	for (auto& obj : m_objList)
 	{
+		if (spEditorCamera && obj != spEditorCamera) { continue; }
+
 		obj->Update();
 	}
 }
 
 void BaseScene::PostUpdate()
 {
+	// フリーカメラ使用中はエディタカメラ以外のゲーム進行を止める(自由に見渡せるようにするため)
+	std::shared_ptr<KdGameObject> spEditorCamera = LevelEditorManager::Instance().GetEditorCamera();
+
 	for (auto& obj : m_objList)
 	{
+		if (spEditorCamera && obj != spEditorCamera) { continue; }
+
 		obj->PostUpdate();
 	}
 }
