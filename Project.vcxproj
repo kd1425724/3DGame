@@ -277,6 +277,7 @@
     <ClInclude Include="Src\Application\Debug\DebugFlags\DebugFlags.h" />
     <ClInclude Include="Src\Application\Debug\DebugManager.h" />
     <ClInclude Include="Src\Application\Debug\DebugParams\DebugParams.h" />
+    <ClInclude Include="Src\Application\Debug\DebugEffect\DebugEffect.h" />
     <ClInclude Include="Src\Application\Debug\DebugUtility\DebugUtility.h" />
     <ClInclude Include="Src\Application\Debug\DebugWatch\DebugWatch.h" />
     <ClInclude Include="Src\Application\GameObject\Block\Block.h" />
@@ -351,6 +352,7 @@
     <ClCompile Include="Src\Application\Debug\DebugFlags\DebugFlags.cpp" />
     <ClCompile Include="Src\Application\Debug\DebugManager.cpp" />
     <ClCompile Include="Src\Application\Debug\DebugParams\DebugParams.cpp" />
+    <ClCompile Include="Src\Application\Debug\DebugEffect\DebugEffect.cpp" />
     <ClCompile Include="Src\Application\Debug\DebugWatch\DebugWatch.cpp" />
     <ClCompile Include="Src\Application\GameObject\Block\Block.cpp" />
     <ClCompile Include="Src\Application\GameObject\Camera\CameraBase.cpp" />

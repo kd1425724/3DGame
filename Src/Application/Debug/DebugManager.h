@@ -41,6 +41,7 @@ public:
 	bool m_showFlags = true;
 	bool m_showWatch = true;
 	bool m_showParams = true;
+	bool m_showEffect = true;
 
 private:
 
