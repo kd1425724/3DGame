@@ -140,8 +140,10 @@ private:
 	};
 	ClipboardData m_clipboard;
 
-	// Ctrl+C/V/D のキー入力エッジ検知用(直前のフレームでキーが押されていたか)
+	// Ctrl+C/V/D/Z/Y のキー入力エッジ検知用(直前のフレームでキーが押されていたか)
 	bool m_prevKeyC = false;
 	bool m_prevKeyV = false;
 	bool m_prevKeyD = false;
+	bool m_prevKeyZ = false;
+	bool m_prevKeyY = false;
 };

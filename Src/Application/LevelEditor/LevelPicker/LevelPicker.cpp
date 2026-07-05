@@ -4,6 +4,7 @@
 
 #include "../../main.h"
 #include "../LevelEditorManager.h"
+#include "../LevelEditorHistory/LevelEditorHistory.h"
 #include "../../Scene/SceneManager.h"
 #include "../../GameObject/Camera/EditorCamera/EditorCamera.h"
 
@@ -141,6 +142,8 @@ void LevelPicker::Update()
 
 			if (bestAxis >= 0)
 			{
+				LevelEditorHistory::Instance().PushUndo();
+
 				// 軸ドラッグ開始
 				m_dragMode = DragMode::Axis;
 				m_dragAxisDir = axisDirs[bestAxis];
@@ -153,6 +156,8 @@ void LevelPicker::Update()
 		// ---- 2. 軸を掴んでいなければ、選択中オブジェクト本体を掴んだかどうかを判定する ----
 		if (selected && ClosestDistanceRayToPoint(rayPos, rayDir, selected->GetPos()) < m_grabRadius)
 		{
+			LevelEditorHistory::Instance().PushUndo();
+
 			// カメラに正対する平面上での自由ドラッグ開始
 			m_dragMode = DragMode::FreePlane;
 			m_dragPlaneNormal = spCamera->GetMatrix().Backward();

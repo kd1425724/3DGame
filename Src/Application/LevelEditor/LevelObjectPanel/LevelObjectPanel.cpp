@@ -1,6 +1,7 @@
 ﻿#include "LevelObjectPanel.h"
 
 #include "../LevelEditorManager.h"
+#include "../LevelEditorHistory/LevelEditorHistory.h"
 #include "../../Scene/SceneManager.h"
 
 void LevelObjectPanel::Draw()
@@ -42,6 +43,7 @@ void LevelObjectPanel::Draw()
 
 		if (ImGui::Button(U8("配置")))
 		{
+			LevelEditorHistory::Instance().PushUndo();
 			mgr.CreateObject(names[m_selectTypeIndex]);
 		}
 	}
@@ -88,6 +90,7 @@ void LevelObjectPanel::Draw()
 	// 描画ループの最中にリストを書き換えると壊れるので、ループの外で削除する
 	if (removeTarget)
 	{
+		LevelEditorHistory::Instance().PushUndo();
 		mgr.RemoveObject(removeTarget);
 	}
 }

@@ -1,6 +1,7 @@
 ﻿#include "LevelInspector.h"
 
 #include "../LevelEditorManager.h"
+#include "../LevelEditorHistory/LevelEditorHistory.h"
 
 void LevelInspector::Draw()
 {
@@ -16,31 +17,27 @@ void LevelInspector::Draw()
 
 	// 名前(imgui_stdlibのstd::string対応InputTextを使用)
 	std::string name = obj->GetName();
-	if (ImGui::InputText(U8("名前"), &name))
-	{
-		obj->SetName(name);
-	}
+	bool nameChanged = ImGui::InputText(U8("名前"), &name);
+	if (ImGui::IsItemActivated()) { LevelEditorHistory::Instance().PushUndo(); }
+	if (nameChanged) { obj->SetName(name); }
 
 	// 座標
 	Math::Vector3 pos = obj->GetPos();
-	if (ImGui::DragFloat3(U8("座標"), &pos.x, 0.1f))
-	{
-		obj->SetPos(pos);
-	}
+	bool posChanged = ImGui::DragFloat3(U8("座標"), &pos.x, 0.1f);
+	if (ImGui::IsItemActivated()) { LevelEditorHistory::Instance().PushUndo(); }
+	if (posChanged) { obj->SetPos(pos); }
 
 	// 回転(度数)
 	Math::Vector3 rot = obj->GetRot();
-	if (ImGui::DragFloat3(U8("回転"), &rot.x, 1.0f))
-	{
-		obj->SetRot(rot);
-	}
+	bool rotChanged = ImGui::DragFloat3(U8("回転"), &rot.x, 1.0f);
+	if (ImGui::IsItemActivated()) { LevelEditorHistory::Instance().PushUndo(); }
+	if (rotChanged) { obj->SetRot(rot); }
 
 	// スケール
 	Math::Vector3 scale = obj->GetScale();
-	if (ImGui::DragFloat3(U8("スケール"), &scale.x, 0.05f))
-	{
-		obj->SetScale(scale);
-	}
+	bool scaleChanged = ImGui::DragFloat3(U8("スケール"), &scale.x, 0.05f);
+	if (ImGui::IsItemActivated()) { LevelEditorHistory::Instance().PushUndo(); }
+	if (scaleChanged) { obj->SetScale(scale); }
 
 	ImGui::Separator();
 
@@ -69,6 +66,7 @@ void LevelInspector::Draw()
 
 	if (ImGui::Button(U8("このオブジェクトを削除")))
 	{
+		LevelEditorHistory::Instance().PushUndo();
 		LevelEditorManager::Instance().RemoveObject(obj);
 	}
 }

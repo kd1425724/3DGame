@@ -6,6 +6,7 @@
 #include "LevelInspector/LevelInspector.h"
 #include "LevelFileIO/LevelFileIO.h"
 #include "LevelPicker/LevelPicker.h"
+#include "LevelEditorHistory/LevelEditorHistory.h"
 
 std::shared_ptr<KdGameObject> LevelEditorManager::CreateObject(const std::string_view objTypeName)
 {
@@ -61,6 +62,8 @@ void LevelEditorManager::Update()
 	bool cTriggered = IsKeyTriggered('C', m_prevKeyC);
 	bool vTriggered = IsKeyTriggered('V', m_prevKeyV);
 	bool dTriggered = IsKeyTriggered('D', m_prevKeyD);
+	bool zTriggered = IsKeyTriggered('Z', m_prevKeyZ);
+	bool yTriggered = IsKeyTriggered('Y', m_prevKeyY);
 
 	if (m_enabled && !ImGui::GetIO().WantCaptureKeyboard)
 	{
@@ -71,6 +74,8 @@ void LevelEditorManager::Update()
 			if (cTriggered) { CopySelected(); }
 			if (vTriggered) { Paste(); }
 			if (dTriggered) { DuplicateSelected(); }
+			if (zTriggered) { LevelEditorHistory::Instance().Undo(); }
+			if (yTriggered) { LevelEditorHistory::Instance().Redo(); }
 		}
 	}
 }
@@ -95,6 +100,8 @@ void LevelEditorManager::CopySelected()
 std::shared_ptr<KdGameObject> LevelEditorManager::Paste()
 {
 	if (!m_clipboard.hasData) { return nullptr; }
+
+	LevelEditorHistory::Instance().PushUndo();
 
 	std::shared_ptr<KdGameObject> spObj = CreateObject(m_clipboard.typeName);
 	if (!spObj) { return nullptr; }
@@ -155,7 +162,9 @@ void LevelEditorManager::Draw()
 		ApplyEditorCameraState(m_useEditorCamera);
 	}
 
-	ImGui::TextDisabled(U8("Ctrl+C: コピー / Ctrl+V: 貼り付け / Ctrl+D: その場で複製"));
+	ImGui::TextDisabled(U8("Ctrl+C: コピー / Ctrl+V: 貼り付け / Ctrl+D: その場で複製 / Ctrl+Z: 元に戻す / Ctrl+Y: やり直す"));
+
+	LevelEditorHistory::Instance().Draw();
 
 	ImGui::Separator();
 

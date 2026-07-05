@@ -130,6 +130,9 @@
     <Filter Include="Src\Application\LevelEditor\LevelFileIO">
       <UniqueIdentifier>{e24b8330-e791-49f0-9e0a-745e801254d5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Application\LevelEditor\LevelEditorHistory">
+      <UniqueIdentifier>{b5c9d3a4-2f6e-4d51-9c4d-7b9f0e1d2c53}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\Application\LevelEditor\LevelInspector">
       <UniqueIdentifier>{1b16fc79-aca2-4ebb-9d10-f4c1d1c4700d}</UniqueIdentifier>
     </Filter>
@@ -369,6 +372,9 @@
     <ClInclude Include="Src\Application\LevelEditor\LevelFileIO\LevelFileIO.h">
       <Filter>Src\Application\LevelEditor\LevelFileIO</Filter>
     </ClInclude>
+    <ClInclude Include="Src\Application\LevelEditor\LevelEditorHistory\LevelEditorHistory.h">
+      <Filter>Src\Application\LevelEditor\LevelEditorHistory</Filter>
+    </ClInclude>
     <ClInclude Include="Src\Application\LevelEditor\LevelPicker\LevelPicker.h">
       <Filter>Src\Application\LevelEditor\LevelPicker</Filter>
     </ClInclude>
@@ -571,6 +577,9 @@
     </ClCompile>
     <ClCompile Include="Src\Application\LevelEditor\LevelFileIO\LevelFileIO.cpp">
       <Filter>Src\Application\LevelEditor\LevelFileIO</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\LevelEditor\LevelEditorHistory\LevelEditorHistory.cpp">
+      <Filter>Src\Application\LevelEditor\LevelEditorHistory</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\LevelEditor\LevelPicker\LevelPicker.cpp">
       <Filter>Src\Application\LevelEditor\LevelPicker</Filter>
