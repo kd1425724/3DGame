@@ -1,6 +1,10 @@
 ﻿#include "GameScene.h"
 #include"../SceneManager.h"
 
+#include "../../GameObject/Ground/Ground.h"
+#include "../../GameObject/Chara/Player/Player.h"
+#include "../../GameObject/Camera/TPSCamera/TPSCamera.h"
+
 void GameScene::Event()
 {
 	if (GetAsyncKeyState('T') & 0x8000)
@@ -14,4 +18,21 @@ void GameScene::Event()
 
 void GameScene::Init()
 {
+	// 地面
+	std::shared_ptr<Ground> spGround = std::make_shared<Ground>();
+	spGround->Init();
+	AddObject(spGround);
+
+	// プレイヤー
+	std::shared_ptr<Player> spPlayer = std::make_shared<Player>();
+	spPlayer->Init();
+	spPlayer->SetPos(Math::Vector3(0, 1.0f, 0));
+	AddObject(spPlayer);
+
+	// TPSカメラ(プレイヤーを追従、地面との当たり判定でめり込み防止)
+	std::shared_ptr<TPSCamera> spCamera = std::make_shared<TPSCamera>();
+	spCamera->Init();
+	spCamera->SetTarget(spPlayer);
+	spCamera->RegistHitObject(spGround);
+	AddObject(spCamera);
 }

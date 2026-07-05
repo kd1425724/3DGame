@@ -91,6 +91,15 @@
     <Filter Include="Src\Application\GameObject\Camera\FPSCamera">
       <UniqueIdentifier>{cd662ee1-c913-4e31-addc-42ef89e2668c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Application\GameObject\Chara">
+      <UniqueIdentifier>{b2f6e1a0-6c3d-4a2e-9f1b-3e6d7c8a9b10}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Src\Application\GameObject\Chara\Player">
+      <UniqueIdentifier>{c3a7f2b1-7d4e-4b3f-8a2c-4f7e8d9b0c21}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Src\Application\GameObject\Ground">
+      <UniqueIdentifier>{d4b8a3c2-8e5f-4c40-9b3d-5a8f9e0c1d32}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\Application\Debug">
       <UniqueIdentifier>{81b7a301-0093-415a-895f-4f6d7d620939}</UniqueIdentifier>
     </Filter>
@@ -306,6 +315,15 @@
     <ClInclude Include="Src\Application\GameObject\Camera\TPSCamera\TPSCamera.h">
       <Filter>Src\Application\GameObject\Camera\TPSCamera</Filter>
     </ClInclude>
+    <ClInclude Include="Src\Application\GameObject\Chara\CharaBase.h">
+      <Filter>Src\Application\GameObject\Chara</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\Application\GameObject\Chara\Player\Player.h">
+      <Filter>Src\Application\GameObject\Chara\Player</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\Application\GameObject\Ground\Ground.h">
+      <Filter>Src\Application\GameObject\Ground</Filter>
+    </ClInclude>
     <ClInclude Include="Src\Application\GameObject\Camera\FPSCamera\FPSCamera.h">
       <Filter>Src\Application\GameObject\Camera\FPSCamera</Filter>
     </ClInclude>
@@ -496,6 +514,15 @@
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Camera\TPSCamera\TPSCamera.cpp">
       <Filter>Src\Application\GameObject\Camera\TPSCamera</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\GameObject\Chara\CharaBase.cpp">
+      <Filter>Src\Application\GameObject\Chara</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\GameObject\Chara\Player\Player.cpp">
+      <Filter>Src\Application\GameObject\Chara\Player</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\GameObject\Ground\Ground.cpp">
+      <Filter>Src\Application\GameObject\Ground</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Camera\FPSCamera\FPSCamera.cpp">
       <Filter>Src\Application\GameObject\Camera\FPSCamera</Filter>
