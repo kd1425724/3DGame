@@ -41,6 +41,8 @@ bool LevelFileIO::Save(const std::string& filename)
 	std::ofstream ofs(filename);
 	if (!ofs) { return false; }
 
+	nlohmann::json json = nlohmann::json::array();
+
 	for (auto& obj : SceneManager::Instance().GetObjList())
 	{
 		if (!obj) { continue; }
@@ -53,11 +55,17 @@ bool LevelFileIO::Save(const std::string& filename)
 		Math::Vector3 rot = obj->GetRot();
 		Math::Vector3 scale = obj->GetScale();
 
-		ofs << typeName << "," << obj->GetName() << ","
-			<< pos.x << "," << pos.y << "," << pos.z << ","
-			<< rot.x << "," << rot.y << "," << rot.z << ","
-			<< scale.x << "," << scale.y << "," << scale.z << "\n";
+		nlohmann::json object;
+		object["type"] = typeName;
+		object["name"] = obj->GetName();
+		object["pos"] = { pos.x, pos.y, pos.z };
+		object["rot"] = { rot.x, rot.y, rot.z };
+		object["scale"] = { scale.x, scale.y, scale.z };
+
+		json.push_back(std::move(object));
 	}
+
+	ofs << json.dump(4);
 
 	return true;
 }
@@ -66,24 +74,25 @@ bool LevelFileIO::Load(const std::string& filename)
 {
 	LevelEditorManager& mgr = LevelEditorManager::Instance();
 
-	// KdCSVDataはファイルが無いとassertで止まる仕様なので、事前にチェックする
+	std::ifstream ifs(filename);
+	if (!ifs) { return false; }
+
+	nlohmann::json json;
+	try
 	{
-		std::ifstream existsCheck(filename);
-		if (!existsCheck) { return false; }
+		ifs >> json;
+	}
+	catch (const nlohmann::json::parse_error&)
+	{
+		return false;
 	}
 
-	// プロジェクト標準のcsv読み込みクラスを使用
-	KdCSVData csv(filename);
-
-	for (size_t lineIdx = 0; lineIdx < csv.GetLineSize(); lineIdx++)
+	for (auto& object : json)
 	{
-		const std::vector<std::string>& cols = csv.GetLine(lineIdx);
+		if (!object.contains("type") || !object.contains("name")) { continue; }
 
-		// 種類名,インスタンス名,Pos*3,Rot*3,Scale*3 の11列
-		if (cols.size() < 11) { continue; }
-
-		const std::string& typeName = cols[0];
-		const std::string& instanceName = cols[1];
+		const std::string typeName = object["type"].get<std::string>();
+		const std::string instanceName = object["name"].get<std::string>();
 
 		// ※ typeNameが RegisterCreatable で登録されていない場合、
 		//    Framework側のKdGameObjectFactoryがassertで止まります
@@ -94,13 +103,16 @@ bool LevelFileIO::Load(const std::string& filename)
 
 		spObj->SetName(instanceName);
 
-		Math::Vector3 pos(std::stof(cols[2]), std::stof(cols[3]), std::stof(cols[4]));
-		Math::Vector3 rot(std::stof(cols[5]), std::stof(cols[6]), std::stof(cols[7]));
-		Math::Vector3 scale(std::stof(cols[8]), std::stof(cols[9]), std::stof(cols[10]));
+		auto readVec3 = [&](const char* key) -> Math::Vector3
+		{
+			if (!object.contains(key)) { return {}; }
+			auto& v = object[key];
+			return { v.at(0).get<float>(), v.at(1).get<float>(), v.at(2).get<float>() };
+		};
 
-		spObj->SetPos(pos);
-		spObj->SetRot(rot);
-		spObj->SetScale(scale);
+		spObj->SetPos(readVec3("pos"));
+		spObj->SetRot(readVec3("rot"));
+		spObj->SetScale(readVec3("scale"));
 	}
 
 	return true;

@@ -5,7 +5,9 @@
 // レベルエディタ：配置データの保存/読込パネル
 //  ・DebugParamsと同じ安全策を採用
 //    (フォルダが無ければ自動作成、ファイルが無くても落ちない)
-//  ・保存形式：種類名,インスタンス名,PosX,PosY,PosZ,RotX,RotY,RotZ,ScaleX,ScaleY,ScaleZ
+//  ・保存形式：json配列
+//    [ { "type":種類名, "name":インスタンス名,
+//        "pos":[x,y,z], "rot":[x,y,z], "scale":[x,y,z] }, ... ]
 //
 //====================================================
 class LevelFileIO
@@ -35,7 +37,7 @@ private:
 	void operator=(const LevelFileIO&) = delete;
 
 	// ImGui上で編集するファイルパス
-	std::string m_filePath = "Asset/Data/LevelEditor/Level.csv";
+	std::string m_filePath = "Asset/Data/LevelEditor/Level.json";
 
 	// Save/Loadボタンの結果表示用
 	std::string m_lastResultMessage;
