@@ -273,6 +273,7 @@
     <ClInclude Include="..\Library\tinygltf\stb_image.h" />
     <ClInclude Include="..\Library\tinygltf\stb_image_write.h" />
     <ClInclude Include="..\Library\tinygltf\tiny_gltf.h" />
+    <ClInclude Include="Src\Application\API\MathAPI\MathAPI.h" />
     <ClInclude Include="Src\Application\Debug\DebugFlags\DebugFlags.h" />
     <ClInclude Include="Src\Application\Debug\DebugManager.h" />
     <ClInclude Include="Src\Application\Debug\DebugParams\DebugParams.h" />
@@ -344,6 +345,7 @@
     <ClCompile Include="..\Library\imgui\imgui_stdlib.cpp" />
     <ClCompile Include="..\Library\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\Library\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="Src\Application\API\MathAPI\MathAPI.cpp" />
     <ClCompile Include="Src\Application\Debug\DebugFlags\DebugFlags.cpp" />
     <ClCompile Include="Src\Application\Debug\DebugManager.cpp" />
     <ClCompile Include="Src\Application\Debug\DebugParams\DebugParams.cpp" />

@@ -31,6 +31,12 @@
     <Filter Include="Src\Application">
       <UniqueIdentifier>{d0d0f9cf-dabd-4346-bc9a-d9c04cf42372}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Application\API">
+      <UniqueIdentifier>{e5c9d3a4-9f6e-4d51-8c4d-6b9f0e1d2c43}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Src\Application\API\MathAPI">
+      <UniqueIdentifier>{f6dae4b5-a07f-4e62-9d5e-7c0a1f2e3d54}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\Framework\Math">
       <UniqueIdentifier>{04f33e76-24f0-4a58-9355-5770b3f6f9c6}</UniqueIdentifier>
     </Filter>
@@ -339,6 +345,9 @@
     <ClInclude Include="Src\Application\Debug\DebugParams\DebugParams.h">
       <Filter>Src\Application\Debug\DebugParams</Filter>
     </ClInclude>
+    <ClInclude Include="Src\Application\API\MathAPI\MathAPI.h">
+      <Filter>Src\Application\API\MathAPI</Filter>
+    </ClInclude>
     <ClInclude Include="Src\Application\Debug\DebugFlags\DebugFlags.h">
       <Filter>Src\Application\Debug\DebugFlags</Filter>
     </ClInclude>
@@ -535,6 +544,9 @@
     </ClCompile>
     <ClCompile Include="Src\Application\Debug\DebugParams\DebugParams.cpp">
       <Filter>Src\Application\Debug\DebugParams</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\API\MathAPI\MathAPI.cpp">
+      <Filter>Src\Application\API\MathAPI</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\Debug\DebugFlags\DebugFlags.cpp">
       <Filter>Src\Application\Debug\DebugFlags</Filter>
