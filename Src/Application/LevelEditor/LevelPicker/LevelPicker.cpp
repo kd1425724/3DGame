@@ -55,7 +55,6 @@ void LevelPicker::Update()
 	// エディタが無効なら何もしない
 	if (!mgr.m_enabled)
 	{
-		m_prevMouseDown = false;
 		m_dragMode = DragMode::None;
 		return;
 	}
@@ -64,7 +63,6 @@ void LevelPicker::Update()
 	// ※ この判定はImGuiのNewFrame()で更新されるため、実際には1フレーム遅れの値になる点に注意
 	if (ImGui::GetIO().WantCaptureMouse)
 	{
-		m_prevMouseDown = false;
 		m_dragMode = DragMode::None;
 		return;
 	}
@@ -73,23 +71,20 @@ void LevelPicker::Update()
 	std::shared_ptr<EditorCamera> spCamera = mgr.GetEditorCamera();
 	if (!spCamera)
 	{
-		m_prevMouseDown = false;
 		m_dragMode = DragMode::None;
 		return;
 	}
 
-	bool mouseDown = (GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0;
+	bool mouseDown = KdInputManager::Instance().IsHold("LeftClick");
 
 	if (!mouseDown)
 	{
 		// マウスを離したらドラッグ終了
-		m_prevMouseDown = false;
 		m_dragMode = DragMode::None;
 		return;
 	}
 
-	bool justPressed = !m_prevMouseDown;
-	m_prevMouseDown = true;
+	bool justPressed = KdInputManager::Instance().IsPress("LeftClick");
 
 	// マウス座標(クライアント座標)からレイを生成
 	POINT clientPos;

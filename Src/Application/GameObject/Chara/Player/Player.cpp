@@ -2,6 +2,9 @@
 
 #include "../../../main.h"
 #include "../../Camera/CameraBase.h"
+#include "../../Camera/TPSCamera/TPSCamera.h"
+#include "../Enemy/Enemy.h"
+#include "../../../Scene/SceneManager.h"
 
 void Player::Init()
 {
@@ -18,13 +21,9 @@ void Player::Update()
 {
 	Math::Vector3 pos = GetPos();
 
-	Math::Vector3 move = Math::Vector3::Zero;
-
 	// ※ Forward/Backwardの定義上、見た目と前後が逆に感じたため入れ替え済み
-	if (GetAsyncKeyState('W') & 0x8000) { move += Math::Vector3::Backward; }
-	if (GetAsyncKeyState('S') & 0x8000) { move += Math::Vector3::Forward; }
-	if (GetAsyncKeyState('D') & 0x8000) { move += Math::Vector3::Right; }
-	if (GetAsyncKeyState('A') & 0x8000) { move += Math::Vector3::Left; }
+	Math::Vector2 moveAxis = KdInputManager::Instance().GetAxisState("Move");
+	Math::Vector3 move = Math::Vector3::Backward * moveAxis.y + Math::Vector3::Right * moveAxis.x;
 
 	if (move.LengthSquared() > 0.0f)
 	{
@@ -46,4 +45,41 @@ void Player::PostUpdate()
 {
 	// 地面(KdCollider::TypeGround)に立つ
 	GroundCheck();
+
+	// 右クリックの押した瞬間/離した瞬間でロックオンを切り替える
+	std::shared_ptr<TPSCamera> spTpsCamera = std::dynamic_pointer_cast<TPSCamera>(m_wpCamera.lock());
+
+	if (spTpsCamera)
+	{
+		if (KdInputManager::Instance().IsPress("RightClick"))
+		{
+			// 押した瞬間：一番近い敵を探してロックオンする
+			std::shared_ptr<Enemy> nearestEnemy;
+			float nearestDist = FLT_MAX;
+
+			for (auto& obj : SceneManager::Instance().GetObjList())
+			{
+				std::shared_ptr<Enemy> spEnemy = std::dynamic_pointer_cast<Enemy>(obj);
+				if (!spEnemy) { continue; }
+
+				float dist = Math::Vector3::Distance(GetPos(), spEnemy->GetPos());
+				if (dist < nearestDist)
+				{
+					nearestDist = dist;
+					nearestEnemy = spEnemy;
+				}
+			}
+
+			if (nearestEnemy)
+			{
+				spTpsCamera->SetLockOnTarget(nearestEnemy);
+				spTpsCamera->SetLockOn(true);
+			}
+		}
+		else if (KdInputManager::Instance().IsRelease("RightClick"))
+		{
+			// 離した瞬間：ロックオン解除
+			spTpsCamera->SetLockOn(false);
+		}
+	}
 }

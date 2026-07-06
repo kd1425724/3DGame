@@ -48,9 +48,6 @@ private:
 		FreePlane,	// カメラに正対する平面上で自由に移動
 	};
 
-	// 左クリックが押された瞬間を検知するための直前の状態
-	bool m_prevMouseDown = false;
-
 	// 現在のドラッグ状態
 	DragMode m_dragMode = DragMode::None;
 

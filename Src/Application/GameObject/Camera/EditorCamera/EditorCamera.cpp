@@ -13,23 +13,21 @@ void EditorCamera::Init()
 
 void EditorCamera::PostUpdate()
 {
-	bool rightMouseDown = (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
+	bool rightMouseDown = KdInputManager::Instance().IsHold("RightClick");
 
-	if (rightMouseDown && !m_prevRightMouseDown)
+	if (KdInputManager::Instance().IsPress("RightClick"))
 	{
 		// 右ボタンを押した瞬間：現在のカーソル位置を基準にして、カーソルを隠す
 		// (押す前の位置を基準にすることで、離した時に元の位置へ違和感なく戻せる)
 		GetCursorPos(&m_FixMousePos);
 		ShowCursor(FALSE);
 	}
-	else if (!rightMouseDown && m_prevRightMouseDown)
+	else if (KdInputManager::Instance().IsRelease("RightClick"))
 	{
 		// 右ボタンを離した瞬間：カーソルを押す前の位置へ戻して、ImGui操作を復帰させる
 		SetCursorPos(m_FixMousePos.x, m_FixMousePos.y);
 		ShowCursor(TRUE);
 	}
-
-	m_prevRightMouseDown = rightMouseDown;
 
 	// 右ボタンを押している間だけ視点回転(CameraBaseの機能をそのまま使用)
 	if (rightMouseDown)
@@ -47,7 +45,7 @@ void EditorCamera::PostUpdate()
 	{
 		// 移動速度(Shift押しっぱなしで加速)
 		float speed = m_moveSpeed;
-		if (GetAsyncKeyState(VK_SHIFT) & 0x8000)
+		if (KdInputManager::Instance().IsHold("Boost"))
 		{
 			speed *= m_boostRate;
 		}
@@ -57,14 +55,14 @@ void EditorCamera::PostUpdate()
 		Math::Vector3 forward = m_mRotation.Backward();
 		Math::Vector3 right = m_mRotation.Right();
 
+		Math::Vector2 moveAxis = KdInputManager::Instance().GetAxisState("Move");
+
 		Math::Vector3 move = Math::Vector3::Zero;
 
-		if (GetAsyncKeyState('W') & 0x8000) { move += forward; }
-		if (GetAsyncKeyState('S') & 0x8000) { move -= forward; }
-		if (GetAsyncKeyState('D') & 0x8000) { move += right; }
-		if (GetAsyncKeyState('A') & 0x8000) { move -= right; }
-		if (GetAsyncKeyState('E') & 0x8000) { move += Math::Vector3::Up; }
-		if (GetAsyncKeyState('Q') & 0x8000) { move -= Math::Vector3::Up; }
+		move += forward * moveAxis.y;
+		move += right * moveAxis.x;
+		if (KdInputManager::Instance().IsHold("MoveUp"))	{ move += Math::Vector3::Up; }
+		if (KdInputManager::Instance().IsHold("MoveDown"))	{ move -= Math::Vector3::Up; }
 
 		if (move.LengthSquared() > 0.0f)
 		{

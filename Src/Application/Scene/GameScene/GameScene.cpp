@@ -8,7 +8,7 @@
 
 void GameScene::Event()
 {
-	if (GetAsyncKeyState('T') & 0x8000)
+	if (KdInputManager::Instance().IsHold("SwitchScene"))
 	{
 		SceneManager::Instance().SetNextScene
 		(

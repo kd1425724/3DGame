@@ -42,40 +42,21 @@ void LevelEditorManager::RemoveObject(const std::shared_ptr<KdGameObject>& obj)
 	}
 }
 
-namespace
-{
-	// キーが「今フレームで押された瞬間」かどうかを判定する(押しっぱなしで連続発火しないように)
-	bool IsKeyTriggered(int vk, bool& prevState)
-	{
-		bool down = (GetAsyncKeyState(vk) & 0x8000) != 0;
-		bool triggered = (down && !prevState);
-		prevState = down;
-		return triggered;
-	}
-}
-
 void LevelEditorManager::Update()
 {
 	LevelPicker::Instance().Update();
 
-	// キー入力の判定(ImGuiのテキスト入力中などはショートカットを無効化する)
-	bool cTriggered = IsKeyTriggered('C', m_prevKeyC);
-	bool vTriggered = IsKeyTriggered('V', m_prevKeyV);
-	bool dTriggered = IsKeyTriggered('D', m_prevKeyD);
-	bool zTriggered = IsKeyTriggered('Z', m_prevKeyZ);
-	bool yTriggered = IsKeyTriggered('Y', m_prevKeyY);
-
 	if (m_enabled && !ImGui::GetIO().WantCaptureKeyboard)
 	{
-		bool ctrl = (GetAsyncKeyState(VK_CONTROL) & 0x8000) != 0;
+		bool ctrl = KdInputManager::Instance().IsHold("Ctrl");
 
 		if (ctrl)
 		{
-			if (cTriggered) { CopySelected(); }
-			if (vTriggered) { Paste(); }
-			if (dTriggered) { DuplicateSelected(); }
-			if (zTriggered) { LevelEditorHistory::Instance().Undo(); }
-			if (yTriggered) { LevelEditorHistory::Instance().Redo(); }
+			if (KdInputManager::Instance().IsPress("Copy"))		{ CopySelected(); }
+			if (KdInputManager::Instance().IsPress("Paste"))		{ Paste(); }
+			if (KdInputManager::Instance().IsPress("Duplicate"))	{ DuplicateSelected(); }
+			if (KdInputManager::Instance().IsPress("Undo"))		{ LevelEditorHistory::Instance().Undo(); }
+			if (KdInputManager::Instance().IsPress("Redo"))		{ LevelEditorHistory::Instance().Redo(); }
 		}
 	}
 }

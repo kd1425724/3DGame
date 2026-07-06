@@ -250,6 +250,47 @@ bool Application::Init(int w, int h)
 	});
 
 	//===================================================================
+	// 入力(キーボード・マウス)の登録
+	// ※ ここで名前を付けて登録しておくことで、各クラスはGetAsyncKeyStateを
+	//    直接呼ばずKdInputManager::Instance().IsPress/IsHold/IsRelease(名前)
+	//    で判定できるようになる(キー配置の変更もここ1箇所で済む)
+	//===================================================================
+	{
+		auto pKeyboardMouse = std::make_unique<KdInputCollector>();
+
+		// 移動軸(WASD：上=W、右=D、下=S、左=A)
+		pKeyboardMouse->AddAxis("Move", new KdInputAxisForWindows('W', 'D', 'S', 'A'));
+
+		// EditorCameraの上下移動
+		pKeyboardMouse->AddButton("MoveUp", new KdInputButtonForWindows('E'));
+		pKeyboardMouse->AddButton("MoveDown", new KdInputButtonForWindows('Q'));
+
+		// 加速(EditorCamera)
+		pKeyboardMouse->AddButton("Boost", new KdInputButtonForWindows(VK_SHIFT));
+
+		// 修飾キー
+		pKeyboardMouse->AddButton("Ctrl", new KdInputButtonForWindows(VK_CONTROL));
+
+		// マウスボタン
+		pKeyboardMouse->AddButton("RightClick", new KdInputButtonForWindows(VK_RBUTTON));
+		pKeyboardMouse->AddButton("LeftClick", new KdInputButtonForWindows(VK_LBUTTON));
+
+		// レベルエディタのショートカット(Ctrlとの組み合わせは呼び出し側で判定)
+		pKeyboardMouse->AddButton("Copy", new KdInputButtonForWindows('C'));
+		pKeyboardMouse->AddButton("Paste", new KdInputButtonForWindows('V'));
+		pKeyboardMouse->AddButton("Duplicate", new KdInputButtonForWindows('D'));
+		pKeyboardMouse->AddButton("Undo", new KdInputButtonForWindows('Z'));
+		pKeyboardMouse->AddButton("Redo", new KdInputButtonForWindows('Y'));
+
+		// その他
+		pKeyboardMouse->AddButton("Escape", new KdInputButtonForWindows(VK_ESCAPE));
+		pKeyboardMouse->AddButton("SwitchScene", new KdInputButtonForWindows('T'));
+		pKeyboardMouse->AddButton("Confirm", new KdInputButtonForWindows(VK_RETURN));
+
+		KdInputManager::Instance().AddDevice("KeyboardMouse", pKeyboardMouse);
+	}
+
+	//===================================================================
 	// シーンの初期化(開始シーンの生成。SceneManagerのコンストラクタでは行わない)
 	//===================================================================
 	SceneManager::Instance().Init();
@@ -306,15 +347,6 @@ void Application::Execute()
 			break;
 		}
 
-		if (GetAsyncKeyState(VK_ESCAPE))
-		{
-//			if (MessageBoxA(m_window.GetWndHandle(), "本当にゲームを終了しますか？",
-//				"終了確認", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES)
-			{
-				End();
-			}
-		}
-
 		//=========================================
 		//
 		// アプリケーション更新処理
@@ -323,6 +355,16 @@ void Application::Execute()
 
 		KdBeginUpdate();
 		{
+			// ※ KdInputManagerの更新(KdBeginUpdate内)より後で判定する必要がある
+			if (KdInputManager::Instance().IsHold("Escape"))
+			{
+//				if (MessageBoxA(m_window.GetWndHandle(), "本当にゲームを終了しますか？",
+//					"終了確認", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) == IDYES)
+				{
+					End();
+				}
+			}
+
 			PreUpdate();
 
 			Update();

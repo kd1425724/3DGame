@@ -22,10 +22,29 @@ void TPSCamera::PostUpdate()
 	}
 
 	// カメラの回転(Ctrlを押している間はマウスを中央に固定しない。ImGui操作等のため)
-	if (!(GetAsyncKeyState(VK_CONTROL) & 0x8000))
+	if (!KdInputManager::Instance().IsHold("Ctrl"))
 	{
 		UpdateRotateByMouse();
 	}
+
+	// ロックオン中はマウス操作より優先して、ロックオン対象の方向を向く
+	if (m_isLockOn)
+	{
+		const std::shared_ptr<const KdGameObject> spLockOnTarget = m_wpLockOnTarget.lock();
+		if (spLockOnTarget)
+		{
+			Math::Vector3 targetPos = spLockOnTarget->GetPos();
+			targetPos.y += 0.75f;
+
+			Math::Vector3 dir = targetPos - GetPos();
+			dir.Normalize();
+
+			// カメラの回転は m_rot ではなく m_DegAng で管理されている(GetRotationMatrix参照)
+			m_DegAng.y = DirectX::XMConvertToDegrees(atan2f(dir.x, dir.z));
+			m_DegAng.x = DirectX::XMConvertToDegrees(asinf(dir.y));
+		}
+	}
+
 	m_mRotation = GetRotationMatrix();
 	m_mWorld = m_mLocalPos * m_mRotation * _targetMat;
 

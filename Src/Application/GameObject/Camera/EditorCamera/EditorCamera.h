@@ -29,7 +29,4 @@ private:
 
 	// Shiftを押している間の速度倍率
 	float m_boostRate = 3.0f;
-
-	// 直前フレームでマウス右ボタンを押していたか(押した/離した瞬間の検知用)
-	bool m_prevRightMouseDown = false;
 };
