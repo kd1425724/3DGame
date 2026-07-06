@@ -40,8 +40,8 @@ void TPSCamera::PostUpdate()
 			dir.Normalize();
 
 			// カメラの回転は m_rot ではなく m_DegAng で管理されている(GetRotationMatrix参照)
+			// ※ ヨー(左右)のみロックオン対象方向に固定し、ピッチ(上下)はマウス操作のまま残す
 			m_DegAng.y = DirectX::XMConvertToDegrees(atan2f(dir.x, dir.z));
-			m_DegAng.x = DirectX::XMConvertToDegrees(asinf(dir.y));
 		}
 	}
 
