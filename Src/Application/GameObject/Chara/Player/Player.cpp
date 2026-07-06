@@ -54,7 +54,7 @@ void Player::Update()
 
 		Math::Vector3 firePos = GetPos() + Math::Vector3(0, 1.0f, 0) + front * 1.0f;
 
-		std::weak_ptr<KdEffekseerObject> wpEfk = KdEffekseerManager::GetInstance().Play("Magic/BlueLaser/BlueLaser/BluLaser.efk", firePos);
+		std::weak_ptr<KdEffekseerObject> wpEfk = KdEffekseerManager::GetInstance().Play("Magic/BlueLaser/BlueLaser/BlueLaser.efk", firePos);
 
 		// 発射位置だけでなく向きも正面に合わせる
 		std::shared_ptr<KdEffekseerObject> spEfk = wpEfk.lock();
