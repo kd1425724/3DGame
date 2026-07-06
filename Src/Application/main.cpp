@@ -67,6 +67,9 @@ void Application::KdPostUpdate()
 {
 	// 3DSoundListnerの行列を更新
 	KdAudioManager::Instance().SetListnerMatrix(KdShaderManager::Instance().GetCameraCB().mView.Invert());
+
+	// Effekseerエフェクトの更新
+	KdEffekseerManager::GetInstance().Update();
 }
 
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
@@ -132,6 +135,9 @@ void Application::PreDraw()
 void Application::Draw()
 {
 	SceneManager::Instance().Draw();
+
+	// Effekseerエフェクトの描画
+	KdEffekseerManager::GetInstance().Draw();
 }
 
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
@@ -223,7 +229,12 @@ bool Application::Init(int w, int h)
 	// フォント初期化
 	//===================================================================
 	KdFontManager::Instance().Init(GetWindowHandle());
-	
+
+	//===================================================================
+	// Effekseer初期化
+	//===================================================================
+	KdEffekseerManager::GetInstance().Create(w, h);
+
 	//===================================================================
 	// ゲーム固有の初期化
 	//===================================================================
