@@ -55,7 +55,7 @@ void LevelObjectPanel::Draw()
 	//----------------------------------------
 	ImGui::Text(U8("配置済みオブジェクト一覧"));
 
-	ImGui::TextDisabled(U8("Shift+クリックで複数選択"));
+	ImGui::TextDisabled(U8("Ctrl+クリックで複数選択"));
 
 	ImGui::BeginChild("LevelObjectList", ImVec2(0, 200), true);
 
@@ -73,8 +73,8 @@ void LevelObjectPanel::Draw()
 
 		if (ImGui::Selectable(label.c_str(), isSelected))
 		{
-			// Shift+クリックは複数選択(選択済みなら外す/未選択なら追加する)
-			if (KdInputManager::Instance().IsHold("Shift"))
+			// Ctrl+クリックは複数選択(選択済みなら外す/未選択なら追加する)
+			if (KdInputManager::Instance().IsHold("Ctrl"))
 			{
 				mgr.ToggleSelected(obj);
 			}

@@ -197,8 +197,8 @@ void LevelPicker::Update()
 
 		if (nearestObj)
 		{
-			// Shiftを押しながらのクリックは複数選択(選択済みなら外す/未選択なら追加する)
-			if (KdInputManager::Instance().IsHold("Shift"))
+			// Ctrlを押しながらのクリックは複数選択(選択済みなら外す/未選択なら追加する)
+			if (KdInputManager::Instance().IsHold("Ctrl"))
 			{
 				mgr.ToggleSelected(nearestObj);
 			}

@@ -60,7 +60,7 @@ public:
 	// 主選択(選択中の先頭)を取得する。何も選択されていなければnullptr
 	std::shared_ptr<KdGameObject> GetSelected() const;
 
-	// 選択の追加/解除を切り替える(Shift+クリック用：選択済みなら外し、未選択なら追加する)
+	// 選択の追加/解除を切り替える(Ctrl+クリック用：選択済みなら外し、未選択なら追加する)
 	void ToggleSelected(const std::shared_ptr<KdGameObject>& obj);
 
 	// 現在選択中の全オブジェクトを取得する(既に破棄されたものは除く)
@@ -154,7 +154,7 @@ private:
 	// 生成したオブジェクトがどの種類名で作られたか(保存時に使用)
 	std::unordered_map<const KdGameObject*, std::string> m_objectTypeNames;
 
-	// 現在選択中のオブジェクト一覧(先頭が主選択。Shift+クリックで追加/解除される)
+	// 現在選択中のオブジェクト一覧(先頭が主選択。Ctrl+クリックで追加/解除される)
 	std::vector<std::weak_ptr<KdGameObject>> m_wpSelectedList;
 
 	// ハイライト表示用のワイヤーフレーム(毎フレームAdd→Drawするだけの使い捨て)
