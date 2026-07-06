@@ -17,6 +17,10 @@ void CameraBase::PreDraw()
 
 	m_spCamera->SetCameraMatrix(m_mWorld);
 	m_spCamera->SetToShader();
+
+	// このフレームの描画に実際使われるカメラをEffekseerにも反映する
+	// (TPSCamera/EditorCameraはシーンのオブジェクト列に排他で1つだけ存在するため、これで常に現在の描画カメラと一致する)
+	KdEffekseerManager::GetInstance().SetCamera(m_spCamera);
 }
 
 void CameraBase::SetTarget(const std::shared_ptr<KdGameObject>& target)
