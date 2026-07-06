@@ -1,5 +1,7 @@
 ﻿#include "LevelEditorManager.h"
 
+#include <cmath>
+
 #include "../Scene/SceneManager.h"
 #include "../GameObject/Camera/EditorCamera/EditorCamera.h"
 #include "LevelObjectPanel/LevelObjectPanel.h"
@@ -106,6 +108,30 @@ std::shared_ptr<KdGameObject> LevelEditorManager::DuplicateSelected()
 	return Paste();
 }
 
+Math::Vector3 LevelEditorManager::SnapPos(const Math::Vector3& pos) const
+{
+	if (!m_useGridSnap || m_gridSnapSize <= 0.0f) { return pos; }
+
+	auto snapAxis = [this](float value)
+	{
+		return std::round(value / m_gridSnapSize) * m_gridSnapSize;
+	};
+
+	return Math::Vector3(snapAxis(pos.x), snapAxis(pos.y), snapAxis(pos.z));
+}
+
+Math::Vector3 LevelEditorManager::SnapRot(const Math::Vector3& rot) const
+{
+	if (!m_useRotationSnap || m_rotationSnapDeg <= 0.0f) { return rot; }
+
+	auto snapAxis = [this](float value)
+	{
+		return std::round(value / m_rotationSnapDeg) * m_rotationSnapDeg;
+	};
+
+	return Math::Vector3(snapAxis(rot.x), snapAxis(rot.y), snapAxis(rot.z));
+}
+
 void LevelEditorManager::ApplyEditorCameraState(bool wantsEnabled)
 {
 	if (wantsEnabled)
@@ -142,6 +168,18 @@ void LevelEditorManager::Draw()
 	{
 		ApplyEditorCameraState(m_useEditorCamera);
 	}
+
+	// グリッドスナップ(座標)
+	ImGui::Checkbox(U8("グリッドスナップ"), &m_useGridSnap);
+	ImGui::SameLine();
+	ImGui::SetNextItemWidth(100.0f);
+	ImGui::DragFloat(U8("マス目サイズ"), &m_gridSnapSize, 0.1f, 0.1f, 100.0f);
+
+	// 回転スナップ
+	ImGui::Checkbox(U8("回転スナップ"), &m_useRotationSnap);
+	ImGui::SameLine();
+	ImGui::SetNextItemWidth(100.0f);
+	ImGui::DragFloat(U8("刻み角度"), &m_rotationSnapDeg, 1.0f, 1.0f, 180.0f);
 
 	ImGui::TextDisabled(U8("Ctrl+C: コピー / Ctrl+V: 貼り付け / Ctrl+D: その場で複製 / Ctrl+Z: 元に戻す / Ctrl+Y: やり直す"));
 

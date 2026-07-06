@@ -206,7 +206,7 @@ void LevelPicker::Update()
 		if (ClosestParamsBetweenLines(m_dragAxisStartObjPos, m_dragAxisDir, rayPos, rayDir, s, t))
 		{
 			float delta = s - m_dragAxisStartS;
-			selected->SetPos(m_dragAxisStartObjPos + m_dragAxisDir * delta);
+			selected->SetPos(mgr.SnapPos(m_dragAxisStartObjPos + m_dragAxisDir * delta));
 		}
 	}
 	else if (m_dragMode == DragMode::FreePlane)
@@ -220,7 +220,7 @@ void LevelPicker::Update()
 
 			if (t > 0.0f)
 			{
-				selected->SetPos(rayPos + rayDir * t);
+				selected->SetPos(mgr.SnapPos(rayPos + rayDir * t));
 			}
 		}
 	}

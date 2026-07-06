@@ -82,6 +82,20 @@ public:
 	//    その場合は一度OFF→ONにし直してください
 	bool m_useEditorCamera = false;
 
+	// グリッドスナップ(座標)のON/OFFとマス目のサイズ(ワールド単位)
+	bool  m_useGridSnap = false;
+	float m_gridSnapSize = 1.0f;
+
+	// 回転スナップのON/OFFと刻み角度(度数)
+	bool  m_useRotationSnap = false;
+	float m_rotationSnapDeg = 15.0f;
+
+	// グリッドスナップが有効な場合、座標を最寄りのマス目に丸めて返す(無効ならそのまま返す)
+	Math::Vector3 SnapPos(const Math::Vector3& pos) const;
+
+	// 回転スナップが有効な場合、各軸の角度を最寄りの刻み角度に丸めて返す(無効ならそのまま返す)
+	Math::Vector3 SnapRot(const Math::Vector3& rot) const;
+
 	// 現在有効な編集用フリーカメラを取得する(無効なら nullptr。LevelPickerのレイキャストに使用)
 	std::shared_ptr<EditorCamera> GetEditorCamera() const
 	{

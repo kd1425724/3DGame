@@ -25,13 +25,13 @@ void LevelInspector::Draw()
 	Math::Vector3 pos = obj->GetPos();
 	bool posChanged = ImGui::DragFloat3(U8("座標"), &pos.x, 0.1f);
 	if (ImGui::IsItemActivated()) { LevelEditorHistory::Instance().PushUndo(); }
-	if (posChanged) { obj->SetPos(pos); }
+	if (posChanged) { obj->SetPos(LevelEditorManager::Instance().SnapPos(pos)); }
 
 	// 回転(度数)
 	Math::Vector3 rot = obj->GetRot();
 	bool rotChanged = ImGui::DragFloat3(U8("回転"), &rot.x, 1.0f);
 	if (ImGui::IsItemActivated()) { LevelEditorHistory::Instance().PushUndo(); }
-	if (rotChanged) { obj->SetRot(rot); }
+	if (rotChanged) { obj->SetRot(LevelEditorManager::Instance().SnapRot(rot)); }
 
 	// スケール
 	Math::Vector3 scale = obj->GetScale();
