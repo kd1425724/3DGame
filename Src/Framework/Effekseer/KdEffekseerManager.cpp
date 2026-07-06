@@ -1,24 +1,11 @@
 ﻿
 void KdEffekseerManager::Create(int w, int h)
 {
-	// [調査用ログ] 呼び出し時のウィンドウサイズを確認
-	{
-		char buf[128];
-		sprintf_s(buf, "[KdEffekseerManager] Create() called: w=%d h=%d\n", w, h);
-		OutputDebugStringA(buf);
-	}
-
 	// エフェクトのレンダラーの作成
 	m_efkRenderer = ::EffekseerRendererDX11::Renderer::Create(KdDirect3D::Instance().WorkDev(), KdDirect3D::Instance().WorkDevContext(), 8000);
 
-	// [調査用ログ] レンダラー作成結果を確認
-	OutputDebugStringA(m_efkRenderer != nullptr ? "[KdEffekseerManager] Create(): m_efkRenderer OK\n" : "[KdEffekseerManager] Create(): m_efkRenderer is NULL\n");
-
 	// エフェクトのマネージャーの作成
 	m_efkManager = ::Effekseer::Manager::Create(8000);
-
-	// [調査用ログ] マネージャー作成結果を確認
-	OutputDebugStringA(m_efkManager != nullptr ? "[KdEffekseerManager] Create(): m_efkManager OK\n" : "[KdEffekseerManager] Create(): m_efkManager is NULL\n");
 
 	// 左手座標系に変換
 	m_efkManager->SetCoordinateSystem(Effekseer::CoordinateSystem::LH);
@@ -212,20 +199,9 @@ std::weak_ptr<KdEffekseerObject> KdEffekseerManager::Play(const PlayEfkInfo& inf
 	{
 		std::string loadFileName = EffekseerPath + info.FileName;
 
-		// [調査用ログ] 実際に読み込みを試みるパスと、その時点でのマネージャーの状態を確認
-		{
-			char buf[512];
-			sprintf_s(buf, "[KdEffekseerManager] Play(): loading \"%s\" (m_efkManager=%s)\n",
-				loadFileName.c_str(), m_efkManager != nullptr ? "valid" : "NULL");
-			OutputDebugStringA(buf);
-		}
-
 		// エフェクト新規生成
 		auto effect = Effekseer::Effect::Create(m_efkManager,
 			(const EFK_CHAR*)sjis_to_wide(loadFileName).c_str());
-
-		// [調査用ログ] 読み込み結果を確認
-		OutputDebugStringA(effect != nullptr ? "[KdEffekseerManager] Play(): Effect::Create OK\n" : "[KdEffekseerManager] Play(): Effect::Create FAILED\n");
 
 		if (effect == nullptr)
 		{
