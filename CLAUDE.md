@@ -2,6 +2,8 @@
 
 C++/DirectX11製の3Dゲームフレームワーク。TPS視点のアクションゲームを制作中。
 
+**このファイルの運用**：コーディング規約・設計判断・ワークフローなど、今後のセッションにも影響する重要なルールが会話中に決まった場合は、その場でこのファイルに追加してよいか確認すること。
+
 ## アーキテクチャ
 
 - `Src/Framework/` — エンジン非依存の汎用機能（Direct3D, Shader, Math, Audio, Input, Font, Effekseer, Window, Utility, `KdGameObject`基底クラスなど）
