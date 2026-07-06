@@ -19,6 +19,13 @@ void CharaBase::GroundCheck()
 	//あたる側の設定＝＝＝＝＝＝＝＝＝＝
 	KdCollider::RayInfo ray(KdCollider::TypeGround, GetPos() + Math::Vector3(0, 1.0f, 0), Math::Vector3::Down, 2.0f);
 
+	// デバッグ表示：地面判定に使用したレイを可視化
+	if (KdGameObject::s_showColliderDebug)
+	{
+		if (!m_pDebugWire) { m_pDebugWire = std::make_unique<KdDebugWireFrame>(); }
+		m_pDebugWire->AddDebugLine(ray.m_pos, ray.m_dir, ray.m_range, Math::Color(1.0f, 1.0f, 0.0f, 1.0f));
+	}
+
 	// レイに当たったオブジェクトを格納するリストを作成
 	std::list<KdCollider::CollisionResult> retRayList;
 

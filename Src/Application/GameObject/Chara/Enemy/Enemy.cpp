@@ -62,6 +62,13 @@ void Enemy::Update()
 
 void Enemy::PostUpdate()
 {
+	// デバッグ表示：接触判定(m_hitRadius)を可視化
+	if (KdGameObject::s_showColliderDebug)
+	{
+		if (!m_pDebugWire) { m_pDebugWire = std::make_unique<KdDebugWireFrame>(); }
+		m_pDebugWire->AddDebugSphere(GetPos(), m_hitRadius, kRedColor);
+	}
+
 	std::shared_ptr<KdGameObject> spTarget = m_wpTarget.lock();
 
 	// 対象に接触したら消滅する
