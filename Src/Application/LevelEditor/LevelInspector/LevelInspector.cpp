@@ -7,13 +7,22 @@ void LevelInspector::Draw()
 {
 	ImGui::Text(U8("インスペクター"));
 
-	std::shared_ptr<KdGameObject> obj = LevelEditorManager::Instance().GetSelected();
+	std::vector<std::shared_ptr<KdGameObject>> selectedList = LevelEditorManager::Instance().GetSelectedList();
 
-	if (!obj)
+	if (selectedList.empty())
 	{
 		ImGui::TextDisabled(U8("( オブジェクトが選択されていません )"));
 		return;
 	}
+
+	// 複数選択中は専用パネルへ切り替える
+	if (selectedList.size() > 1)
+	{
+		DrawMultiSelect(selectedList);
+		return;
+	}
+
+	std::shared_ptr<KdGameObject> obj = selectedList.front();
 
 	// 名前(imgui_stdlibのstd::string対応InputTextを使用)
 	std::string name = obj->GetName();
@@ -68,5 +77,55 @@ void LevelInspector::Draw()
 	{
 		LevelEditorHistory::Instance().PushUndo();
 		LevelEditorManager::Instance().RemoveObject(obj);
+	}
+}
+
+void LevelInspector::DrawMultiSelect(const std::vector<std::shared_ptr<KdGameObject>>& selectedList)
+{
+	LevelEditorManager& mgr = LevelEditorManager::Instance();
+
+	ImGui::Text(U8("選択中：%d個"), static_cast<int>(selectedList.size()));
+	ImGui::TextDisabled(U8("ドラッグした分だけ選択中の全オブジェクトに反映されます"));
+
+	// 移動(相対)：ドラッグした量をそのまま選択中の全オブジェクトに加算する
+	Math::Vector3 moveDelta = Math::Vector3::Zero;
+	bool moveChanged = ImGui::DragFloat3(U8("移動(相対)"), &moveDelta.x, 0.05f);
+	if (ImGui::IsItemActivated()) { LevelEditorHistory::Instance().PushUndo(); }
+	if (moveChanged)
+	{
+		for (auto& obj : selectedList) { obj->SetPos(obj->GetPos() + moveDelta); }
+	}
+
+	// 回転(相対・度数)
+	Math::Vector3 rotDelta = Math::Vector3::Zero;
+	bool rotChanged = ImGui::DragFloat3(U8("回転(相対)"), &rotDelta.x, 0.5f);
+	if (ImGui::IsItemActivated()) { LevelEditorHistory::Instance().PushUndo(); }
+	if (rotChanged)
+	{
+		for (auto& obj : selectedList) { obj->SetRot(obj->GetRot() + rotDelta); }
+	}
+
+	// スケール(相対倍率)：1.0を基準にドラッグした比率を選択中の全オブジェクトの現在のスケールに掛ける
+	float scaleFactor = 1.0f;
+	bool scaleChanged = ImGui::DragFloat(U8("スケール(相対倍率)"), &scaleFactor, 0.01f, 0.01f, 10.0f);
+	if (ImGui::IsItemActivated()) { LevelEditorHistory::Instance().PushUndo(); }
+	if (scaleChanged)
+	{
+		for (auto& obj : selectedList) { obj->SetScale(obj->GetScale() * scaleFactor); }
+	}
+
+	ImGui::Spacing();
+
+	if (ImGui::Button(U8("選択中を全て削除")))
+	{
+		LevelEditorHistory::Instance().PushUndo();
+		mgr.RemoveSelectedObjects();
+	}
+
+	ImGui::SameLine();
+
+	if (ImGui::Button(U8("選択解除")))
+	{
+		mgr.ClearSelection();
 	}
 }

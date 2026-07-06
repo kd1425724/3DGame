@@ -59,4 +59,9 @@ private:
 	// ---- FreePlaneドラッグ用 ----
 	Math::Vector3 m_dragPlaneNormal;
 	Math::Vector3 m_dragPlanePoint;
+
+	// ---- グループ移動用(Axis/FreePlane共通) ----
+	// ドラッグ開始時点での、選択中全オブジェクトの座標
+	// (先頭が主選択。主選択の移動量をそのまま他の選択オブジェクトにも適用して追従させる)
+	std::vector<std::pair<std::weak_ptr<KdGameObject>, Math::Vector3>> m_dragGroupStartPos;
 };

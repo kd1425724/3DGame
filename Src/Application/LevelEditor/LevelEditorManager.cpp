@@ -1,6 +1,7 @@
 ﻿#include "LevelEditorManager.h"
 
 #include <cmath>
+#include <algorithm>
 
 #include "../Scene/SceneManager.h"
 #include "../GameObject/Camera/EditorCamera/EditorCamera.h"
@@ -24,7 +25,7 @@ std::shared_ptr<KdGameObject> LevelEditorManager::CreateObject(const std::string
 
 		m_objectTypeNames[spObj.get()] = std::string(objTypeName);
 
-		m_wpSelected = spObj;
+		SetSelected(spObj);
 	}
 
 	return spObj;
@@ -38,9 +39,88 @@ void LevelEditorManager::RemoveObject(const std::shared_ptr<KdGameObject>& obj)
 
 	m_objectTypeNames.erase(obj.get());
 
-	if (GetSelected() == obj)
+	// 選択中リストからも取り除く(破棄済みのものも一緒に掃除しておく)
+	m_wpSelectedList.erase(
+		std::remove_if(m_wpSelectedList.begin(), m_wpSelectedList.end(),
+			[&](const std::weak_ptr<KdGameObject>& wp) { return wp.expired() || wp.lock() == obj; }),
+		m_wpSelectedList.end());
+}
+
+void LevelEditorManager::SetSelected(const std::shared_ptr<KdGameObject>& obj)
+{
+	m_wpSelectedList.clear();
+
+	if (obj) { m_wpSelectedList.push_back(obj); }
+}
+
+std::shared_ptr<KdGameObject> LevelEditorManager::GetSelected() const
+{
+	for (auto& wp : m_wpSelectedList)
 	{
-		m_wpSelected.reset();
+		std::shared_ptr<KdGameObject> sp = wp.lock();
+		if (sp) { return sp; }
+	}
+
+	return nullptr;
+}
+
+void LevelEditorManager::ToggleSelected(const std::shared_ptr<KdGameObject>& obj)
+{
+	if (!obj) { return; }
+
+	auto itr = std::find_if(m_wpSelectedList.begin(), m_wpSelectedList.end(),
+		[&](const std::weak_ptr<KdGameObject>& wp) { return wp.lock() == obj; });
+
+	if (itr != m_wpSelectedList.end())
+	{
+		// 既に選択中なら外す
+		m_wpSelectedList.erase(itr);
+	}
+	else
+	{
+		// 未選択なら追加する
+		m_wpSelectedList.push_back(obj);
+	}
+}
+
+std::vector<std::shared_ptr<KdGameObject>> LevelEditorManager::GetSelectedList() const
+{
+	std::vector<std::shared_ptr<KdGameObject>> result;
+
+	for (auto& wp : m_wpSelectedList)
+	{
+		std::shared_ptr<KdGameObject> sp = wp.lock();
+		if (sp) { result.push_back(sp); }
+	}
+
+	return result;
+}
+
+bool LevelEditorManager::IsSelected(const std::shared_ptr<KdGameObject>& obj) const
+{
+	if (!obj) { return false; }
+
+	for (auto& wp : m_wpSelectedList)
+	{
+		if (wp.lock() == obj) { return true; }
+	}
+
+	return false;
+}
+
+void LevelEditorManager::ClearSelection()
+{
+	m_wpSelectedList.clear();
+}
+
+void LevelEditorManager::RemoveSelectedObjects()
+{
+	// RemoveObject()内で選択リストからも取り除かれるため、先にコピーを取ってから回す
+	std::vector<std::shared_ptr<KdGameObject>> targets = GetSelectedList();
+
+	for (auto& obj : targets)
+	{
+		RemoveObject(obj);
 	}
 }
 
@@ -59,6 +139,13 @@ void LevelEditorManager::Update()
 			if (KdInputManager::Instance().IsPress("Duplicate"))	{ DuplicateSelected(); }
 			if (KdInputManager::Instance().IsPress("Undo"))		{ LevelEditorHistory::Instance().Undo(); }
 			if (KdInputManager::Instance().IsPress("Redo"))		{ LevelEditorHistory::Instance().Redo(); }
+		}
+
+		// Deleteキーで選択中のオブジェクトを一括削除
+		if (KdInputManager::Instance().IsPress("Delete") && !GetSelectedList().empty())
+		{
+			LevelEditorHistory::Instance().PushUndo();
+			RemoveSelectedObjects();
 		}
 	}
 }
@@ -97,7 +184,7 @@ std::shared_ptr<KdGameObject> LevelEditorManager::Paste()
 	spObj->SetRot(m_clipboard.rot);
 	spObj->SetScale(m_clipboard.scale);
 
-	m_wpSelected = spObj;
+	SetSelected(spObj);
 
 	return spObj;
 }
@@ -204,15 +291,19 @@ void LevelEditorManager::DrawHighlight()
 {
 	if (!m_enabled) { return; }
 
-	std::shared_ptr<KdGameObject> obj = GetSelected();
-	if (!obj) { return; }
+	std::vector<std::shared_ptr<KdGameObject>> selectedList = GetSelectedList();
+	if (selectedList.empty()) { return; }
 
-	// 選択中オブジェクトを囲むボックス(黄色)
+	// 選択中の全オブジェクトを囲むボックス(黄色)
 	static const Math::Color highlightColor = Math::Color(1.0f, 1.0f, 0.0f, 1.0f);
-	m_highlightWire.AddDebugBox(obj->GetMatrix(), m_highlightBoxExtents, { 0, 0, 0 }, true, highlightColor);
+	for (auto& obj : selectedList)
+	{
+		m_highlightWire.AddDebugBox(obj->GetMatrix(), m_highlightBoxExtents, { 0, 0, 0 }, true, highlightColor);
+	}
 
-	// 移動ギズモ(ワールド軸に沿った赤:X 緑:Y 青:Z のハンドル)
-	Math::Vector3 pos = obj->GetPos();
+	// 移動ギズモ(ワールド軸に沿った赤:X 緑:Y 青:Z のハンドル)は主選択の位置に1つだけ表示する
+	// (複数選択時は掴んで動かすと選択中全オブジェクトが同じ量だけ追従する)
+	Math::Vector3 pos = selectedList.front()->GetPos();
 	m_highlightWire.AddDebugLine(pos, Math::Vector3(1, 0, 0), m_gizmoLength, kRedColor);
 	m_highlightWire.AddDebugLine(pos, Math::Vector3(0, 1, 0), m_gizmoLength, kGreenColor);
 	m_highlightWire.AddDebugLine(pos, Math::Vector3(0, 0, 1), m_gizmoLength, kBlueColor);

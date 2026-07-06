@@ -281,6 +281,7 @@ bool Application::Init(int w, int h)
 
 		// 修飾キー
 		pKeyboardMouse->AddButton("Ctrl", new KdInputButtonForWindows(VK_CONTROL));
+		pKeyboardMouse->AddButton("Shift", new KdInputButtonForWindows(VK_SHIFT));
 
 		// マウスボタン
 		pKeyboardMouse->AddButton("RightClick", new KdInputButtonForWindows(VK_RBUTTON));
@@ -292,6 +293,7 @@ bool Application::Init(int w, int h)
 		pKeyboardMouse->AddButton("Duplicate", new KdInputButtonForWindows('D'));
 		pKeyboardMouse->AddButton("Undo", new KdInputButtonForWindows('Z'));
 		pKeyboardMouse->AddButton("Redo", new KdInputButtonForWindows('Y'));
+		pKeyboardMouse->AddButton("Delete", new KdInputButtonForWindows(VK_DELETE));
 
 		// その他
 		pKeyboardMouse->AddButton("Escape", new KdInputButtonForWindows(VK_ESCAPE));

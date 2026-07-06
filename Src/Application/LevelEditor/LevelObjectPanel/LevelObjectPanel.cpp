@@ -55,16 +55,17 @@ void LevelObjectPanel::Draw()
 	//----------------------------------------
 	ImGui::Text(U8("配置済みオブジェクト一覧"));
 
+	ImGui::TextDisabled(U8("Shift+クリックで複数選択"));
+
 	ImGui::BeginChild("LevelObjectList", ImVec2(0, 200), true);
 
-	std::shared_ptr<KdGameObject> selected = mgr.GetSelected();
 	std::shared_ptr<KdGameObject> removeTarget;
 
 	for (auto& obj : SceneManager::Instance().GetObjList())
 	{
 		if (!obj) { continue; }
 
-		bool isSelected = (obj == selected);
+		bool isSelected = mgr.IsSelected(obj);
 
 		ImGui::PushID(obj.get());
 
@@ -72,7 +73,15 @@ void LevelObjectPanel::Draw()
 
 		if (ImGui::Selectable(label.c_str(), isSelected))
 		{
-			mgr.SetSelected(obj);
+			// Shift+クリックは複数選択(選択済みなら外す/未選択なら追加する)
+			if (KdInputManager::Instance().IsHold("Shift"))
+			{
+				mgr.ToggleSelected(obj);
+			}
+			else
+			{
+				mgr.SetSelected(obj);
+			}
 		}
 
 		ImGui::SameLine();

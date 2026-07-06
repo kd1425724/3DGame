@@ -54,9 +54,26 @@ public:
 		return (itr != m_objectTypeNames.end()) ? itr->second : std::string();
 	}
 
-	// 選択中オブジェクトの設定/取得
-	void SetSelected(const std::shared_ptr<KdGameObject>& obj) { m_wpSelected = obj; }
-	std::shared_ptr<KdGameObject> GetSelected() const { return m_wpSelected.lock(); }
+	// 選択を1つだけにする(既存の選択は全て解除される)
+	void SetSelected(const std::shared_ptr<KdGameObject>& obj);
+
+	// 主選択(選択中の先頭)を取得する。何も選択されていなければnullptr
+	std::shared_ptr<KdGameObject> GetSelected() const;
+
+	// 選択の追加/解除を切り替える(Shift+クリック用：選択済みなら外し、未選択なら追加する)
+	void ToggleSelected(const std::shared_ptr<KdGameObject>& obj);
+
+	// 現在選択中の全オブジェクトを取得する(既に破棄されたものは除く)
+	std::vector<std::shared_ptr<KdGameObject>> GetSelectedList() const;
+
+	// 指定のオブジェクトが選択中かどうか
+	bool IsSelected(const std::shared_ptr<KdGameObject>& obj) const;
+
+	// 選択を全て解除する
+	void ClearSelection();
+
+	// 選択中の全オブジェクトを削除する(呼び出し側でPushUndo()しておくこと)
+	void RemoveSelectedObjects();
 
 	// エディタウィンドウの表示ON/OFF
 	bool m_enabled = true;
@@ -133,8 +150,8 @@ private:
 	// 生成したオブジェクトがどの種類名で作られたか(保存時に使用)
 	std::unordered_map<const KdGameObject*, std::string> m_objectTypeNames;
 
-	// 現在選択中のオブジェクト
-	std::weak_ptr<KdGameObject> m_wpSelected;
+	// 現在選択中のオブジェクト一覧(先頭が主選択。Shift+クリックで追加/解除される)
+	std::vector<std::weak_ptr<KdGameObject>> m_wpSelectedList;
 
 	// ハイライト表示用のワイヤーフレーム(毎フレームAdd→Drawするだけの使い捨て)
 	KdDebugWireFrame m_highlightWire;

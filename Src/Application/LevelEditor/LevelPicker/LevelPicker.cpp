@@ -144,6 +144,13 @@ void LevelPicker::Update()
 				m_dragAxisDir = axisDirs[bestAxis];
 				m_dragAxisStartObjPos = objPos;
 				m_dragAxisStartS = bestS;
+
+				// グループ移動用に、選択中全オブジェクトの開始座標を記録しておく
+				m_dragGroupStartPos.clear();
+				for (auto& obj : mgr.GetSelectedList())
+				{
+					m_dragGroupStartPos.emplace_back(obj, obj->GetPos());
+				}
 				return;
 			}
 		}
@@ -158,6 +165,13 @@ void LevelPicker::Update()
 			m_dragPlaneNormal = spCamera->GetMatrix().Backward();
 			m_dragPlaneNormal.Normalize();
 			m_dragPlanePoint = selected->GetPos();
+
+			// グループ移動用に、選択中全オブジェクトの開始座標を記録しておく
+			m_dragGroupStartPos.clear();
+			for (auto& obj : mgr.GetSelectedList())
+			{
+				m_dragGroupStartPos.emplace_back(obj, obj->GetPos());
+			}
 			return;
 		}
 
@@ -183,7 +197,15 @@ void LevelPicker::Update()
 
 		if (nearestObj)
 		{
-			mgr.SetSelected(nearestObj);
+			// Shiftを押しながらのクリックは複数選択(選択済みなら外す/未選択なら追加する)
+			if (KdInputManager::Instance().IsHold("Shift"))
+			{
+				mgr.ToggleSelected(nearestObj);
+			}
+			else
+			{
+				mgr.SetSelected(nearestObj);
+			}
 		}
 
 		return;
@@ -206,7 +228,17 @@ void LevelPicker::Update()
 		if (ClosestParamsBetweenLines(m_dragAxisStartObjPos, m_dragAxisDir, rayPos, rayDir, s, t))
 		{
 			float delta = s - m_dragAxisStartS;
-			selected->SetPos(mgr.SnapPos(m_dragAxisStartObjPos + m_dragAxisDir * delta));
+
+			// 主選択の新しい座標(グリッドスナップ込み)を求め、実際に動いた量を
+			// 選択中の他オブジェクトにもそのまま適用して一緒に追従させる
+			Math::Vector3 newPrimaryPos = mgr.SnapPos(m_dragAxisStartObjPos + m_dragAxisDir * delta);
+			Math::Vector3 appliedDelta = newPrimaryPos - m_dragAxisStartObjPos;
+
+			for (auto& [wpObj, startPos] : m_dragGroupStartPos)
+			{
+				std::shared_ptr<KdGameObject> obj = wpObj.lock();
+				if (obj) { obj->SetPos(startPos + appliedDelta); }
+			}
 		}
 	}
 	else if (m_dragMode == DragMode::FreePlane)
@@ -220,7 +252,14 @@ void LevelPicker::Update()
 
 			if (t > 0.0f)
 			{
-				selected->SetPos(mgr.SnapPos(rayPos + rayDir * t));
+				Math::Vector3 newPrimaryPos = mgr.SnapPos(rayPos + rayDir * t);
+				Math::Vector3 appliedDelta = newPrimaryPos - m_dragPlanePoint;
+
+				for (auto& [wpObj, startPos] : m_dragGroupStartPos)
+				{
+					std::shared_ptr<KdGameObject> obj = wpObj.lock();
+					if (obj) { obj->SetPos(startPos + appliedDelta); }
+				}
 			}
 		}
 	}
