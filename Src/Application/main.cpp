@@ -276,6 +276,9 @@ bool Application::Init(int w, int h)
 		pKeyboardMouse->AddButton("MoveUp", new KdInputButtonForWindows('E'));
 		pKeyboardMouse->AddButton("MoveDown", new KdInputButtonForWindows('Q'));
 
+		// Playerのレーザー発射(EditorCameraのMoveUpと同じキーだが別名で登録、用途が異なるので問題ない)
+		pKeyboardMouse->AddButton("FireLaser", new KdInputButtonForWindows('E'));
+
 		// 加速(EditorCamera)
 		pKeyboardMouse->AddButton("Boost", new KdInputButtonForWindows(VK_SHIFT));
 

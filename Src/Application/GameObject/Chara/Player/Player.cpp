@@ -39,6 +39,30 @@ void Player::Update()
 		pos += move * m_moveSpeed * Application::Instance().GetDeltaTime();
 		SetPos(pos);
 	}
+
+	// Eキーでプレイヤーの正面にBlueLaserエフェクトを発射する
+	if (KdInputManager::Instance().IsPress("FireLaser"))
+	{
+		// プレイヤーの正面方向(カメラの水平向きが基準。移動のBackward基準と合わせてある)
+		Math::Vector3 front = Math::Vector3::Backward;
+
+		std::shared_ptr<CameraBase> spCamera = m_wpCamera.lock();
+		if (spCamera)
+		{
+			front = Math::Vector3::TransformNormal(front, spCamera->GetRotationYMatrix());
+		}
+
+		Math::Vector3 firePos = GetPos() + Math::Vector3(0, 1.0f, 0) + front * 1.0f;
+
+		std::weak_ptr<KdEffekseerObject> wpEfk = KdEffekseerManager::GetInstance().Play("BlueLaser/BlueLaser.efk", firePos);
+
+		// 発射位置だけでなく向きも正面に合わせる
+		std::shared_ptr<KdEffekseerObject> spEfk = wpEfk.lock();
+		if (spEfk)
+		{
+			spEfk->SetWorldMatrix(Math::Matrix::CreateWorld(firePos, front, Math::Vector3::Up));
+		}
+	}
 }
 
 void Player::PostUpdate()
