@@ -75,8 +75,12 @@ public:
 	// 選択中の全オブジェクトを削除する(呼び出し側でPushUndo()しておくこと)
 	void RemoveSelectedObjects();
 
-	// エディタウィンドウの表示ON/OFF
+	// エディタモードのON/OFF(選択/ギズモ操作/ハイライト表示などが全て止まる)
+	// ※ 直接書き換えても良いが、編集用フリーカメラも一緒に切りたい場合はSetEnabled()を使うこと
 	bool m_enabled = true;
+
+	// エディタモードのON/OFFを切り替える(OFFにする場合、編集用フリーカメラも一緒に無効化してゲームプレイ側のカメラに戻す)
+	void SetEnabled(bool enabled);
 
 	// ImGui描画(NewFrame~Renderの間で呼び出す。DebugManager::Draw() から呼ばれる)
 	void Draw();

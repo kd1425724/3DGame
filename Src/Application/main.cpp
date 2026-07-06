@@ -294,6 +294,7 @@ bool Application::Init(int w, int h)
 		pKeyboardMouse->AddButton("Undo", new KdInputButtonForWindows('Z'));
 		pKeyboardMouse->AddButton("Redo", new KdInputButtonForWindows('Y'));
 		pKeyboardMouse->AddButton("Delete", new KdInputButtonForWindows(VK_DELETE));
+		pKeyboardMouse->AddButton("ToggleEditor", new KdInputButtonForWindows(VK_F1));
 
 		// その他
 		pKeyboardMouse->AddButton("Escape", new KdInputButtonForWindows(VK_ESCAPE));

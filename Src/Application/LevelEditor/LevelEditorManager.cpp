@@ -124,8 +124,26 @@ void LevelEditorManager::RemoveSelectedObjects()
 	}
 }
 
+void LevelEditorManager::SetEnabled(bool enabled)
+{
+	m_enabled = enabled;
+
+	// エディタモードを抜けたら、編集用フリーカメラも一緒に切ってゲームプレイ側のカメラに戻す
+	if (!m_enabled && m_useEditorCamera)
+	{
+		m_useEditorCamera = false;
+		ApplyEditorCameraState(false);
+	}
+}
+
 void LevelEditorManager::Update()
 {
+	// F1でエディタモードのON/OFFを切り替える(OFF中でもこのキーだけは常に効く)
+	if (!ImGui::GetIO().WantCaptureKeyboard && KdInputManager::Instance().IsPress("ToggleEditor"))
+	{
+		SetEnabled(!m_enabled);
+	}
+
 	LevelPicker::Instance().Update();
 
 	if (m_enabled && !ImGui::GetIO().WantCaptureKeyboard)
@@ -242,13 +260,27 @@ void LevelEditorManager::ApplyEditorCameraState(bool wantsEnabled)
 
 void LevelEditorManager::Draw()
 {
-	if (!m_enabled) { return; }
-
 	if (!ImGui::Begin(U8("LevelEditor")))
 	{
 		ImGui::End();
 		return;
 	}
+
+	// エディタモードのON/OFF(F1キーでも切り替え可能)
+	bool enabled = m_enabled;
+	if (ImGui::Checkbox(U8("エディタモード (F1)"), &enabled))
+	{
+		SetEnabled(enabled);
+	}
+
+	if (!m_enabled)
+	{
+		ImGui::TextDisabled(U8("( エディタモードはOFFです。F1またはチェックボックスでONに戻せます )"));
+		ImGui::End();
+		return;
+	}
+
+	ImGui::Separator();
 
 	// 編集用フリーカメラのON/OFF
 	if (ImGui::Checkbox(U8("編集用フリーカメラ (WASD+QE, マウスで視点回転, Shiftで加速)"), &m_useEditorCamera))
