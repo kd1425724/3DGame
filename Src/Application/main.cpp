@@ -429,6 +429,9 @@ void Application::Release()
 
 	KdAudioManager::Instance().Release();
 
+	// KdDirect3Dのデバイス解放より前に、DX11リソースを持つEffekseerを解放しておく
+	KdEffekseerManager::GetInstance().Release();
+
 	KdDirect3D::Instance().Release();
 
 	// ウィンドウ削除
