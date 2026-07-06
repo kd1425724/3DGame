@@ -12,13 +12,13 @@ void KdEffekseerManager::Create(int w, int h)
 	m_efkRenderer = ::EffekseerRendererDX11::Renderer::Create(KdDirect3D::Instance().WorkDev(), KdDirect3D::Instance().WorkDevContext(), 8000);
 
 	// [調査用ログ] レンダラー作成結果を確認
-	OutputDebugStringA(m_efkRenderer ? "[KdEffekseerManager] Create(): m_efkRenderer OK\n" : "[KdEffekseerManager] Create(): m_efkRenderer is NULL\n");
+	OutputDebugStringA(m_efkRenderer != nullptr ? "[KdEffekseerManager] Create(): m_efkRenderer OK\n" : "[KdEffekseerManager] Create(): m_efkRenderer is NULL\n");
 
 	// エフェクトのマネージャーの作成
 	m_efkManager = ::Effekseer::Manager::Create(8000);
 
 	// [調査用ログ] マネージャー作成結果を確認
-	OutputDebugStringA(m_efkManager ? "[KdEffekseerManager] Create(): m_efkManager OK\n" : "[KdEffekseerManager] Create(): m_efkManager is NULL\n");
+	OutputDebugStringA(m_efkManager != nullptr ? "[KdEffekseerManager] Create(): m_efkManager OK\n" : "[KdEffekseerManager] Create(): m_efkManager is NULL\n");
 
 	// 左手座標系に変換
 	m_efkManager->SetCoordinateSystem(Effekseer::CoordinateSystem::LH);
@@ -216,7 +216,7 @@ std::weak_ptr<KdEffekseerObject> KdEffekseerManager::Play(const PlayEfkInfo& inf
 		{
 			char buf[512];
 			sprintf_s(buf, "[KdEffekseerManager] Play(): loading \"%s\" (m_efkManager=%s)\n",
-				loadFileName.c_str(), m_efkManager ? "valid" : "NULL");
+				loadFileName.c_str(), m_efkManager != nullptr ? "valid" : "NULL");
 			OutputDebugStringA(buf);
 		}
 
@@ -225,7 +225,7 @@ std::weak_ptr<KdEffekseerObject> KdEffekseerManager::Play(const PlayEfkInfo& inf
 			(const EFK_CHAR*)sjis_to_wide(loadFileName).c_str());
 
 		// [調査用ログ] 読み込み結果を確認
-		OutputDebugStringA(effect ? "[KdEffekseerManager] Play(): Effect::Create OK\n" : "[KdEffekseerManager] Play(): Effect::Create FAILED\n");
+		OutputDebugStringA(effect != nullptr ? "[KdEffekseerManager] Play(): Effect::Create OK\n" : "[KdEffekseerManager] Play(): Effect::Create FAILED\n");
 
 		if (effect == nullptr)
 		{
