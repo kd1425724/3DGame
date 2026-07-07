@@ -52,5 +52,5 @@ private:
 	std::vector<FiredLaser> m_firedLasers;
 
 	// レーザーを発射してから強制停止するまでの時間(秒)
-	float m_laserStopTime = 2.0f;
+	float m_laserStopTime = 5.0f;
 };
