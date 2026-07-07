@@ -25,6 +25,10 @@ void LaserShot::Fire(const Math::Vector3& _pos, const Math::Vector3& _dir)
 
 	m_phase = Phase::Charge;
 	m_chargeElapsed = 0.0f;
+
+	// レーザーは一瞬の発射なので寿命を短くする(長いと連射時にエフェクトが積み重なりFPSが落ちる)
+	// ※ 見た目の長さはここで調整可能。素材のパーティクルを減らすとさらに軽くなる
+	m_lifeTime = 1.0f;
 }
 
 void LaserShot::Update()
