@@ -57,13 +57,16 @@ void Player::Update()
 		std::weak_ptr<KdEffekseerObject> wpEfk = KdEffekseerManager::GetInstance().Play("Magic/BlueLaser/BlueLaser.efk", firePos);
 
 		// 発射位置だけでなく向きも正面に合わせる
+		Math::Matrix worldMatrix = Math::Matrix::CreateWorld(firePos, front, Math::Vector3::Up);
+
 		std::shared_ptr<KdEffekseerObject> spEfk = wpEfk.lock();
 		if (spEfk)
 		{
-			spEfk->SetWorldMatrix(Math::Matrix::CreateWorld(firePos, front, Math::Vector3::Up));
+			spEfk->SetWorldMatrix(worldMatrix);
 
 			// 一定時間(m_laserStopTime秒)で強制停止できるよう発射リストに登録する
-			m_firedLasers.push_back({ wpEfk, 0.0f });
+			// (worldMatrixを保持しておき、毎フレーム適用し直す)
+			m_firedLasers.push_back({ wpEfk, worldMatrix, 0.0f });
 		}
 	}
 
@@ -85,6 +88,10 @@ void Player::UpdateFiredLasers()
 			itr = m_firedLasers.erase(itr);
 			continue;
 		}
+
+		// 発射時のワールド行列を毎フレーム適用し直す
+		// (後半に遅れて生成されるノードにも位置が反映され、原点(0,0,0)に出るのを防ぐ)
+		spEfk->SetWorldMatrix(itr->worldMatrix);
 
 		itr->elapsed += deltaTime;
 

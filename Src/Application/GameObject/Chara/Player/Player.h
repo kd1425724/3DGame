@@ -38,10 +38,13 @@ private:
 	// 移動方向の基準にするカメラ
 	std::weak_ptr<CameraBase> m_wpCamera;
 
-	// 発射中のレーザー1発分(エフェクト実体への弱参照 + 経過時間)
+	// 発射中のレーザー1発分(エフェクト実体への弱参照 + 発射時のワールド行列 + 経過時間)
+	// ※ 行列を保持して毎フレーム適用し直すのは、後半に遅れて生成されるノードが
+	//    位置未適用のまま原点(0,0,0)に出るのを防ぐため
 	struct FiredLaser
 	{
 		std::weak_ptr<KdEffekseerObject> effect;
+		Math::Matrix worldMatrix = Math::Matrix::Identity;
 		float elapsed = 0.0f;
 	};
 
