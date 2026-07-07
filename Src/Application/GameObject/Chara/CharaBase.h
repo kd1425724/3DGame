@@ -4,7 +4,8 @@
 //
 // 全キャラクター(Player/Enemyなど)の基底クラス
 //  ・モデル表示(色味を変えて種類を見分けられるようにcolRateを持つ)
-//  ・下方向へのレイ判定で地面(KdCollider::TypeGround)に立つ機能
+//  ・重力＋垂直速度を持ち、下方向レイで地面(KdCollider::TypeGround)に着地する
+//  ・ジャンプ対応：上昇中や空中では地面に吸着せず、落下して着地したときだけ立たせる
 //
 //====================================================
 class CharaBase : public KdGameObject
@@ -20,12 +21,31 @@ public:
 
 protected:
 
-	// 現在地から下方向にレイを飛ばし、地面(KdCollider::TypeGround)に当たったらその高さに立たせる
+	// 重力を適用して垂直移動し、落下中に地面(TypeGround)へ着地したらその高さに立たせる
+	// ※ PostUpdate等の「world状態の解決」フェーズで毎フレーム呼ぶ想定
 	void GroundCheck();
+
+	// 接地中ならジャンプする(垂直速度に初速m_jumpPowerを与える)
+	void Jump();
+
+	// 接地しているか
+	bool IsGrounded() const { return m_isGrounded; }
 
 	// 表示用モデルワーク
 	KdModelWork m_modelWork;
 
 	// 描画時の色味(サブクラスで変更して他のキャラクターと見分けられるようにする)
 	Math::Color m_color = kWhiteColor;
+
+	// 垂直方向の速度(上向きが+)。重力とジャンプで変化する
+	float m_verticalVelocity = 0.0f;
+
+	// 接地しているか(GroundCheckで毎フレーム更新)
+	bool m_isGrounded = false;
+
+	// 重力加速度(1秒あたりの下向き速度変化)
+	float m_gravity = 20.0f;
+
+	// ジャンプの初速
+	float m_jumpPower = 8.0f;
 };

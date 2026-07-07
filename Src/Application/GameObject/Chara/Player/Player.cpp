@@ -41,6 +41,12 @@ void Player::Update()
 		SetPos(pos);
 	}
 
+	// SPACEでジャンプ(接地中のみ有効。実際の上下移動・着地はPostUpdateのGroundCheckで解決)
+	if (KdInputManager::Instance().IsPress("Jump"))
+	{
+		Jump();
+	}
+
 	// Eキーでプレイヤーの正面にレーザー(当たり判定つき)を発射する
 	if (KdInputManager::Instance().IsPress("FireLaser"))
 	{
