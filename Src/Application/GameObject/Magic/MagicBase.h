@@ -25,7 +25,8 @@ protected:
 	void PlayEffect(const std::string& _effectPath, const Math::Matrix& _worldMatrix);
 
 	// エフェクトを停止して自身を消滅状態にする
-	void StopAndExpire();
+	// ※ 追加でエフェクト(魔法陣など)を持つ派生はoverrideして自前分も止め、MagicBase::StopAndExpire()を呼ぶ
+	virtual void StopAndExpire();
 
 	// 従えているエフェクト(見た目)への弱参照
 	std::weak_ptr<KdEffekseerObject> m_wpEffect;
