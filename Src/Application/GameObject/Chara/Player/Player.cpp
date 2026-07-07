@@ -61,6 +61,42 @@ void Player::Update()
 		if (spEfk)
 		{
 			spEfk->SetWorldMatrix(Math::Matrix::CreateWorld(firePos, front, Math::Vector3::Up));
+
+			// 一定時間(m_laserStopTime秒)で強制停止できるよう発射リストに登録する
+			m_firedLasers.push_back({ wpEfk, 0.0f });
+		}
+	}
+
+	// 発射済みレーザーの経過時間を進め、時間が来たものを止める
+	UpdateFiredLasers();
+}
+
+void Player::UpdateFiredLasers()
+{
+	float deltaTime = Application::Instance().GetDeltaTime();
+
+	for (auto itr = m_firedLasers.begin(); itr != m_firedLasers.end(); )
+	{
+		std::shared_ptr<KdEffekseerObject> spEfk = itr->effect.lock();
+
+		// 既に破棄されている(自然に消えた)ものはリストから除外するだけ
+		if (!spEfk)
+		{
+			itr = m_firedLasers.erase(itr);
+			continue;
+		}
+
+		itr->elapsed += deltaTime;
+
+		// 規定時間を超えたら強制停止して除外する
+		if (itr->elapsed >= m_laserStopTime)
+		{
+			spEfk->StopEffect();
+			itr = m_firedLasers.erase(itr);
+		}
+		else
+		{
+			++itr;
 		}
 	}
 }
