@@ -4,7 +4,7 @@
 #include "../../Camera/CameraBase.h"
 #include "../../Camera/TPSCamera/TPSCamera.h"
 #include "../Enemy/Enemy.h"
-#include "../../LaserShot/LaserShot.h"
+#include "../../Magic/LaserShot/LaserShot.h"
 #include "../../../Scene/SceneManager.h"
 
 void Player::Init()

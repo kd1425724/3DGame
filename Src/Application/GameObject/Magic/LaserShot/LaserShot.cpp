@@ -1,8 +1,7 @@
 ﻿#include "LaserShot.h"
 
-#include "../../main.h"
-#include "../../Scene/SceneManager.h"
-#include "../Chara/Enemy/Enemy.h"
+#include "../../../Scene/SceneManager.h"
+#include "../../Chara/Enemy/Enemy.h"
 
 void LaserShot::Fire(const Math::Vector3& _pos, const Math::Vector3& _dir)
 {
@@ -12,33 +11,8 @@ void LaserShot::Fire(const Math::Vector3& _pos, const Math::Vector3& _dir)
 	// 当たり判定用に自身の座標を発射位置に置く(回転は判定(球)に不要なので平行移動のみ)
 	SetPos(_pos);
 
-	// エフェクトを発射位置・正面向きで再生する
-	m_effectMatrix = Math::Matrix::CreateWorld(_pos, m_dir, Math::Vector3::Up);
-	m_wpEffect = KdEffekseerManager::GetInstance().Play("Magic/BlueLaser/BlueLaser.efk", _pos);
-
-	std::shared_ptr<KdEffekseerObject> spEffect = m_wpEffect.lock();
-	if (spEffect)
-	{
-		spEffect->SetWorldMatrix(m_effectMatrix);
-	}
-}
-
-void LaserShot::Update()
-{
-	// エフェクトの位置を毎フレーム適用し直す
-	// (後半に遅れて生成されるノードにも位置が反映され、原点(0,0,0)に出るのを防ぐ)
-	std::shared_ptr<KdEffekseerObject> spEffect = m_wpEffect.lock();
-	if (spEffect)
-	{
-		spEffect->SetWorldMatrix(m_effectMatrix);
-	}
-
-	// 寿命を進め、時間が来たら停止して消滅する
-	m_elapsed += Application::Instance().GetDeltaTime();
-	if (m_elapsed >= m_lifeTime)
-	{
-		StopAndExpire();
-	}
+	// エフェクトを発射位置・正面向きで再生する(保持・毎フレーム適用はMagicBaseが行う)
+	PlayEffect("Magic/BlueLaser/BlueLaser.efk", Math::Matrix::CreateWorld(_pos, m_dir, Math::Vector3::Up));
 }
 
 void LaserShot::PostUpdate()
@@ -75,15 +49,4 @@ void LaserShot::DrawDebug()
 	}
 
 	KdGameObject::DrawDebug();
-}
-
-void LaserShot::StopAndExpire()
-{
-	std::shared_ptr<KdEffekseerObject> spEffect = m_wpEffect.lock();
-	if (spEffect)
-	{
-		spEffect->StopEffect();
-	}
-
-	m_isExpired = true;
 }

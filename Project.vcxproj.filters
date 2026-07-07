@@ -109,8 +109,11 @@
     <Filter Include="Src\Application\GameObject\Ground">
       <UniqueIdentifier>{d4b8a3c2-8e5f-4c40-9b3d-5a8f9e0c1d32}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Src\Application\GameObject\LaserShot">
+    <Filter Include="Src\Application\GameObject\Magic">
       <UniqueIdentifier>{e5c9b4d3-9f60-4d51-ac4e-6b9f0a1d2e43}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Src\Application\GameObject\Magic\LaserShot">
+      <UniqueIdentifier>{f6d0c5e4-a071-4e62-bd5f-7c0a1b2e3f54}</UniqueIdentifier>
     </Filter>
     <Filter Include="Src\Application\Debug">
       <UniqueIdentifier>{81b7a301-0093-415a-895f-4f6d7d620939}</UniqueIdentifier>
@@ -345,8 +348,11 @@
     <ClInclude Include="Src\Application\GameObject\Ground\Ground.h">
       <Filter>Src\Application\GameObject\Ground</Filter>
     </ClInclude>
-    <ClInclude Include="Src\Application\GameObject\LaserShot\LaserShot.h">
-      <Filter>Src\Application\GameObject\LaserShot</Filter>
+    <ClInclude Include="Src\Application\GameObject\Magic\MagicBase.h">
+      <Filter>Src\Application\GameObject\Magic</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\Application\GameObject\Magic\LaserShot\LaserShot.h">
+      <Filter>Src\Application\GameObject\Magic\LaserShot</Filter>
     </ClInclude>
     <ClInclude Include="Src\Application\GameObject\Camera\FPSCamera\FPSCamera.h">
       <Filter>Src\Application\GameObject\Camera\FPSCamera</Filter>
@@ -560,8 +566,11 @@
     <ClCompile Include="Src\Application\GameObject\Ground\Ground.cpp">
       <Filter>Src\Application\GameObject\Ground</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Application\GameObject\LaserShot\LaserShot.cpp">
-      <Filter>Src\Application\GameObject\LaserShot</Filter>
+    <ClCompile Include="Src\Application\GameObject\Magic\MagicBase.cpp">
+      <Filter>Src\Application\GameObject\Magic</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\GameObject\Magic\LaserShot\LaserShot.cpp">
+      <Filter>Src\Application\GameObject\Magic\LaserShot</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Camera\FPSCamera\FPSCamera.cpp">
       <Filter>Src\Application\GameObject\Camera\FPSCamera</Filter>
