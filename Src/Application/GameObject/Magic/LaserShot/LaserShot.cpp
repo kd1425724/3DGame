@@ -28,8 +28,8 @@ void LaserShot::PostUpdate()
 		std::shared_ptr<Enemy> spEnemy = std::dynamic_pointer_cast<Enemy>(obj);
 		if (!spEnemy) { continue; }
 
-		std::list<KdCollider::CollisionResult> results;
-		if (spEnemy->Intersects(attackSphere, &results))
+		// 当たったかどうか(bool)だけ分かればよいので詳細リザルトは不要(nullptrを渡す)
+		if (spEnemy->Intersects(attackSphere, nullptr))
 		{
 			// 当たった相手に通知する(Enemy側で消滅などの処理を行う)
 			spEnemy->OnHit(this);
