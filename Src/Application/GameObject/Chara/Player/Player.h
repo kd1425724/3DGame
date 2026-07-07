@@ -28,8 +28,7 @@ public:
 
 private:
 
-	// 1秒あたりの移動速度
-	float m_moveSpeed = 5.0f;
+	// ※ 移動速度はDebugParams("プレイヤー/移動速度")で調整する
 
 	// 移動方向の基準にするカメラ
 	std::weak_ptr<CameraBase> m_wpCamera;

@@ -3,6 +3,7 @@
 #include "../../../main.h"
 #include "../../../API/MathAPI/MathAPI.h"
 #include "../../../Scene/SceneManager.h"
+#include "../../../Debug/DebugParams/DebugParams.h"
 #include "../Player/Player.h"
 
 void Enemy::Init()
@@ -67,12 +68,14 @@ void Enemy::Update()
 	{
 		toTarget.Normalize();
 
-		pos += toTarget * m_moveSpeed * Application::Instance().GetDeltaTime();
+		float moveSpeed = DebugParams::Instance().Float("敵/移動速度", 1.5f, 0.0f, 20.0f);
+		pos += toTarget * moveSpeed * Application::Instance().GetDeltaTime();
 		SetPos(pos);
 
 		// 対象の方向を向く
+		float turnSpeedDeg = DebugParams::Instance().Float("敵/旋回速度", 180.0f, 0.0f, 720.0f);
 		Math::Vector3 rot = GetRot();
-		rot.y = MathAPI::RotateToDirection(rot.y, toTarget, m_turnSpeedDeg * Application::Instance().GetDeltaTime());
+		rot.y = MathAPI::RotateToDirection(rot.y, toTarget, turnSpeedDeg * Application::Instance().GetDeltaTime());
 		SetRot(rot);
 	}
 }

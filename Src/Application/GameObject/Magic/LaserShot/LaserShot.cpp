@@ -2,6 +2,7 @@
 
 #include "../../../main.h"
 #include "../../../Scene/SceneManager.h"
+#include "../../../Debug/DebugParams/DebugParams.h"
 #include "../../Chara/Enemy/Enemy.h"
 
 void LaserShot::Fire(const Math::Vector3& _pos, const Math::Vector3& _dir)
@@ -15,7 +16,7 @@ void LaserShot::Fire(const Math::Vector3& _pos, const Math::Vector3& _dir)
 	// 発射位置・正面向きの行列を作っておく(魔法陣・レーザー両方でこの行列を使う)
 	m_effectMatrix = Math::Matrix::CreateWorld(_pos, m_dir, Math::Vector3::Up);
 
-	// まず魔法陣を表示してチャージ開始する(レーザーはm_chargeTime秒後に発射)
+	// まず魔法陣を表示してチャージ開始する(レーザーはチャージ時間後に発射)
 	m_wpMagicCircle = KdEffekseerManager::GetInstance().Play("Magic/MagicCircle/MagicCircle.efk", _pos);
 	std::shared_ptr<KdEffekseerObject> spCircle = m_wpMagicCircle.lock();
 	if (spCircle)
@@ -27,8 +28,8 @@ void LaserShot::Fire(const Math::Vector3& _pos, const Math::Vector3& _dir)
 	m_chargeElapsed = 0.0f;
 
 	// レーザーは一瞬の発射なので寿命を短くする(長いと連射時にエフェクトが積み重なりFPSが落ちる)
-	// ※ 見た目の長さはここで調整可能。素材のパーティクルを減らすとさらに軽くなる
-	m_lifeTime = 1.0f;
+	// DebugParamsで調整可能(素材のパーティクルを減らすとさらに軽くなる)
+	m_lifeTime = DebugParams::Instance().Float("レーザー/寿命", 1.0f, 0.0f, 10.0f);
 }
 
 void LaserShot::Update()
@@ -43,8 +44,9 @@ void LaserShot::Update()
 	if (m_phase == Phase::Charge)
 	{
 		// チャージ中：時間が来たら魔法陣の位置からレーザーを発射する
+		float chargeTime = DebugParams::Instance().Float("レーザー/チャージ時間", 1.0f, 0.0f, 5.0f);
 		m_chargeElapsed += Application::Instance().GetDeltaTime();
-		if (m_chargeElapsed >= m_chargeTime)
+		if (m_chargeElapsed >= chargeTime)
 		{
 			// レーザーを再生(以降はMagicBaseが位置再適用+寿命管理を行う)
 			PlayEffect("Magic/BlueLaser/BlueLaser.efk", m_effectMatrix);
@@ -62,9 +64,11 @@ void LaserShot::PostUpdate()
 	// レーザー発射中だけ攻撃判定を行う(チャージ中は当たらない)
 	if (m_isExpired || m_phase != Phase::Fire) { return; }
 
-	// 攻撃判定：発射位置から前方m_hitOffsetの位置に半径m_hitRadiusの球を作り、敵に当てる
-	Math::Vector3 attackCenter = GetPos() + m_dir * m_hitOffset;
-	KdCollider::SphereInfo attackSphere(KdCollider::TypeDamage, attackCenter, m_hitRadius);
+	// 攻撃判定：発射位置から前方(オフセット)の位置に半径(攻撃半径)の球を作り、敵に当てる
+	float hitOffset = DebugParams::Instance().Float("レーザー/攻撃前方オフセット", 2.0f, 0.0f, 10.0f);
+	float hitRadius = DebugParams::Instance().Float("レーザー/攻撃半径", 1.5f, 0.0f, 10.0f);
+	Math::Vector3 attackCenter = GetPos() + m_dir * hitOffset;
+	KdCollider::SphereInfo attackSphere(KdCollider::TypeDamage, attackCenter, hitRadius);
 
 	for (auto& obj : SceneManager::Instance().GetObjList())
 	{
@@ -87,8 +91,10 @@ void LaserShot::DrawDebug()
 	{
 		if (!m_pDebugWire) { m_pDebugWire = std::make_unique<KdDebugWireFrame>(); }
 
-		Math::Vector3 attackCenter = GetPos() + m_dir * m_hitOffset;
-		m_pDebugWire->AddDebugSphere(attackCenter, m_hitRadius, Math::Color(1.0f, 0.3f, 0.3f, 1.0f));
+		float hitOffset = DebugParams::Instance().Float("レーザー/攻撃前方オフセット", 2.0f, 0.0f, 10.0f);
+		float hitRadius = DebugParams::Instance().Float("レーザー/攻撃半径", 1.5f, 0.0f, 10.0f);
+		Math::Vector3 attackCenter = GetPos() + m_dir * hitOffset;
+		m_pDebugWire->AddDebugSphere(attackCenter, hitRadius, Math::Color(1.0f, 0.3f, 0.3f, 1.0f));
 	}
 
 	KdGameObject::DrawDebug();

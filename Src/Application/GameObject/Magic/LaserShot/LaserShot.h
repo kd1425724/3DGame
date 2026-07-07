@@ -6,8 +6,9 @@
 //
 // レーザーの発射体(魔法陣チャージ→レーザー発射の2段階、当たり判定つき)
 //  ・MagicBaseを継承し、エフェクト保持・寿命・位置再適用は基底に任せる
-//  ・Fire()するとまず魔法陣(MagicCircle)を表示(チャージ)、m_chargeTime秒後に
+//  ・Fire()するとまず魔法陣(MagicCircle)を表示(チャージ)、チャージ時間後に
 //    その位置からレーザーを発射する。攻撃判定はレーザー発射中のみ有効
+//  ・チャージ時間/寿命/攻撃半径などの数値はDebugParams("レーザー/...")で調整する
 //
 // 使い方(Player等から)：
 //   auto shot = std::make_shared<LaserShot>();
@@ -43,14 +44,10 @@ private:
 	// 魔法陣(チャージ中の見た目)への弱参照
 	std::weak_ptr<KdEffekseerObject> m_wpMagicCircle;
 
-	// 魔法陣を表示してからレーザーを発射するまでの時間(秒)と経過
-	float m_chargeTime = 1.0f;
+	// 魔法陣を表示してからレーザーを発射するまでの経過時間
+	// ※ チャージ時間・寿命・攻撃半径/オフセットはDebugParams("レーザー/...")で調整する
 	float m_chargeElapsed = 0.0f;
 
 	// 正面方向(攻撃判定の中心を前方にずらすのに使う)
 	Math::Vector3 m_dir = Math::Vector3::Backward;
-
-	// 攻撃判定の球：発射位置から前方m_hitOffsetの位置に半径m_hitRadiusの球を置く
-	float m_hitRadius = 1.5f;
-	float m_hitOffset = 2.0f;
 };

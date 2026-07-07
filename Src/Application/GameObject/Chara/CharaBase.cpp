@@ -2,6 +2,7 @@
 
 #include "../../main.h"
 #include "../../Scene/SceneManager.h"
+#include "../../Debug/DebugParams/DebugParams.h"
 
 void CharaBase::SetAsset(const std::string& assetName)
 {
@@ -19,8 +20,9 @@ void CharaBase::GroundCheck()
 {
 	float deltaTime = Application::Instance().GetDeltaTime();
 
-	// 重力を加算し、垂直方向に移動させる
-	m_verticalVelocity -= m_gravity * deltaTime;
+	// 重力を加算し、垂直方向に移動させる(重力はDebugParamsで調整可能)
+	float gravity = DebugParams::Instance().Float("キャラ/重力", 20.0f, 0.0f, 100.0f);
+	m_verticalVelocity -= gravity * deltaTime;
 
 	Math::Vector3 pos = GetPos();
 	pos.y += m_verticalVelocity * deltaTime;
@@ -93,6 +95,7 @@ void CharaBase::Jump()
 	// 接地しているときだけジャンプできる
 	if (!m_isGrounded) { return; }
 
-	m_verticalVelocity = m_jumpPower;
+	// ジャンプ初速はDebugParamsで調整可能
+	m_verticalVelocity = DebugParams::Instance().Float("キャラ/ジャンプ力", 8.0f, 0.0f, 30.0f);
 	m_isGrounded = false;
 }

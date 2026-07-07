@@ -6,6 +6,7 @@
 #include "../Enemy/Enemy.h"
 #include "../../Magic/LaserShot/LaserShot.h"
 #include "../../../Scene/SceneManager.h"
+#include "../../../Debug/DebugParams/DebugParams.h"
 
 void Player::Init()
 {
@@ -37,7 +38,8 @@ void Player::Update()
 			move = Math::Vector3::TransformNormal(move, spCamera->GetRotationYMatrix());
 		}
 
-		pos += move * m_moveSpeed * Application::Instance().GetDeltaTime();
+		float moveSpeed = DebugParams::Instance().Float("プレイヤー/移動速度", 5.0f, 0.0f, 20.0f);
+		pos += move * moveSpeed * Application::Instance().GetDeltaTime();
 		SetPos(pos);
 	}
 
