@@ -128,11 +128,23 @@ void LevelEditorManager::SetEnabled(bool enabled)
 {
 	m_enabled = enabled;
 
-	// エディタモードを抜けたら、編集用フリーカメラも一緒に切ってゲームプレイ側のカメラに戻す
-	if (!m_enabled && m_useEditorCamera)
+	if (m_enabled)
 	{
-		m_useEditorCamera = false;
-		ApplyEditorCameraState(false);
+		// エディタモードに入ったら、編集用フリーカメラに自動で切り替える
+		if (!m_useEditorCamera)
+		{
+			m_useEditorCamera = true;
+			ApplyEditorCameraState(true);
+		}
+	}
+	else
+	{
+		// エディタモードを抜けたら、編集用フリーカメラも一緒に切ってゲームプレイ側のカメラに戻す
+		if (m_useEditorCamera)
+		{
+			m_useEditorCamera = false;
+			ApplyEditorCameraState(false);
+		}
 	}
 }
 
