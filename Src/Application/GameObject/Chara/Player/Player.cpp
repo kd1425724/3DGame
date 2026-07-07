@@ -4,6 +4,7 @@
 #include "../../Camera/CameraBase.h"
 #include "../../Camera/TPSCamera/TPSCamera.h"
 #include "../Enemy/Enemy.h"
+#include "../../LaserShot/LaserShot.h"
 #include "../../../Scene/SceneManager.h"
 
 void Player::Init()
@@ -40,7 +41,7 @@ void Player::Update()
 		SetPos(pos);
 	}
 
-	// Eキーでプレイヤーの正面にBlueLaserエフェクトを発射する
+	// Eキーでプレイヤーの正面にレーザー(当たり判定つき)を発射する
 	if (KdInputManager::Instance().IsPress("FireLaser"))
 	{
 		// プレイヤーの正面方向(カメラの水平向きが基準。移動のBackward基準と合わせてある)
@@ -54,57 +55,11 @@ void Player::Update()
 
 		Math::Vector3 firePos = GetPos() + Math::Vector3(0, 1.0f, 0) + front * 1.0f;
 
-		std::weak_ptr<KdEffekseerObject> wpEfk = KdEffekseerManager::GetInstance().Play("Magic/BlueLaser/BlueLaser.efk", firePos);
-
-		// 発射位置だけでなく向きも正面に合わせる
-		Math::Matrix worldMatrix = Math::Matrix::CreateWorld(firePos, front, Math::Vector3::Up);
-
-		std::shared_ptr<KdEffekseerObject> spEfk = wpEfk.lock();
-		if (spEfk)
-		{
-			spEfk->SetWorldMatrix(worldMatrix);
-
-			// 一定時間(m_laserStopTime秒)で強制停止できるよう発射リストに登録する
-			// (worldMatrixを保持しておき、毎フレーム適用し直す)
-			m_firedLasers.push_back({ wpEfk, worldMatrix, 0.0f });
-		}
-	}
-
-	// 発射済みレーザーの経過時間を進め、時間が来たものを止める
-	UpdateFiredLasers();
-}
-
-void Player::UpdateFiredLasers()
-{
-	float deltaTime = Application::Instance().GetDeltaTime();
-
-	for (auto itr = m_firedLasers.begin(); itr != m_firedLasers.end(); )
-	{
-		std::shared_ptr<KdEffekseerObject> spEfk = itr->effect.lock();
-
-		// 既に破棄されている(自然に消えた)ものはリストから除外するだけ
-		if (!spEfk)
-		{
-			itr = m_firedLasers.erase(itr);
-			continue;
-		}
-
-		// 発射時のワールド行列を毎フレーム適用し直す
-		// (後半に遅れて生成されるノードにも位置が反映され、原点(0,0,0)に出るのを防ぐ)
-		spEfk->SetWorldMatrix(itr->worldMatrix);
-
-		itr->elapsed += deltaTime;
-
-		// 規定時間を超えたら強制停止して除外する
-		if (itr->elapsed >= m_laserStopTime)
-		{
-			spEfk->StopEffect();
-			itr = m_firedLasers.erase(itr);
-		}
-		else
-		{
-			++itr;
-		}
+		// LaserShotを生成してシーンに追加する(エフェクト再生・寿命・当たり判定は
+		// LaserShot自身が管理するので、Player側は生成して渡すだけ)
+		std::shared_ptr<LaserShot> spLaser = std::make_shared<LaserShot>();
+		spLaser->Fire(firePos, front);
+		SceneManager::Instance().AddObject(spLaser);
 	}
 }
 

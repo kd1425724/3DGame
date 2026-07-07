@@ -14,6 +14,23 @@ void Enemy::Init()
 
 	// Playerと同じ比率で縮小
 	SetScale(Math::Vector3(0.5f, 0.5f, 0.5f));
+
+	// 攻撃を受ける側の当たり判定(球)を登録する
+	// ※ 半径はローカル値。Intersects時にworld行列(このEnemyはscale0.5)で縮むため、
+	//    world半径≒m_hitRadiusになるようローカル半径をscaleで割って指定する
+	m_pCollider = std::make_unique<KdCollider>();
+	m_pCollider->RegisterCollisionShape(
+		"EnemyDamage",
+		Math::Vector3::Zero,
+		m_hitRadius / 0.5f,
+		KdCollider::TypeDamage
+	);
+}
+
+void Enemy::OnHit(KdGameObject* /*_other*/)
+{
+	// 攻撃に当たったら消滅する
+	m_isExpired = true;
 }
 
 void Enemy::Update()

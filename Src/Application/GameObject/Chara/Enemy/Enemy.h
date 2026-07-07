@@ -21,6 +21,9 @@ public:
 	void Update()		override;
 	void PostUpdate()	override;
 
+	// 攻撃(レーザー等)に当たったときに呼ばれる：消滅する
+	void OnHit(KdGameObject* _other) override;
+
 	// 追従・接触判定の対象を設定する
 	void SetTarget(const std::shared_ptr<KdGameObject>& target) { m_wpTarget = target; }
 

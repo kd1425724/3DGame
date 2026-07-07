@@ -28,29 +28,9 @@ public:
 
 private:
 
-	// 発射したレーザーエフェクトを一定時間で強制停止する処理
-	// (エフェクト素材側に長寿命/無限生成ノードが残っていても、ゲーム側で必ず打ち切る)
-	void UpdateFiredLasers();
-
 	// 1秒あたりの移動速度
 	float m_moveSpeed = 5.0f;
 
 	// 移動方向の基準にするカメラ
 	std::weak_ptr<CameraBase> m_wpCamera;
-
-	// 発射中のレーザー1発分(エフェクト実体への弱参照 + 発射時のワールド行列 + 経過時間)
-	// ※ 行列を保持して毎フレーム適用し直すのは、後半に遅れて生成されるノードが
-	//    位置未適用のまま原点(0,0,0)に出るのを防ぐため
-	struct FiredLaser
-	{
-		std::weak_ptr<KdEffekseerObject> effect;
-		Math::Matrix worldMatrix = Math::Matrix::Identity;
-		float elapsed = 0.0f;
-	};
-
-	// 発射中のレーザー一覧(経過時間がm_laserStopTimeを超えたら停止して除外する)
-	std::vector<FiredLaser> m_firedLasers;
-
-	// レーザーを発射してから強制停止するまでの時間(秒)
-	float m_laserStopTime = 5.0f;
 };
