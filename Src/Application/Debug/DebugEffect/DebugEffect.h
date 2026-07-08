@@ -27,8 +27,17 @@ private:
 	DebugEffect(const DebugEffect&) = delete;
 	void operator=(const DebugEffect&) = delete;
 
+	// Asset/Data/Effect/ を再帰走査して m_efkFiles を作り直す
+	void RefreshFileList();
+
 	// 再生するエフェクトファイル名(Asset/Data/Effect/からの相対パス)
 	std::string m_fileName;
+
+	// 実フォルダを走査して見つけた.efkの相対パス一覧(プルダウン選択用)
+	std::vector<std::string> m_efkFiles;
+
+	// 初回Draw時に一度だけ自動走査するためのフラグ
+	bool m_fileListScanned = false;
 
 	// 再生パラメータ
 	Math::Vector3	m_pos;
