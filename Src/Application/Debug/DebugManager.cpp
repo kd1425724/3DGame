@@ -19,18 +19,19 @@ void DebugManager::BeginFrame()
 
 void DebugManager::Draw()
 {
-	if (m_showAll)
-	{
-		// 上部メニューバー(各ウィンドウの個別ON/OFF)
-		DrawMenuBar();
+	// F3でOFFのときはメニューバー含め全デバッグUIを描画しない(画面を素に戻す)
+	if (!m_showAll) { return; }
 
-		if (m_showFlags)	{ DebugFlags::Instance().Draw(); }
-		if (m_showWatch)	{ DebugWatch::Instance().Draw(); }
-		if (m_showParams)	{ DebugParams::Instance().Draw(); }
-		if (m_showEffect)	{ DebugEffect::Instance().Draw(); }
-	}
+	// 上部メニューバー(各ウィンドウの個別ON/OFF)
+	DrawMenuBar();
 
-	// レベルエディタ(配置ツール)は独自のF1トグルで制御(m_showAllとは独立)
+	if (m_showFlags)	{ DebugFlags::Instance().Draw(); }
+	if (m_showWatch)	{ DebugWatch::Instance().Draw(); }
+	if (m_showParams)	{ DebugParams::Instance().Draw(); }
+	if (m_showEffect)	{ DebugEffect::Instance().Draw(); }
+
+	// レベルエディタ(配置ツール)のパネルもF3の一括トグルで隠す
+	// (エディタモード自体のON/OFF・カメラ・3Dギズモは従来どおりF1で制御。ここは表示だけ)
 	LevelEditorManager::Instance().Draw();
 }
 
