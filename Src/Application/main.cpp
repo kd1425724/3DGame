@@ -302,6 +302,9 @@ bool Application::Init(int w, int h)
 		pKeyboardMouse->AddButton("Delete", new KdInputButtonForWindows(VK_DELETE));
 		pKeyboardMouse->AddButton("ToggleEditor", new KdInputButtonForWindows(VK_F1));
 
+		// 全デバッグUIの表示/非表示を一括切替
+		pKeyboardMouse->AddButton("ToggleDebugGui", new KdInputButtonForWindows(VK_F3));
+
 		// その他
 		pKeyboardMouse->AddButton("Escape", new KdInputButtonForWindows(VK_ESCAPE));
 		pKeyboardMouse->AddButton("SwitchScene", new KdInputButtonForWindows('T'));

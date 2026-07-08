@@ -37,13 +37,19 @@ public:
 	// ImGuiのNewFrame~Renderの間で呼び出す(全デバッグウィンドウの描画)
 	void Draw();
 
-	// 各ウィンドウの表示ON/OFF(必要であればメニューなどから切り替える)
+	// 全デバッグUIの表示ON/OFF(F3で一括トグル。falseだとメニューバー含め全て隠す)
+	bool m_showAll = true;
+
+	// 各ウィンドウの表示ON/OFF(上部メニューバーのチェックで切り替える)
 	bool m_showFlags = true;
 	bool m_showWatch = true;
 	bool m_showParams = true;
 	bool m_showEffect = true;
 
 private:
+
+	// 上部メニューバー(各ウィンドウのON/OFF + 一括操作)
+	void DrawMenuBar();
 
 	DebugManager() = default;
 	~DebugManager() = default;
