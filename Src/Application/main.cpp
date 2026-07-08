@@ -2,6 +2,7 @@
 
 #include "Scene/SceneManager.h"
 #include "Debug/DebugManager.h"
+#include "Debug/DebugParams/DebugParams.h"
 #include "Debug/DebugFlags/DebugFlags.h"
 #include "LevelEditor/LevelEditorManager.h"
 #include "GameObject/Block/Block.h"
@@ -308,6 +309,13 @@ bool Application::Init(int w, int h)
 
 		KdInputManager::Instance().AddDevice("KeyboardMouse", pKeyboardMouse);
 	}
+
+	//===================================================================
+	// デバッグ調整値をファイルから復元する
+	// (シーン生成前に呼ぶこと。各オブジェクトが初めてDebugParams::Float()等で
+	//  登録する前にLoadしておくと、保存値がpendingとして既定値より優先される)
+	//===================================================================
+	DebugParams::Instance().Load();
 
 	//===================================================================
 	// シーンの初期化(開始シーンの生成。SceneManagerのコンストラクタでは行わない)
