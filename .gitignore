@@ -7,6 +7,9 @@ Project/
 x64/
 .vs
 
+#開発者ローカルのDebugParams調整値(実行時保存。最終値はコードのFloat()既定値に焼き込む方針)
+/Asset/Data/Debug/
+
 #共通無視拡張子
 *.tlog
 *.obj
