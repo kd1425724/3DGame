@@ -69,6 +69,8 @@ public:
 	enum class ObjectTag
 	{
 		None,
+		Player,
+		Enemy,
 	};
 	//各当たり判定が必要なオブジェクトでoverride
 	virtual ObjectTag GetObjectTag() { return ObjectTag::None; }

@@ -4,7 +4,6 @@
 #include "../../../API/MathAPI/MathAPI.h"
 #include "../../../Scene/SceneManager.h"
 #include "../../../Debug/DebugParams/DebugParams.h"
-#include "../Player/Player.h"
 
 void Enemy::Init()
 {
@@ -43,14 +42,9 @@ void Enemy::Update()
 	//    自己再入でフリーズするため、Update()まで遅延させている
 	if (m_wpTarget.expired())
 	{
-		for (auto& obj : SceneManager::Instance().GetObjList())
+		if (std::shared_ptr<KdGameObject> spPlayer = SceneManager::Instance().FindObjectWithTag(ObjectTag::Player))
 		{
-			std::shared_ptr<Player> spPlayer = std::dynamic_pointer_cast<Player>(obj);
-			if (spPlayer)
-			{
-				m_wpTarget = spPlayer;
-				break;
-			}
+			m_wpTarget = spPlayer;
 		}
 	}
 

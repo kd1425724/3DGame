@@ -3,7 +3,6 @@
 #include "../../../main.h"
 #include "../../../Scene/SceneManager.h"
 #include "../../../Debug/DebugParams/DebugParams.h"
-#include "../../Chara/Enemy/Enemy.h"
 
 void LaserShot::Fire(const Math::Vector3& _pos, const Math::Vector3& _dir)
 {
@@ -70,11 +69,8 @@ void LaserShot::PostUpdate()
 	Math::Vector3 attackCenter = GetPos() + m_dir * hitOffset;
 	KdCollider::SphereInfo attackSphere(KdCollider::TypeDamage, attackCenter, hitRadius);
 
-	for (auto& obj : SceneManager::Instance().GetObjList())
+	for (auto& spEnemy : SceneManager::Instance().FindObjectsWithTag(ObjectTag::Enemy))
 	{
-		std::shared_ptr<Enemy> spEnemy = std::dynamic_pointer_cast<Enemy>(obj);
-		if (!spEnemy) { continue; }
-
 		// 当たったかどうか(bool)だけ分かればよいので詳細リザルトは不要(nullptrを渡す)
 		if (spEnemy->Intersects(attackSphere, nullptr))
 		{

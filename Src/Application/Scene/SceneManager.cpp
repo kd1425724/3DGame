@@ -60,6 +60,31 @@ void SceneManager::RemoveObject(const std::shared_ptr<KdGameObject>& _obj)
 	m_currentScene->RemoveObject(_obj);
 }
 
+std::vector<std::shared_ptr<KdGameObject>> SceneManager::FindObjectsWithTag(KdGameObject::ObjectTag _tag)
+{
+	std::vector<std::shared_ptr<KdGameObject>> results;
+	for (auto& obj : GetObjList())
+	{
+		if (obj && obj->GetObjectTag() == _tag)
+		{
+			results.push_back(obj);
+		}
+	}
+	return results;
+}
+
+std::shared_ptr<KdGameObject> SceneManager::FindObjectWithTag(KdGameObject::ObjectTag _tag)
+{
+	for (auto& obj : GetObjList())
+	{
+		if (obj && obj->GetObjectTag() == _tag)
+		{
+			return obj;
+		}
+	}
+	return nullptr;
+}
+
 void SceneManager::ChangeScene(SceneType _sceneType)
 {
 	// 次のシーンを作成し、現在のシーンにする

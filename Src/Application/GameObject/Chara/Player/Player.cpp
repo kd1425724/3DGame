@@ -3,7 +3,6 @@
 #include "../../../main.h"
 #include "../../Camera/CameraBase.h"
 #include "../../Camera/TPSCamera/TPSCamera.h"
-#include "../Enemy/Enemy.h"
 #include "../../Magic/LaserShot/LaserShot.h"
 #include "../../../Scene/SceneManager.h"
 #include "../../../Debug/DebugParams/DebugParams.h"
@@ -84,14 +83,11 @@ void Player::PostUpdate()
 		if (KdInputManager::Instance().IsPress("RightClick"))
 		{
 			// 押した瞬間：一番近い敵を探してロックオンする
-			std::shared_ptr<Enemy> nearestEnemy;
+			std::shared_ptr<KdGameObject> nearestEnemy;
 			float nearestDist = FLT_MAX;
 
-			for (auto& obj : SceneManager::Instance().GetObjList())
+			for (auto& spEnemy : SceneManager::Instance().FindObjectsWithTag(ObjectTag::Enemy))
 			{
-				std::shared_ptr<Enemy> spEnemy = std::dynamic_pointer_cast<Enemy>(obj);
-				if (!spEnemy) { continue; }
-
 				float dist = Math::Vector3::Distance(GetPos(), spEnemy->GetPos());
 				if (dist < nearestDist)
 				{

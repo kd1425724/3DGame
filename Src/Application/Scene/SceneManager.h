@@ -48,6 +48,13 @@ public :
 	// 現在のシーンからオブジェクトを削除
 	void RemoveObject(const std::shared_ptr<KdGameObject>& _obj);
 
+	// 種別タグ(KdGameObject::GetObjectTag)で現在シーンのオブジェクトを探す
+	//  ・FindObjectsWithTag ... 一致する全オブジェクトを返す(0件なら空)
+	//  ・FindObjectWithTag  ... 最初に一致した1つを返す(無ければnullptr)
+	// dynamic_pointer_castによる種別判定の共通化用
+	std::vector<std::shared_ptr<KdGameObject>> FindObjectsWithTag(KdGameObject::ObjectTag _tag);
+	std::shared_ptr<KdGameObject> FindObjectWithTag(KdGameObject::ObjectTag _tag);
+
 private :
 
 	// シーン切り替え関数

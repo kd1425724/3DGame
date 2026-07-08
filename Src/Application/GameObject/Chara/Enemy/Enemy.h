@@ -21,6 +21,9 @@ public:
 	void Update()		override;
 	void PostUpdate()	override;
 
+	// 種別タグ：シーン内からEnemyを探すときの判定に使う(dynamic_pointer_castの代わり)
+	ObjectTag GetObjectTag() override { return ObjectTag::Enemy; }
+
 	// 攻撃(レーザー等)に当たったときに呼ばれる：消滅する
 	void OnHit(KdGameObject* _other) override;
 
