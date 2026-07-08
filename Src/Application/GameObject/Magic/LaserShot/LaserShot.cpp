@@ -28,7 +28,7 @@ void LaserShot::Fire(const Math::Vector3& _pos, const Math::Vector3& _dir)
 
 	// レーザーは一瞬の発射なので寿命を短くする(長いと連射時にエフェクトが積み重なりFPSが落ちる)
 	// DebugParamsで調整可能(素材のパーティクルを減らすとさらに軽くなる)
-	m_lifeTime = DebugParams::Instance().Float("レーザー/寿命", 1.0f, 0.0f, 10.0f);
+	m_lifeTime = DebugParams::Instance().Float(U8("レーザー/寿命"), 1.0f, 0.0f, 10.0f);
 }
 
 void LaserShot::Update()
@@ -43,7 +43,7 @@ void LaserShot::Update()
 	if (m_phase == Phase::Charge)
 	{
 		// チャージ中：時間が来たら魔法陣の位置からレーザーを発射する
-		float chargeTime = DebugParams::Instance().Float("レーザー/チャージ時間", 1.0f, 0.0f, 5.0f);
+		float chargeTime = DebugParams::Instance().Float(U8("レーザー/チャージ時間"), 1.0f, 0.0f, 5.0f);
 		m_chargeElapsed += Application::Instance().GetDeltaTime();
 		if (m_chargeElapsed >= chargeTime)
 		{
@@ -64,8 +64,8 @@ void LaserShot::PostUpdate()
 	if (m_isExpired || m_phase != Phase::Fire) { return; }
 
 	// 攻撃判定：発射位置から前方(オフセット)の位置に半径(攻撃半径)の球を作り、敵に当てる
-	float hitOffset = DebugParams::Instance().Float("レーザー/攻撃前方オフセット", 2.0f, 0.0f, 10.0f);
-	float hitRadius = DebugParams::Instance().Float("レーザー/攻撃半径", 1.5f, 0.0f, 10.0f);
+	float hitOffset = DebugParams::Instance().Float(U8("レーザー/攻撃前方オフセット"), 2.0f, 0.0f, 10.0f);
+	float hitRadius = DebugParams::Instance().Float(U8("レーザー/攻撃半径"), 1.5f, 0.0f, 10.0f);
 	Math::Vector3 attackCenter = GetPos() + m_dir * hitOffset;
 	KdCollider::SphereInfo attackSphere(KdCollider::TypeDamage, attackCenter, hitRadius);
 
@@ -87,8 +87,8 @@ void LaserShot::DrawDebug()
 	{
 		if (!m_pDebugWire) { m_pDebugWire = std::make_unique<KdDebugWireFrame>(); }
 
-		float hitOffset = DebugParams::Instance().Float("レーザー/攻撃前方オフセット", 2.0f, 0.0f, 10.0f);
-		float hitRadius = DebugParams::Instance().Float("レーザー/攻撃半径", 1.5f, 0.0f, 10.0f);
+		float hitOffset = DebugParams::Instance().Float(U8("レーザー/攻撃前方オフセット"), 2.0f, 0.0f, 10.0f);
+		float hitRadius = DebugParams::Instance().Float(U8("レーザー/攻撃半径"), 1.5f, 0.0f, 10.0f);
 		Math::Vector3 attackCenter = GetPos() + m_dir * hitOffset;
 		m_pDebugWire->AddDebugSphere(attackCenter, hitRadius, Math::Color(1.0f, 0.3f, 0.3f, 1.0f));
 	}

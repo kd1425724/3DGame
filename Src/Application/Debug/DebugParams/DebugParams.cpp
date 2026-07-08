@@ -114,7 +114,7 @@ void DebugParams::Draw()
 	if (!m_lastResultMessage.empty())
 	{
 		ImGui::SameLine();
-		ImGui::TextDisabled("%s", m_lastResultMessage.c_str());
+		ImGui::TextDisabled(U8("%s"), m_lastResultMessage.c_str());
 	}
 
 	ImGui::Separator();

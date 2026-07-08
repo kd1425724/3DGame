@@ -21,7 +21,7 @@ void CharaBase::GroundCheck()
 	float deltaTime = Application::Instance().GetDeltaTime();
 
 	// 重力を加算し、垂直方向に移動させる(重力はDebugParamsで調整可能)
-	float gravity = DebugParams::Instance().Float("キャラ/重力", 20.0f, 0.0f, 100.0f);
+	float gravity = DebugParams::Instance().Float(U8("キャラ/重力"), 20.0f, 0.0f, 100.0f);
 	m_verticalVelocity -= gravity * deltaTime;
 
 	Math::Vector3 pos = GetPos();
@@ -96,6 +96,6 @@ void CharaBase::Jump()
 	if (!m_isGrounded) { return; }
 
 	// ジャンプ初速はDebugParamsで調整可能
-	m_verticalVelocity = DebugParams::Instance().Float("キャラ/ジャンプ力", 8.0f, 0.0f, 30.0f);
+	m_verticalVelocity = DebugParams::Instance().Float(U8("キャラ/ジャンプ力"), 8.0f, 0.0f, 30.0f);
 	m_isGrounded = false;
 }

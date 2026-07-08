@@ -37,7 +37,7 @@ void Player::Update()
 			move = Math::Vector3::TransformNormal(move, spCamera->GetRotationYMatrix());
 		}
 
-		float moveSpeed = DebugParams::Instance().Float("プレイヤー/移動速度", 5.0f, 0.0f, 20.0f);
+		float moveSpeed = DebugParams::Instance().Float(U8("プレイヤー/移動速度"), 5.0f, 0.0f, 20.0f);
 		pos += move * moveSpeed * Application::Instance().GetDeltaTime();
 		SetPos(pos);
 	}

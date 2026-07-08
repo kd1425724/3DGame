@@ -8,9 +8,12 @@
 //  ・Save / Load ボタンでファイルに保存・復元できる(調整結果を残せる)
 //
 // 使い方：
-//  float speed = DebugParams::Instance().Float("Player/移動速度", 5.0f, 0.0f, 20.0f);
-//  int   hp    = DebugParams::Instance().Int("Enemy/HP", 100);
-//  bool  invincible = DebugParams::Instance().Bool("Player/無敵");
+//  float speed = DebugParams::Instance().Float(U8("プレイヤー/移動速度"), 5.0f, 0.0f, 20.0f);
+//  int   hp    = DebugParams::Instance().Int(U8("敵/HP"), 100);
+//  bool  invincible = DebugParams::Instance().Bool(U8("プレイヤー/無敵"));
+//
+//  ※ 日本語を含むキーは必ず U8() で包むこと。素の文字列リテラルだと
+//     実行文字セット(Shift-JIS)に変換され、UTF-8前提のImGuiで文字化けする。
 //
 //  "カテゴリ名/名前" のように "/" を入れるとImGui上でカテゴリごとに
 //  折り畳み表示される。
