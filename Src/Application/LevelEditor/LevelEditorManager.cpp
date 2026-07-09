@@ -23,7 +23,7 @@ std::shared_ptr<KdGameObject> LevelEditorManager::CreateObject(const std::string
 		// 現在のシーンに追加(SceneManagerが「現在のシーン」への追加を委譲してくれる)
 		SceneManager::Instance().AddObject(spObj);
 
-		m_objectTypeNames[spObj.get()] = std::string(objTypeName);
+		m_objectTypeNames[spObj.get()] = { spObj, std::string(objTypeName) };
 
 		SetSelected(spObj);
 	}
@@ -38,6 +38,14 @@ void LevelEditorManager::RemoveObject(const std::shared_ptr<KdGameObject>& obj)
 	SceneManager::Instance().RemoveObject(obj);
 
 	m_objectTypeNames.erase(obj.get());
+
+	// 自力消滅(IsExpired)などRemoveObjectを通らずに消えたオブジェクトのエントリも
+	// ここでまとめて掃除しておく(生ポインタキーが残り続けるのを防ぐ)
+	for (auto it = m_objectTypeNames.begin(); it != m_objectTypeNames.end(); )
+	{
+		if (it->second.wp.expired()) { it = m_objectTypeNames.erase(it); }
+		else { ++it; }
+	}
 
 	// 選択中リストからも取り除く(破棄済みのものも一緒に掃除しておく)
 	m_wpSelectedList.erase(

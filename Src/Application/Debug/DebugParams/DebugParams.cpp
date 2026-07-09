@@ -212,57 +212,62 @@ bool DebugParams::Load(const std::string& filename)
 	if (!ifs) { return false; }
 
 	nlohmann::json json;
+
+	// パース(ifs >> json)だけでなく、値の取り出し(get/at)も含めてまとめて保護する。
+	// 起動時に呼ばれるため、壊れた/古い形式のJSON(型不一致・要素数不足など)でも
+	// 例外で落とさず、既定値のまま起動できるようにする。
+	// nlohmann::json::exception は parse_error / type_error / out_of_range の基底クラス。
 	try
 	{
 		ifs >> json;
+
+		if (json.contains("floats"))
+		{
+			for (auto& [name, value] : json["floats"].items())
+			{
+				float v = value.get<float>();
+				auto itr = m_floats.find(name);
+				if (itr != m_floats.end()) { itr->second.value = v; }
+				else { m_pendingFloats[name] = v; }
+			}
+		}
+
+		if (json.contains("ints"))
+		{
+			for (auto& [name, value] : json["ints"].items())
+			{
+				int v = value.get<int>();
+				auto itr = m_ints.find(name);
+				if (itr != m_ints.end()) { itr->second.value = v; }
+				else { m_pendingInts[name] = v; }
+			}
+		}
+
+		if (json.contains("vectors"))
+		{
+			for (auto& [name, value] : json["vectors"].items())
+			{
+				Math::Vector3 v(value.at(0).get<float>(), value.at(1).get<float>(), value.at(2).get<float>());
+				auto itr = m_vectors.find(name);
+				if (itr != m_vectors.end()) { itr->second = v; }
+				else { m_pendingVectors[name] = v; }
+			}
+		}
+
+		if (json.contains("bools"))
+		{
+			for (auto& [name, value] : json["bools"].items())
+			{
+				bool v = value.get<bool>();
+				auto itr = m_bools.find(name);
+				if (itr != m_bools.end()) { itr->second = v; }
+				else { m_pendingBools[name] = v; }
+			}
+		}
 	}
-	catch (const nlohmann::json::parse_error&)
+	catch (const nlohmann::json::exception&)
 	{
 		return false;
-	}
-
-	if (json.contains("floats"))
-	{
-		for (auto& [name, value] : json["floats"].items())
-		{
-			float v = value.get<float>();
-			auto itr = m_floats.find(name);
-			if (itr != m_floats.end()) { itr->second.value = v; }
-			else { m_pendingFloats[name] = v; }
-		}
-	}
-
-	if (json.contains("ints"))
-	{
-		for (auto& [name, value] : json["ints"].items())
-		{
-			int v = value.get<int>();
-			auto itr = m_ints.find(name);
-			if (itr != m_ints.end()) { itr->second.value = v; }
-			else { m_pendingInts[name] = v; }
-		}
-	}
-
-	if (json.contains("vectors"))
-	{
-		for (auto& [name, value] : json["vectors"].items())
-		{
-			Math::Vector3 v(value.at(0).get<float>(), value.at(1).get<float>(), value.at(2).get<float>());
-			auto itr = m_vectors.find(name);
-			if (itr != m_vectors.end()) { itr->second = v; }
-			else { m_pendingVectors[name] = v; }
-		}
-	}
-
-	if (json.contains("bools"))
-	{
-		for (auto& [name, value] : json["bools"].items())
-		{
-			bool v = value.get<bool>();
-			auto itr = m_bools.find(name);
-			if (itr != m_bools.end()) { itr->second = v; }
-			else { m_pendingBools[name] = v; }
-		}
 	}
 
 	return true;

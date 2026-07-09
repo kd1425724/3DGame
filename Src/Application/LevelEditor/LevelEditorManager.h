@@ -50,8 +50,19 @@ public:
 	// 生成時に使った種類名を取得する(保存時に使用。エディタ経由で生成していない場合は空文字)
 	std::string GetObjectTypeName(const std::shared_ptr<KdGameObject>& obj) const
 	{
+		if (!obj) { return std::string(); }
+
 		auto itr = m_objectTypeNames.find(obj.get());
-		return (itr != m_objectTypeNames.end()) ? itr->second : std::string();
+
+		// 生ポインタは解放後に別オブジェクトへ再利用され得るため、weak_ptrで
+		// 「今そのアドレスにいるのが登録時と同じオブジェクトか」を確認してから返す
+		// (再利用された別オブジェクトを誤って種類名付き＝エディタ管理下と誤検出しない)
+		if (itr != m_objectTypeNames.end() && itr->second.wp.lock() == obj)
+		{
+			return itr->second.typeName;
+		}
+
+		return std::string();
 	}
 
 	// 選択を1つだけにする(既存の選択は全て解除される)
@@ -152,7 +163,14 @@ private:
 	std::vector<std::string> m_creatableNames;
 
 	// 生成したオブジェクトがどの種類名で作られたか(保存時に使用)
-	std::unordered_map<const KdGameObject*, std::string> m_objectTypeNames;
+	// ※ 生ポインタは解放後に再利用され得るので、weak_ptrを併せ持ち
+	//    GetObjectTypeName()で同一性を検証する(誤検出防止)
+	struct TypeNameEntry
+	{
+		std::weak_ptr<KdGameObject> wp;
+		std::string                 typeName;
+	};
+	std::unordered_map<const KdGameObject*, TypeNameEntry> m_objectTypeNames;
 
 	// 現在選択中のオブジェクト一覧(先頭が主選択。Ctrl+クリックで追加/解除される)
 	std::vector<std::weak_ptr<KdGameObject>> m_wpSelectedList;

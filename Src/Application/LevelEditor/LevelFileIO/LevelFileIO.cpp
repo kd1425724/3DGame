@@ -89,30 +89,46 @@ bool LevelFileIO::Load(const std::string& filename)
 
 	for (auto& object : json)
 	{
-		if (!object.contains("type") || !object.contains("name")) { continue; }
-
-		const std::string typeName = object["type"].get<std::string>();
-		const std::string instanceName = object["name"].get<std::string>();
-
-		// ※ typeNameが RegisterCreatable で登録されていない場合、
-		//    Framework側のKdGameObjectFactoryがassertで止まります
-		//   (未登録の種類がデータに紛れているという実装ミスを検知するためなので、
-		//    データを直したうえで登録漏れが無いか確認してください)
-		std::shared_ptr<KdGameObject> spObj = mgr.CreateObject(typeName);
-		if (!spObj) { continue; }
-
-		spObj->SetName(instanceName);
-
-		auto readVec3 = [&](const char* key) -> Math::Vector3
+		// 1要素ずつ保護する。ある要素が型不一致・要素数不足で壊れていても、
+		// その要素だけスキップして残りは読み込む(壊れた1個で全体が読めなくならない)
+		try
 		{
-			if (!object.contains(key)) { return {}; }
-			auto& v = object[key];
-			return { v.at(0).get<float>(), v.at(1).get<float>(), v.at(2).get<float>() };
-		};
+			if (!object.contains("type") || !object.contains("name")) { continue; }
 
-		spObj->SetPos(readVec3("pos"));
-		spObj->SetRot(readVec3("rot"));
-		spObj->SetScale(readVec3("scale"));
+			const std::string typeName = object["type"].get<std::string>();
+			const std::string instanceName = object["name"].get<std::string>();
+
+			// ※ typeNameが RegisterCreatable で登録されていない場合、
+			//    Framework側のKdGameObjectFactoryがassertで止まります
+			//   (未登録の種類がデータに紛れているという実装ミスを検知するためなので、
+			//    データを直したうえで登録漏れが無いか確認してください)
+			std::shared_ptr<KdGameObject> spObj = mgr.CreateObject(typeName);
+			if (!spObj) { continue; }
+
+			spObj->SetName(instanceName);
+
+			//Math::Vector3に変換
+			//ラムダ式をその場で作る
+			//指定したkeyの３要素を取り出す
+			auto readVec3 = [&object](const char* key) -> Math::Vector3
+			{
+				//keyが無ければ(0,0,0)を返す(欠けたデータでも落ちないように)
+				if (!object.contains(key)) { return {}; }
+				auto& v = object[key];
+
+				//jsonにある値を一つずつ取り出す
+				return { v.at(0).get<float>(), v.at(1).get<float>(), v.at(2).get<float>() };
+			};
+
+			spObj->SetPos(readVec3("pos"));
+			spObj->SetRot(readVec3("rot"));
+			spObj->SetScale(readVec3("scale"));
+		}
+		catch (const nlohmann::json::exception&)
+		{
+			// この要素は壊れているのでスキップして次へ
+			continue;
+		}
 	}
 
 	return true;
