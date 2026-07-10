@@ -3,6 +3,7 @@
 #include "../CharaBase.h"
 
 class CameraBase;
+class WireAction;
 
 //====================================================
 //
@@ -16,8 +17,10 @@ class Player : public CharaBase
 {
 public:
 
-	Player()				{}
-	~Player()	override	{}
+	// ※ コンストラクタ/デストラクタは.cppで定義する
+	//    (unique_ptr<WireAction>を前方宣言で持つため、実体化はWireAction.hをincludeした.cpp側で行う)
+	Player();
+	~Player()	override;
 
 	void Init()			override;
 	void Update()		override;
@@ -35,4 +38,10 @@ private:
 
 	// 移動方向の基準にするカメラ
 	std::weak_ptr<CameraBase> m_wpCamera;
+
+	//ワイヤー
+	std::unique_ptr<WireAction> m_upWire;
+
+	// ワイヤー中の3D速度(通常時のm_verticalVelocityとは別。スイングは縦横まとめて要るため)
+	Math::Vector3 m_velocity = {};
 };

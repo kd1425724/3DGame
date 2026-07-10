@@ -283,6 +283,9 @@ bool Application::Init(int w, int h)
 		// Playerのジャンプ
 		pKeyboardMouse->AddButton("Jump", new KdInputButtonForWindows(VK_SPACE));
 
+		// Playerのワイヤーアクション(発射/解除)
+		pKeyboardMouse->AddButton("WireShoot", new KdInputButtonForWindows('F'));
+
 		// 加速(EditorCamera)
 		pKeyboardMouse->AddButton("Boost", new KdInputButtonForWindows(VK_SHIFT));
 
