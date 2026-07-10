@@ -291,6 +291,7 @@
     <ClInclude Include="Src\Application\GameObject\Ground\Ground.h" />
     <ClInclude Include="Src\Application\GameObject\Magic\MagicBase.h" />
     <ClInclude Include="Src\Application\GameObject\Magic\LaserShot\LaserShot.h" />
+    <ClInclude Include="Src\Application\GameObject\Wire\WireAction.h" />
     <ClInclude Include="Src\Application\LevelEditor\LevelEditorManager.h" />
     <ClInclude Include="Src\Application\LevelEditor\LevelEditorHistory\LevelEditorHistory.h" />
     <ClInclude Include="Src\Application\LevelEditor\LevelFileIO\LevelFileIO.h" />
@@ -367,6 +368,7 @@
     <ClCompile Include="Src\Application\GameObject\Ground\Ground.cpp" />
     <ClCompile Include="Src\Application\GameObject\Magic\MagicBase.cpp" />
     <ClCompile Include="Src\Application\GameObject\Magic\LaserShot\LaserShot.cpp" />
+    <ClCompile Include="Src\Application\GameObject\Wire\WireAction.cpp" />
     <ClCompile Include="Src\Application\LevelEditor\LevelEditorManager.cpp" />
     <ClCompile Include="Src\Application\LevelEditor\LevelEditorHistory\LevelEditorHistory.cpp" />
     <ClCompile Include="Src\Application\LevelEditor\LevelFileIO\LevelFileIO.cpp" />

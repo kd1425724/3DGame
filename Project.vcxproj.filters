@@ -115,6 +115,9 @@
     <Filter Include="Src\Application\GameObject\Magic\LaserShot">
       <UniqueIdentifier>{f6d0c5e4-a071-4e62-bd5f-7c0a1b2e3f54}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Application\GameObject\Wire">
+      <UniqueIdentifier>{a7e1c2d3-1122-4b33-9c44-5d6e7f809aa1}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\Application\Debug">
       <UniqueIdentifier>{81b7a301-0093-415a-895f-4f6d7d620939}</UniqueIdentifier>
     </Filter>
@@ -354,6 +357,9 @@
     <ClInclude Include="Src\Application\GameObject\Magic\LaserShot\LaserShot.h">
       <Filter>Src\Application\GameObject\Magic\LaserShot</Filter>
     </ClInclude>
+    <ClInclude Include="Src\Application\GameObject\Wire\WireAction.h">
+      <Filter>Src\Application\GameObject\Wire</Filter>
+    </ClInclude>
     <ClInclude Include="Src\Application\GameObject\Camera\FPSCamera\FPSCamera.h">
       <Filter>Src\Application\GameObject\Camera\FPSCamera</Filter>
     </ClInclude>
@@ -571,6 +577,9 @@
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Magic\LaserShot\LaserShot.cpp">
       <Filter>Src\Application\GameObject\Magic\LaserShot</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\GameObject\Wire\WireAction.cpp">
+      <Filter>Src\Application\GameObject\Wire</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Camera\FPSCamera\FPSCamera.cpp">
       <Filter>Src\Application\GameObject\Camera\FPSCamera</Filter>
