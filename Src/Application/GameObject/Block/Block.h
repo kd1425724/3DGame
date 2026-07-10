@@ -15,6 +15,7 @@ public:
 
 private:
 
-	// 表示用モデルワーク
-	KdModelWork m_modelWork;
+	// 表示・当たり判定の両方で共有するモデルワーク
+	// (当たり判定側にshared_ptrとして渡して共有するためshared_ptrで保持。Groundと同じ形)
+	std::shared_ptr<KdModelWork> m_spModelWork;
 };
