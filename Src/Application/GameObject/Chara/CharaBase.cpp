@@ -85,10 +85,6 @@ void CharaBase::ResolveGround(Math::Vector3& pos)
 		}
 	}
 
-	// 【落下調査・一時的】レイの結果を記録(あとで消す)
-	m_dbgRayHit = hit;
-	if (hit) { m_dbgStandY = hitPos.y + (GetScale().y * 0.5f); }
-
 	// 落下中(velocity.y<=0)に地面へ届いていて、立つべき高さより下に来ていたら着地させる
 	// ※ 上昇中(ジャンプ直後)は吸着しないので、そのまま上へ飛べる
 	if (hit && m_velocity.y <= 0.0f)

@@ -6,7 +6,6 @@
 #include "../../Magic/LaserShot/LaserShot.h"
 #include "../../../Scene/SceneManager.h"
 #include "../../../Debug/DebugParams/DebugParams.h"
-#include "../../../Debug/DebugWatch/DebugWatch.h"   // 【落下調査・一時的】あとで消す
 
 #include"../../Wire/WireAction.h"
 
@@ -169,13 +168,6 @@ void Player::PostUpdate()
 	{
 		GroundCheck();
 	}
-
-	// 【落下調査・一時的】DebugWatchに毎フレーム出す(あとで消す)
-	DebugWatch::Instance().Watch(U8("落下調査/接地"), m_isGrounded);
-	DebugWatch::Instance().Watch(U8("落下調査/velY"), m_velocity.y);
-	DebugWatch::Instance().Watch(U8("落下調査/posY"), GetPos().y);
-	DebugWatch::Instance().Watch(U8("落下調査/レイ命中"), m_dbgRayHit);
-	DebugWatch::Instance().Watch(U8("落下調査/standY"), m_dbgStandY);
 
 	// ロックオンの切り替え(右クリックはワイヤー発射に使うので、ロックオンは別入力"LockOn")
 	std::shared_ptr<TPSCamera> spTpsCamera = std::dynamic_pointer_cast<TPSCamera>(m_wpCamera.lock());
