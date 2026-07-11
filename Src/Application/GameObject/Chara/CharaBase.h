@@ -35,6 +35,12 @@ protected:
 	// ※ 縦の乗り上げ/着地はResolveGroundが担当。ワイヤー中もすり抜け防止に使う
 	void ResolveBump(Math::Vector3& pos);
 
+	// 高速移動で壁(TypeBump)を1フレームで飛び越える(トンネリング)のを防ぐ連続当たり判定。
+	// フレーム開始位置fromPosから移動後posへ体の高さで水平レイを飛ばし、途中に壁があれば
+	// その手前(半径ぶん外側)で止め、壁へ向かう水平速度を消す。ResolveBumpの前に呼ぶ安全弁。
+	// ※ ワイヤーのスイング/フリングなど水平速度が大きいときに効く(低速時はResolveBumpで足りる)
+	void ResolveBumpSweep(const Math::Vector3& fromPos, Math::Vector3& pos);
+
 	// 接地中ならジャンプする(垂直速度に初速を与える。初速はDebugParams"キャラ/ジャンプ力")
 	void Jump();
 

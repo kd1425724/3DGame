@@ -27,10 +27,14 @@ void CharaBase::GroundCheck()
 	// 速度で位置を進める(縦横まとめて)。水平速度は各キャラのUpdateが設定する
 	// ※ Enemyは水平をUpdateで直接動かすためm_velocity.xzは0のまま＝縦だけ動く
 	Math::Vector3 pos = GetPos();
+	Math::Vector3 startPos = pos;   // 移動前の位置(スイープの始点)
 	pos += m_velocity * deltaTime;
 
 	// 地面に潜っていたら押し上げて落下を止める(接地状態もここで更新される)
 	ResolveGround(pos);
+
+	// 高速移動で壁を飛び越える(トンネリング)のを先に止める
+	ResolveBumpSweep(startPos, pos);
 
 	// 壁(TypeBump=Block等)にめり込んでいたら水平に押し出す
 	ResolveBump(pos);
@@ -162,6 +166,66 @@ void CharaBase::ResolveBump(Math::Vector3& pos)
 			if (into < 0.0f) { m_velocity -= n * into; }
 		}
 	}
+}
+
+void CharaBase::ResolveBumpSweep(const Math::Vector3& fromPos, Math::Vector3& pos)
+{
+	float radius = DebugParams::Instance().Float(U8("キャラ/壁当たり半径"), 0.4f, 0.1f, 2.0f);
+
+	// 水平移動量だけを見る(縦の乗り降り・着地はResolveGroundが担当)
+	Math::Vector3 delta(pos.x - fromPos.x, 0.0f, pos.z - fromPos.z);
+	float dist = delta.Length();
+
+	// 半径以下の移動ならトンネリングは起きない(体の球が必ず壁と重なる)。
+	// その場合は静止時のResolveBump(重なり押し出し)に任せて、ここは何もしない。
+	if (dist <= radius) { return; }
+
+	Math::Vector3 dir = delta / dist;
+
+	// レイを飛ばす高さは体の中心あたり(ResolveBumpの球中心と同じ)
+	float sampleY = pos.y - GetScale().y * 0.5f + radius + 0.02f;
+	Math::Vector3 origin(fromPos.x, sampleY, fromPos.z);
+
+	// レイ長は「移動量 + 半径」。半径ぶん伸ばすのは、体の表面が壁に触れる所で止めたいから
+	KdCollider::RayInfo ray(KdCollider::TypeBump, origin, dir, dist + radius);
+
+	// デバッグ表示：スイープに使ったレイを可視化
+	if (KdGameObject::s_showColliderDebug)
+	{
+		if (!m_pDebugWire) { m_pDebugWire = std::make_unique<KdDebugWireFrame>(); }
+		m_pDebugWire->AddDebugLine(ray.m_pos, ray.m_dir, ray.m_range, Math::Color(1.0f, 0.4f, 0.0f, 1.0f));
+	}
+
+	std::list<KdCollider::CollisionResult> results;
+	for (auto& obj : SceneManager::Instance().GetObjList())
+	{
+		if (!obj) { continue; }
+		obj->Intersects(ray, &results);
+	}
+
+	// 一番手前(overlapが最大=originから最も近い)の壁を採用する
+	float maxOverlap = 0.0f;
+	Math::Vector3 hitPos;
+	bool hit = false;
+	for (auto& ret : results)
+	{
+		if (ret.m_overlapDistance > maxOverlap)
+		{
+			maxOverlap = ret.m_overlapDistance;
+			hitPos = ret.m_hitPos;
+			hit = true;
+		}
+	}
+	if (!hit) { return; }
+
+	// 壁の手前(半径ぶん外側)まで水平位置を戻す。縦(y)はいじらない
+	Math::Vector3 stop = hitPos - dir * radius;
+	pos.x = stop.x;
+	pos.z = stop.z;
+
+	// 壁へ向かう水平速度成分を消して、壁に沿って滑るようにする
+	float into = m_velocity.Dot(dir);
+	if (into > 0.0f) { m_velocity -= dir * into; }
 }
 
 void CharaBase::Jump()

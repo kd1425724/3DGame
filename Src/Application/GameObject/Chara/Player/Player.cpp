@@ -70,6 +70,7 @@ void Player::Update()
 
 		// 速度で進めてから、ワイヤーの距離拘束を解く
 		Math::Vector3 pos = GetPos();
+		Math::Vector3 startPos = pos;   // 移動前の位置(スイープの始点)
 		pos += m_velocity * dt;
 
 		// W(+1)でたぐり寄せ / S(-1)で伸ばし
@@ -79,6 +80,9 @@ void Player::Update()
 		// 地面に潜らないよう押し上げる(ワイヤー中もすり抜け防止)
 		// ※ m_isGroundedもここで更新される。空中を振っている間は接地false=離した時のフリングが残る
 		ResolveGround(pos);
+
+		// スイングは高速なので、まず壁を飛び越えるトンネリングを止める(startPos→posを掃引)
+		ResolveBumpSweep(startPos, pos);
 
 		// 塔(Block)にめり込まないよう水平に押し出す(スイングで塔に突っ込んでもすり抜けない)
 		ResolveBump(pos);
