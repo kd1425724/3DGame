@@ -110,6 +110,13 @@ void CharaBase::ResolveBump(Math::Vector3& pos)
 	// ※ 縦の着地はResolveGroundが担当するので、ここは水平方向だけ押す
 	float radius = DebugParams::Instance().Float(U8("キャラ/壁当たり半径"), 0.4f, 0.1f, 2.0f);
 
+	// デバッグ表示：壁当たり用の球を可視化(DebugFlags「当たり判定/AABB表示」でON/OFF)
+	if (KdGameObject::s_showColliderDebug)
+	{
+		if (!m_pDebugWire) { m_pDebugWire = std::make_unique<KdDebugWireFrame>(); }
+		m_pDebugWire->AddDebugSphere(pos, radius, Math::Color(0.3f, 0.6f, 1.0f, 1.0f));
+	}
+
 	// 複数の壁に挟まれても安定するよう数回反復する
 	for (int iter = 0; iter < 3; ++iter)
 	{
