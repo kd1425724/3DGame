@@ -1,5 +1,7 @@
 ﻿#include "TPSCamera.h"
 
+#include "../../../Scene/SceneManager.h"
+
 void TPSCamera::Init()
 {
 	// 親クラスの初期化呼び出し
@@ -68,40 +70,39 @@ void TPSCamera::PostUpdate()
 	}
 
 	// 当たり判定をしたいタイプを設定
-	rayInfo.m_type = KdCollider::TypeGround;
+	// 地面(TypeGround)だけでなく塔などのBlock(TypeBump)にもカメラを遮らせる
+	rayInfo.m_type = KdCollider::TypeGround | KdCollider::TypeBump;
 
-	// ②HIT判定対象オブジェクトに総当たり
-	for (std::weak_ptr<KdGameObject> wpGameObj : m_wpHitObjectList)
+	// ②シーン内の全オブジェクトに総当たり
+	// ※ 以前はカメラ専用の登録リスト(RegistHitObject)だけを見ていたため、
+	//   レベルエディタのLevel.jsonから後で足された塔(Block)が対象外ですり抜けていた。
+	//   Player側の当たり判定(CharaBase)と同じくSceneManagerの全オブジェクトを走査する。
+	std::list<KdCollider::CollisionResult> retRayList;
+	for (auto& spGameObj : SceneManager::Instance().GetObjList())
 	{
-		std::shared_ptr<KdGameObject> spGameObj = wpGameObj.lock();
-		if (spGameObj)
-		{
-			std::list<KdCollider::CollisionResult> retRayList;
-			spGameObj->Intersects(rayInfo, &retRayList);
+		if (!spGameObj) { continue; }
+		spGameObj->Intersects(rayInfo, &retRayList);
+	}
 
-			// ③ 結果を使って座標を補完する
-			// レイに当たったリストから一番近いオブジェクトを検出
-			float maxOverLap = 0;
-			Math::Vector3 hitPos = {};
-			bool hit = false;
-			for (auto& ret : retRayList)
-			{
-				// レイを遮断しオーバーした長さが
-				// 一番長いものを探す
-				if (maxOverLap < ret.m_overlapDistance)
-				{
-					maxOverLap = ret.m_overlapDistance;
-					hitPos = ret.m_hitPos;
-					hit = true;
-				}
-			}
-			if (hit)
-			{
-				// 何かしらの障害物に当たっている
-				Math::Vector3 _hitPos = hitPos;
-				_hitPos += rayInfo.m_dir * 0.4f;
-				SetPos(_hitPos);
-			}
+	// ③ 結果を使って座標を補完する
+	// レイに当たったリストから一番遮った(overlapが最大の)障害物を検出
+	float maxOverLap = 0;
+	Math::Vector3 hitPos = {};
+	bool hit = false;
+	for (auto& ret : retRayList)
+	{
+		if (maxOverLap < ret.m_overlapDistance)
+		{
+			maxOverLap = ret.m_overlapDistance;
+			hitPos = ret.m_hitPos;
+			hit = true;
 		}
+	}
+	if (hit)
+	{
+		// 何かしらの障害物に当たっている。障害物の手前にカメラを寄せる
+		Math::Vector3 _hitPos = hitPos;
+		_hitPos += rayInfo.m_dir * 0.4f;
+		SetPos(_hitPos);
 	}
 }
