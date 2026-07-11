@@ -49,8 +49,11 @@ void CharaBase::ResolveGround(Math::Vector3& pos)
 	float fallThisFrame = (m_velocity.y < 0.0f) ? (-m_velocity.y * deltaTime) : 0.0f;
 	float rayRange = rayStartUp + (GetScale().y * 0.5f) + fallThisFrame + 0.1f;
 
+	// レイの始点を「このフレームの落下量ぶん」上げる。
+	// こうすると高速落下(＝低FPSで1フレームの移動量が大きい)でも、通り過ぎた区間を
+	// レイが必ず覆うので、薄い地面をすり抜けない(トンネリング防止)。
 	// 地面(TypeGround)に加えてBlock等(TypeBump)の天面にも乗れるようにする
-	KdCollider::RayInfo ray(KdCollider::TypeGround | KdCollider::TypeBump, pos + Math::Vector3(0, rayStartUp, 0), Math::Vector3::Down, rayRange);
+	KdCollider::RayInfo ray(KdCollider::TypeGround | KdCollider::TypeBump, pos + Math::Vector3(0, rayStartUp + fallThisFrame, 0), Math::Vector3::Down, rayRange);
 
 	// デバッグ表示：地面判定に使用したレイを可視化
 	if (KdGameObject::s_showColliderDebug)
