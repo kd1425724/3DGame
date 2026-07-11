@@ -37,10 +37,14 @@ public:
 			   DirectX::XMConvertToRadians(m_DegAng.y));
 	}
 
-	void RegistHitObject(const std::shared_ptr<KdGameObject>& object)
-	{
-		m_wpHitObjectList.push_back(object);
-	}
+	// 【現在未使用】カメラの当たり判定を「登録したオブジェクトだけ」に当てるための登録口。
+	// TPSCamera側をSceneManagerの全オブジェクト走査(TypeGround|TypeBump)に変更したため呼ばれなくなった。
+	// (レベルエディタでLevel.jsonから後ロードされる塔などを取りこぼす問題への対応)
+	// 登録方式に戻す可能性を考えて元の実装をコメントで残す。
+	//void RegistHitObject(const std::shared_ptr<KdGameObject>& object)
+	//{
+	//	m_wpHitObjectList.push_back(object);
+	//}
 
 	// カメラは毎フレームm_mWorldを独自に(m_mLocalPos * m_mRotation * ターゲット行列で)組み立てているため、
 	// KdGameObject::SetPos(m_pos + MatrixUpdate)を使うと回転成分が消えてしまう。
@@ -58,7 +62,8 @@ protected:
 
 	std::shared_ptr<KdCamera>					m_spCamera		= nullptr;
 	std::weak_ptr<KdGameObject>					m_wpTarget;
-	std::vector<std::weak_ptr<KdGameObject>>	m_wpHitObjectList{};
+	// 【現在未使用】RegistHitObjectで登録したカメラ当たり対象。上のRegistHitObjectと対で残す。
+	//std::vector<std::weak_ptr<KdGameObject>>	m_wpHitObjectList{};
 
 	Math::Matrix								m_mLocalPos		= Math::Matrix::Identity;
 	Math::Matrix								m_mRotation		= Math::Matrix::Identity;

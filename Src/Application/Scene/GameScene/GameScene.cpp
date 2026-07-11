@@ -37,7 +37,9 @@ void GameScene::Init()
 	std::shared_ptr<TPSCamera> spCamera = std::make_shared<TPSCamera>();
 	spCamera->Init();
 	spCamera->SetTarget(spPlayer);
-	spCamera->RegistHitObject(spGround);
+	// 【現在未使用】以前はカメラのめり込み判定対象を手動登録していた。
+	// 現在はTPSCameraがSceneManagerの全オブジェクトを走査するため登録不要(CameraBase::RegistHitObject参照)。
+	//spCamera->RegistHitObject(spGround);
 	AddObject(spCamera);
 
 	// GameSceneからもカメラを参照できるように保持
