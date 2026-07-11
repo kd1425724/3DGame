@@ -25,6 +25,12 @@ protected:
 	// ※ PostUpdate等の「world状態の解決」フェーズで毎フレーム呼ぶ想定
 	void GroundCheck();
 
+	// 移動後の位置posを受け取り、地面(TypeGround)に潜っていたら立つ高さへ押し上げて
+	// 縦の落下を止める。接地状態(m_isGrounded)も更新する。
+	// ※ 重力・移動の積分は呼び出し側で済ませておくこと(この関数は地面との"解決"だけ行う)
+	// ※ ワイヤー中など、GroundCheckを通さず自前で移動するときのすり抜け防止にも使う
+	void ResolveGround(Math::Vector3& pos);
+
 	// 接地中ならジャンプする(垂直速度に初速を与える。初速はDebugParams"キャラ/ジャンプ力")
 	void Jump();
 

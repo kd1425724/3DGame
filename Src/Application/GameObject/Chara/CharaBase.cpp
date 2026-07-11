@@ -29,6 +29,16 @@ void CharaBase::GroundCheck()
 	Math::Vector3 pos = GetPos();
 	pos += m_velocity * deltaTime;
 
+	// 地面に潜っていたら押し上げて落下を止める(接地状態もここで更新される)
+	ResolveGround(pos);
+
+	SetPos(pos);
+}
+
+void CharaBase::ResolveGround(Math::Vector3& pos)
+{
+	float deltaTime = Application::Instance().GetDeltaTime();
+
 	// あたる側の設定＝＝＝＝＝＝＝＝＝＝
 	// レイの始点は少し上(rayStartUp)、長さは「開始高さ + モデルの半分 + このフレームの落下量 + 余裕」
 	// で可変にする。落下量を足すことで、高速落下しても地面をすり抜けにくくする(=可変レイ判定)
@@ -82,14 +92,12 @@ void CharaBase::GroundCheck()
 			pos.y = standY;
 			m_velocity.y = 0.0f;   // 縦の勢いだけ止める(横の勢いはそのまま=着地滑りは各キャラのUpdate側で制御)
 			m_isGrounded = true;
-			SetPos(pos);
 			return;
 		}
 	}
 
-	// それ以外は空中：重力で移動した位置をそのまま適用する
+	// それ以外は空中
 	m_isGrounded = false;
-	SetPos(pos);
 }
 
 void CharaBase::Jump()

@@ -64,9 +64,6 @@ void Player::Update()
 	// === ワイヤー中の物理(スイング) ===
 	if (m_upWire->IsAttached())
 	{
-		// スイング中は空中扱い(離した瞬間に地面移動へ戻って勢いが消えるのを防ぐ)
-		m_isGrounded = false;
-
 		// 重力を3D速度に加える
 		float gravity = DebugParams::Instance().Float(U8("キャラ/重力"), 20.0f, 0.0f, 100.0f);
 		m_velocity.y -= gravity * dt;
@@ -78,6 +75,10 @@ void Player::Update()
 		// W(+1)でたぐり寄せ / S(-1)で伸ばし
 		float reel = KdInputManager::Instance().GetAxisState("Move").y;
 		m_upWire->Update(pos, m_velocity, dt, reel);
+
+		// 地面に潜らないよう押し上げる(ワイヤー中もすり抜け防止)
+		// ※ m_isGroundedもここで更新される。空中を振っている間は接地false=離した時のフリングが残る
+		ResolveGround(pos);
 
 		SetPos(pos);
 		return;   // ワイヤー中は通常移動・ジャンプ・レーザーは止める
