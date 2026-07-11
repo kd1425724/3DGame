@@ -27,10 +27,10 @@ void GameScene::Init()
 	spGround->Init();
 	AddObject(spGround);
 
-	// プレイヤー
+	// プレイヤー(高所スタート。起動時に落下してコースへ降りてくる。地面・塔は原点基準で接地)
 	std::shared_ptr<Player> spPlayer = std::make_shared<Player>();
 	spPlayer->Init();
-	spPlayer->SetPos(Math::Vector3(0, 5.0f, 0));
+	spPlayer->SetPos(Math::Vector3(0, 20.0f, 0));
 	AddObject(spPlayer);
 
 	// TPSカメラ(プレイヤーを追従、地面との当たり判定でめり込み防止)
