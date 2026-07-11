@@ -19,6 +19,8 @@ public:
 
 	void DrawLit()			override;
 
+	void DrawDebug()		override;   // 当たり判定(モデル立方体)を箱で可視化
+
 private:
 
 	// 表示・当たり判定の両方で共有するモデルワーク
