@@ -32,6 +32,9 @@ void CharaBase::GroundCheck()
 	// 地面に潜っていたら押し上げて落下を止める(接地状態もここで更新される)
 	ResolveGround(pos);
 
+	// 壁(TypeBump=Block等)にめり込んでいたら水平に押し出す
+	ResolveBump(pos);
+
 	SetPos(pos);
 }
 
@@ -46,7 +49,8 @@ void CharaBase::ResolveGround(Math::Vector3& pos)
 	float fallThisFrame = (m_velocity.y < 0.0f) ? (-m_velocity.y * deltaTime) : 0.0f;
 	float rayRange = rayStartUp + (GetScale().y * 0.5f) + fallThisFrame + 0.1f;
 
-	KdCollider::RayInfo ray(KdCollider::TypeGround, pos + Math::Vector3(0, rayStartUp, 0), Math::Vector3::Down, rayRange);
+	// 地面(TypeGround)に加えてBlock等(TypeBump)の天面にも乗れるようにする
+	KdCollider::RayInfo ray(KdCollider::TypeGround | KdCollider::TypeBump, pos + Math::Vector3(0, rayStartUp, 0), Math::Vector3::Down, rayRange);
 
 	// デバッグ表示：地面判定に使用したレイを可視化
 	if (KdGameObject::s_showColliderDebug)
@@ -98,6 +102,54 @@ void CharaBase::ResolveGround(Math::Vector3& pos)
 
 	// それ以外は空中
 	m_isGrounded = false;
+}
+
+void CharaBase::ResolveBump(Math::Vector3& pos)
+{
+	// 体を球で近似し、Block等(TypeBump)にめり込んでいたら水平方向へ押し出して壁にする
+	// ※ 縦の着地はResolveGroundが担当するので、ここは水平方向だけ押す
+	float radius = DebugParams::Instance().Float(U8("キャラ/壁当たり半径"), 0.4f, 0.1f, 2.0f);
+
+	// 複数の壁に挟まれても安定するよう数回反復する
+	for (int iter = 0; iter < 3; ++iter)
+	{
+		KdCollider::SphereInfo sphere(KdCollider::TypeBump, pos, radius);
+
+		std::list<KdCollider::CollisionResult> results;
+		for (auto& obj : SceneManager::Instance().GetObjList())
+		{
+			if (!obj) { continue; }
+			obj->Intersects(sphere, &results);
+		}
+
+		// 一番深くめり込んでいる相手から押し出す
+		Math::Vector3 push = Math::Vector3::Zero;
+		float maxOverlap = 0.0f;
+		for (auto& ret : results)
+		{
+			if (ret.m_overlapDistance > maxOverlap)
+			{
+				maxOverlap = ret.m_overlapDistance;
+				push = ret.m_hitDir * ret.m_overlapDistance;
+			}
+		}
+
+		// どこにもめり込んでいなければ終わり
+		if (maxOverlap <= 0.0f) { break; }
+
+		// 水平方向だけ押し出す(縦の乗り上げ・着地はResolveGroundに任せる)
+		push.y = 0.0f;
+		pos += push;
+
+		// 壁へ向かう速度成分を消して、壁に沿って滑るようにする
+		if (push.LengthSquared() > 0.0f)
+		{
+			Math::Vector3 n = push;
+			n.Normalize();
+			float into = m_velocity.Dot(n);
+			if (into < 0.0f) { m_velocity -= n * into; }
+		}
+	}
 }
 
 void CharaBase::Jump()

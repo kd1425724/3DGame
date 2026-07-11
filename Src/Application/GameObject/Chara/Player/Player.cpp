@@ -80,6 +80,9 @@ void Player::Update()
 		// ※ m_isGroundedもここで更新される。空中を振っている間は接地false=離した時のフリングが残る
 		ResolveGround(pos);
 
+		// 塔(Block)にめり込まないよう水平に押し出す(スイングで塔に突っ込んでもすり抜けない)
+		ResolveBump(pos);
+
 		SetPos(pos);
 		return;   // ワイヤー中は通常移動・ジャンプ・レーザーは止める
 	}
@@ -110,11 +113,21 @@ void Player::Update()
 	}
 	else if (wishDir.LengthSquared() > 0.0f)
 	{
-		// 空中は勢い(m_velocity.xz)を保ちつつ、入力があるぶんだけ寄せる(空中制御)
-		// ※ 入力が無いときはm_velocity.xzを触らない=スイング後のフリングが消えない
-		float airControl = DebugParams::Instance().Float(U8("プレイヤー/空中制御"), 3.0f, 0.0f, 20.0f);
-		m_velocity.x += (wishVel.x - m_velocity.x) * airControl * dt;
-		m_velocity.z += (wishVel.z - m_velocity.z) * airControl * dt;
+		// 空中制御(Quake風エアアクセル)：入力方向へ加速はするが、既にある勢いは削らない
+		// ・入力方向の速度成分が moveSpeed に達するまでだけ加速する(それ以上は足さない)
+		// ・横入力なら進行方向を曲げられる(速度は落ちない=速いフリングにブレーキがかからない)
+		float airAccel = DebugParams::Instance().Float(U8("プレイヤー/空中制御"), 10.0f, 0.0f, 100.0f);
+
+		Math::Vector3 horiz(m_velocity.x, 0.0f, m_velocity.z);
+		float speedInWishDir = horiz.Dot(wishDir);      // 今の速度のうち入力方向を向いている分
+		float addSpeed = moveSpeed - speedInWishDir;     // moveSpeedまであとどれだけ足せるか
+		if (addSpeed > 0.0f)
+		{
+			float accel = airAccel * moveSpeed * dt;
+			if (accel > addSpeed) { accel = addSpeed; }  // 入力方向がmoveSpeedを超えないよう頭打ち
+			m_velocity.x += wishDir.x * accel;
+			m_velocity.z += wishDir.z * accel;
+		}
 	}
 
 	// 実際の移動・着地はPostUpdateのGroundCheckがm_velocityを積分して解決する

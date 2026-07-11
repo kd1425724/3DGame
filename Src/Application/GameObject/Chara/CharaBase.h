@@ -31,6 +31,10 @@ protected:
 	// ※ ワイヤー中など、GroundCheckを通さず自前で移動するときのすり抜け防止にも使う
 	void ResolveGround(Math::Vector3& pos);
 
+	// 体を球で近似し、Block等(TypeBump)にめり込んでいたら水平方向へ押し出す(壁として働く)
+	// ※ 縦の乗り上げ/着地はResolveGroundが担当。ワイヤー中もすり抜け防止に使う
+	void ResolveBump(Math::Vector3& pos);
+
 	// 接地中ならジャンプする(垂直速度に初速を与える。初速はDebugParams"キャラ/ジャンプ力")
 	void Jump();
 
