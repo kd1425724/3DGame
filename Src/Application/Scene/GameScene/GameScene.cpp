@@ -6,6 +6,9 @@
 #include "../../GameObject/Chara/Enemy/Enemy.h"
 #include "../../GameObject/Camera/TPSCamera/TPSCamera.h"
 
+#include "../../LevelEditor/LevelFileIO/LevelFileIO.h"
+#include "../../LevelEditor/LevelEditorManager.h"
+
 void GameScene::Event()
 {
 	if (KdInputManager::Instance().IsHold("SwitchScene"))
@@ -27,7 +30,7 @@ void GameScene::Init()
 	// プレイヤー
 	std::shared_ptr<Player> spPlayer = std::make_shared<Player>();
 	spPlayer->Init();
-	spPlayer->SetPos(Math::Vector3(0, 1.0f, 0));
+	spPlayer->SetPos(Math::Vector3(0, 5.0f, 0));
 	AddObject(spPlayer);
 
 	// TPSカメラ(プレイヤーを追従、地面との当たり判定でめり込み防止)
@@ -49,4 +52,11 @@ void GameScene::Init()
 	spEnemy->SetPos(Math::Vector3(3.0f, 1.0f, 3.0f));
 	spEnemy->SetTarget(spPlayer);
 	AddObject(spEnemy);
+
+	// 保存済みレベル(レベルエディタで配置したBlock等)を読み込んで上に足す
+	// ※ 追加ロードなので上のGround/Player/Enemyはそのまま。ファイルが無ければ何も足さない
+	LevelFileIO::Instance().Load("Asset/Data/LevelEditor/Level.json");
+
+	// 読み込み直後は最後の生成物が選択状態になるので、起動時のハイライトを消す
+	LevelEditorManager::Instance().ClearSelection();
 }
