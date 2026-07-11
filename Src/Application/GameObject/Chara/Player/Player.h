@@ -25,6 +25,7 @@ public:
 	void Init()			override;
 	void Update()		override;
 	void PostUpdate()	override;
+	void DrawDebug()	override;
 
 	// 種別タグ：シーン内からPlayerを探すときの判定に使う(dynamic_pointer_castの代わり)
 	ObjectTag GetObjectTag() override { return ObjectTag::Player; }
@@ -42,6 +43,5 @@ private:
 	//ワイヤー
 	std::unique_ptr<WireAction> m_upWire;
 
-	// ワイヤー中の3D速度(通常時のm_verticalVelocityとは別。スイングは縦横まとめて要るため)
-	Math::Vector3 m_velocity = {};
+	// ※ 移動用の速度は基底CharaBaseの m_velocity(3D) を共通で使う
 };

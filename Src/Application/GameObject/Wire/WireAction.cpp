@@ -46,6 +46,7 @@ bool WireAction::Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, fl
 	if (hit)
 	{
 		m_length = Math::Vector3::Distance(_from,m_anchor);
+		m_maxLength = m_length;   // 撃った瞬間の長さをリールアウトの上限にする
 		m_isAttached = true;
 	}
 
@@ -73,11 +74,9 @@ void WireAction::Update(Math::Vector3& _pos, Math::Vector3& _vel, float _dt, flo
 	// ① リール: _reelInput でワイヤー長 m_length を伸縮させる
 	//    ・縮める量 = _reelInput * リール速度(DebugParams) * _dt を m_length から引く
 	//    ・短くなりすぎないよう下限(例:0.5)でクランプ
-	m_length -= _reelInput * DebugParams::Instance().Float(U8("ワイヤー/リール速度"), 5, 0.1f, 10) * _dt;
-	if (m_length < 0.5f)
-	{
-		m_length = 0.5f;
-	}
+	m_length -= _reelInput * DebugParams::Instance().Float(U8("ワイヤー/リール速度"), 5.0f, 0.1f, 10.0f) * _dt;
+	if (m_length < 0.5f)       { m_length = 0.5f; }        // 短すぎ防止
+	if (m_length > m_maxLength) { m_length = m_maxLength; } // 撃った時の長さより伸ばさない
 
 	// ② アンカーから自分へのベクトル toPos = _pos - m_anchor と、その長さ dist を求める
 	//    ・dist がほぼ0なら向きが定義できないので早期return

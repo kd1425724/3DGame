@@ -29,6 +29,8 @@ void Player::Init()
 
 	//ワイヤー
 	m_upWire = std::make_unique<WireAction>();
+
+	m_pDebugWire = std::make_unique<KdDebugWireFrame>();
 }
 
 void Player::Update()
@@ -49,22 +51,22 @@ void Player::Update()
 		Math::Vector3 from = GetPos() + Math::Vector3(0, 1.0f, 0);
 		float maxLen = DebugParams::Instance().Float(U8("ワイヤー/最大長"), 30.0f, 1.0f, 100.0f);
 
-		if (m_upWire->Shoot(from, dir, maxLen))
-		{
-			// 撃った瞬間、通常システムの落下速度を3D速度へ引き継ぐ(急停止しないように)
-			m_velocity = Math::Vector3(0.0f, m_verticalVelocity, 0.0f);
-		}
+		// 撃った瞬間、今の速度(m_velocity)はそのまま引き継ぐ
+		// (走りながら撃てば横の勢いが乗る。速度は基底CharaBaseの共通m_velocity)
+		m_upWire->Shoot(from, dir, maxLen);
 	}
 	if (KdInputManager::Instance().IsRelease("WireShoot"))
 	{
+		// 離しても速度(m_velocity)はそのまま=スイングの勢いで飛んでいける(フリング)
 		m_upWire->Release();
-		// 縦の勢いだけ通常システムへ返す(横の勢いの引き継ぎは今後の課題)
-		m_verticalVelocity = m_velocity.y;
 	}
 
 	// === ワイヤー中の物理(スイング) ===
 	if (m_upWire->IsAttached())
 	{
+		// スイング中は空中扱い(離した瞬間に地面移動へ戻って勢いが消えるのを防ぐ)
+		m_isGrounded = false;
+
 		// 重力を3D速度に加える
 		float gravity = DebugParams::Instance().Float(U8("キャラ/重力"), 20.0f, 0.0f, 100.0f);
 		m_velocity.y -= gravity * dt;
@@ -81,31 +83,42 @@ void Player::Update()
 		return;   // ワイヤー中は通常移動・ジャンプ・レーザーは止める
 	}
 
-	// === 通常移動(ワイヤーを使っていないとき) ===
-	Math::Vector3 pos = GetPos();
-
+	// === 通常移動(velocityベース。接地=キビキビ、空中=勢いを保つ) ===
 	// ※ Forward/Backwardの定義上、見た目と前後が逆に感じたため入れ替え済み
 	Math::Vector2 moveAxis = KdInputManager::Instance().GetAxisState("Move");
-	Math::Vector3 move = Math::Vector3::Backward * moveAxis.y + Math::Vector3::Right * moveAxis.x;
+	Math::Vector3 wishDir = Math::Vector3::Backward * moveAxis.y + Math::Vector3::Right * moveAxis.x;
 
-	if (move.LengthSquared() > 0.0f)
+	float moveSpeed = DebugParams::Instance().Float(U8("プレイヤー/移動速度"), 5.0f, 0.0f, 20.0f);
+	Math::Vector3 wishVel = Math::Vector3::Zero;
+	if (wishDir.LengthSquared() > 0.0f)
 	{
-		move.Normalize();
-		Math::Matrix rotCamMat = Math::Matrix::Identity;
+		wishDir.Normalize();
 		// カメラの水平方向の向きに合わせて移動方向を回転させる(TPS的な移動)
-		std::shared_ptr<CameraBase> spCamera = m_wpCamera.lock();
-		if (spCamera)
+		if (std::shared_ptr<CameraBase> spCamera = m_wpCamera.lock())
 		{
-			move = Math::Vector3::TransformNormal(move, spCamera->GetRotationYMatrix());
+			wishDir = Math::Vector3::TransformNormal(wishDir, spCamera->GetRotationYMatrix());
 		}
-
-		float moveSpeed = DebugParams::Instance().Float(U8("プレイヤー/移動速度"), 5.0f, 0.0f, 20.0f);
-		pos += move * moveSpeed * Application::Instance().GetDeltaTime();
-		SetPos(pos);
-		
+		wishVel = wishDir * moveSpeed;
 	}
 
-	// SPACEでジャンプ(接地中のみ有効。実際の上下移動・着地はPostUpdateのGroundCheckで解決)
+	if (m_isGrounded)
+	{
+		// 接地中はキビキビ動くよう、水平速度を入力に即セット(離せば止まる)
+		m_velocity.x = wishVel.x;
+		m_velocity.z = wishVel.z;
+	}
+	else if (wishDir.LengthSquared() > 0.0f)
+	{
+		// 空中は勢い(m_velocity.xz)を保ちつつ、入力があるぶんだけ寄せる(空中制御)
+		// ※ 入力が無いときはm_velocity.xzを触らない=スイング後のフリングが消えない
+		float airControl = DebugParams::Instance().Float(U8("プレイヤー/空中制御"), 3.0f, 0.0f, 20.0f);
+		m_velocity.x += (wishVel.x - m_velocity.x) * airControl * dt;
+		m_velocity.z += (wishVel.z - m_velocity.z) * airControl * dt;
+	}
+
+	// 実際の移動・着地はPostUpdateのGroundCheckがm_velocityを積分して解決する
+
+	// SPACEでジャンプ(接地中のみ有効。上下移動・着地はGroundCheckで解決)
 	if (KdInputManager::Instance().IsPress("Jump"))
 	{
 		Jump();
@@ -142,12 +155,12 @@ void Player::PostUpdate()
 		GroundCheck();
 	}
 
-	// 右クリックの押した瞬間/離した瞬間でロックオンを切り替える
+	// ロックオンの切り替え(右クリックはワイヤー発射に使うので、ロックオンは別入力"LockOn")
 	std::shared_ptr<TPSCamera> spTpsCamera = std::dynamic_pointer_cast<TPSCamera>(m_wpCamera.lock());
 
 	if (spTpsCamera)
 	{
-		if (KdInputManager::Instance().IsPress("RightClick"))
+		if (KdInputManager::Instance().IsPress("LockOn"))
 		{
 			// 押した瞬間：一番近い敵を探してロックオンする
 			std::shared_ptr<KdGameObject> nearestEnemy;
@@ -169,10 +182,21 @@ void Player::PostUpdate()
 				spTpsCamera->SetLockOn(true);
 			}
 		}
-		else if (KdInputManager::Instance().IsRelease("RightClick"))
+		else if (KdInputManager::Instance().IsRelease("LockOn"))
 		{
 			// 離した瞬間：ロックオン解除
 			spTpsCamera->SetLockOn(false);
 		}
 	}
+}
+
+void Player::DrawDebug()
+{
+	if (m_upWire && m_upWire->IsAttached())        // 繋がっている間だけ
+	{
+		if (!m_pDebugWire) { m_pDebugWire = std::make_unique<KdDebugWireFrame>(); }
+		m_pDebugWire->AddDebugLine(m_pos, m_upWire->GetAnchor(),kBlueColor);
+		m_pDebugWire->Draw();
+	}
+	KdGameObject::DrawDebug();
 }

@@ -37,8 +37,11 @@ protected:
 	// 描画時の色味(サブクラスで変更して他のキャラクターと見分けられるようにする)
 	Math::Color m_color = kWhiteColor;
 
-	// 垂直方向の速度(上向きが+)。重力とジャンプで変化する
-	float m_verticalVelocity = 0.0f;
+	// 速度(3D)。重力・ジャンプ・移動・ワイヤーが共通で使う
+	// ・y … 重力/ジャンプ(GroundCheckが積分し、着地で0に戻す)
+	// ・x,z … 水平移動。各キャラのUpdateが設定する(Enemyは使わず0のまま)
+	// GroundCheckがこの速度でまとめて位置を進めるので、スイング後の勢いも自然に残る
+	Math::Vector3 m_velocity = {};
 
 	// 接地しているか(GroundCheckで毎フレーム更新)
 	bool m_isGrounded = false;
