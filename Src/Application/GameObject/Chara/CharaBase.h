@@ -56,5 +56,9 @@ protected:
 	// 接地しているか(GroundCheckで毎フレーム更新)
 	bool m_isGrounded = false;
 
+	// 【落下調査・一時的】ResolveGroundのレイがヒットしたか/立つべき高さ(あとで消す)
+	bool  m_dbgRayHit = false;
+	float m_dbgStandY = 0.0f;
+
 	// ※ 重力加速度・ジャンプ初速はDebugParams("キャラ/重力"・"キャラ/ジャンプ力")で調整する
 };
