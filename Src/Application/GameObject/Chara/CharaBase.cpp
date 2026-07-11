@@ -110,17 +110,22 @@ void CharaBase::ResolveBump(Math::Vector3& pos)
 	// ※ 縦の着地はResolveGroundが担当するので、ここは水平方向だけ押す
 	float radius = DebugParams::Instance().Float(U8("キャラ/壁当たり半径"), 0.4f, 0.1f, 2.0f);
 
+	// 球の中心の高さ。球の底が足元のほんの少し上に来るように持ち上げる。
+	// こうしないと塔の天面に立ったとき球が天面に潜り込み、水平へ押し出されて引っかかる。
+	// (縦の乗り上げ・着地はResolveGroundが担当。ここは壁=体の高さだけを見る)
+	float centerY = pos.y - GetScale().y * 0.5f + radius + 0.02f;
+
 	// デバッグ表示：壁当たり用の球を可視化(DebugFlags「当たり判定/AABB表示」でON/OFF)
 	if (KdGameObject::s_showColliderDebug)
 	{
 		if (!m_pDebugWire) { m_pDebugWire = std::make_unique<KdDebugWireFrame>(); }
-		m_pDebugWire->AddDebugSphere(pos, radius, Math::Color(0.3f, 0.6f, 1.0f, 1.0f));
+		m_pDebugWire->AddDebugSphere(Math::Vector3(pos.x, centerY, pos.z), radius, Math::Color(0.3f, 0.6f, 1.0f, 1.0f));
 	}
 
 	// 複数の壁に挟まれても安定するよう数回反復する
 	for (int iter = 0; iter < 3; ++iter)
 	{
-		KdCollider::SphereInfo sphere(KdCollider::TypeBump, pos, radius);
+		KdCollider::SphereInfo sphere(KdCollider::TypeBump, Math::Vector3(pos.x, centerY, pos.z), radius);
 
 		std::list<KdCollider::CollisionResult> results;
 		for (auto& obj : SceneManager::Instance().GetObjList())
