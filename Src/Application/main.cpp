@@ -6,6 +6,7 @@
 #include "Debug/DebugFlags/DebugFlags.h"
 #include "LevelEditor/LevelEditorManager.h"
 #include "UI/HudEditor/HudEditorManager.h"
+#include "UI/GameHud/GameHud.h"
 #include "GameObject/Block/Block.h"
 #include "GameObject/Ground/Ground.h"
 #include "GameObject/Chara/Enemy/Enemy.h"
@@ -163,6 +164,9 @@ void Application::DrawSprite()
 
 	// HUD(画面2D)スプライトをシーンのスプライトの上に重ねて描画する
 	HudEditorManager::Instance().DrawSprites();
+
+	// ゲーム本編のHUD(速度メーターなどコード駆動)を描画する
+	GameHud::Instance().Draw();
 }
 
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////

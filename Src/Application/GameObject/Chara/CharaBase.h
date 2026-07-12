@@ -19,6 +19,12 @@ public:
 
 	void DrawLit() override;
 
+	// 水平方向(xz)の速さを返す。HUDの速度メーターなど表示用
+	float GetHorizontalSpeed() const
+	{
+		return sqrtf(m_velocity.x * m_velocity.x + m_velocity.z * m_velocity.z);
+	}
+
 protected:
 
 	// 重力を適用して垂直移動し、落下中に地面(TypeGround)へ着地したらその高さに立たせる
