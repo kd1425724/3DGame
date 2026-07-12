@@ -1,6 +1,8 @@
 ﻿#include "TPSCamera.h"
 
+#include "../../../main.h"
 #include "../../../Scene/SceneManager.h"
+#include "../../../Debug/DebugParams/DebugParams.h"
 
 void TPSCamera::Init()
 {
@@ -15,13 +17,9 @@ void TPSCamera::Init()
 
 void TPSCamera::PostUpdate()
 {
-	// ターゲットの行列(有効な場合利用する)
-	Math::Matrix								_targetMat = Math::Matrix::Identity;
+	const float dt = Application::Instance().GetDeltaTime();
+
 	const std::shared_ptr<const KdGameObject>	_spTarget = m_wpTarget.lock();
-	if (_spTarget)
-	{
-		_targetMat = Math::Matrix::CreateTranslation(_spTarget->GetPos());
-	}
 
 	// カメラの回転(Ctrlを押している間はマウスを中央に固定しない。ImGui操作等のため)
 	if (!KdInputManager::Instance().IsHold("Ctrl"))
@@ -47,7 +45,61 @@ void TPSCamera::PostUpdate()
 		}
 	}
 
-	m_mRotation = GetRotationMatrix();
+	// === 追従対象の位置と移動速度 ===
+	Math::Vector3 targetPos = Math::Vector3::Zero;
+	if (_spTarget) { targetPos = _spTarget->GetPos(); }
+
+	// 初回フレームは現在値に合わせて、起動直後のスムージング暴れを防ぐ
+	if (!m_smoothInit)
+	{
+		m_smoothFollowPos = targetPos;
+		m_smoothDegAng    = m_DegAng;
+		m_prevTargetPos   = targetPos;
+		m_smoothInit      = true;
+	}
+
+	// 対象の移動速度(m/s)。Cのカメラ引きに使う
+	float targetSpeed = 0.0f;
+	if (dt > 0.0f) { targetSpeed = (targetPos - m_prevTargetPos).Length() / dt; }
+	m_prevTargetPos = targetPos;
+
+	// === A: 追従スムージング(注視点をLerpで遅れて寄せる=振り子軌道の急な揺れを吸収) ===
+	float followK = DebugParams::Instance().Float(U8("カメラ/追従スムーズ"), 12.0f, 1.0f, 60.0f);
+	float followT = std::clamp(followK * dt, 0.0f, 1.0f);   // 値が大きいほど追従が速い(=スムージング弱)
+	m_smoothFollowPos = Math::Vector3::Lerp(m_smoothFollowPos, targetPos, followT);
+
+	// === B: 回転スムージング(視点角度を最短経路でLerp=ロックオンのスナップやマウス急変を和らげる) ===
+	float rotK = DebugParams::Instance().Float(U8("カメラ/回転スムーズ"), 20.0f, 1.0f, 60.0f);
+	float rotT = std::clamp(rotK * dt, 0.0f, 1.0f);
+	auto lerpAngle = [](float cur, float tgt, float t)
+	{
+		// 角度差を[-180,180]に畳んで最短方向に補間する(ヨーが720度等に累積してもクルッと回らない)
+		float d = tgt - cur;
+		while (d > 180.0f)  { d -= 360.0f; }
+		while (d < -180.0f) { d += 360.0f; }
+		return cur + d * t;
+	};
+	m_smoothDegAng.x = lerpAngle(m_smoothDegAng.x, m_DegAng.x, rotT);
+	m_smoothDegAng.y = lerpAngle(m_smoothDegAng.y, m_DegAng.y, rotT);
+	m_smoothDegAng.z = lerpAngle(m_smoothDegAng.z, m_DegAng.z, rotT);
+
+	// === C: 速度に応じてカメラを後ろへ引く(情報量を減らして酔い軽減。FOVは一定に保つ) ===
+	float pullPerSpeed = DebugParams::Instance().Float(U8("カメラ/速度引き量"), 0.06f, 0.0f, 1.0f);
+	float pullMax      = DebugParams::Instance().Float(U8("カメラ/速度引き上限"), 3.0f, 0.0f, 15.0f);
+	float pullTarget   = std::clamp(targetSpeed * pullPerSpeed, 0.0f, pullMax);
+	// 引き量も急に変えると酔うので、追従と同じレートで滑らかに寄せる
+	m_smoothPullback  += (pullTarget - m_smoothPullback) * followT;
+
+	// === カメラ行列の構築 ===
+	// ローカル位置(基準 z=-4.0)に、速度ぶんの引きを足して後ろへ下げる
+	m_mLocalPos = Math::Matrix::CreateTranslation(0.0f, 0.75f, -4.0f - m_smoothPullback);
+	// 平滑化した角度で回転行列を作る(CameraBase::GetRotationMatrixは生のm_DegAngを使うのでここでは使わない)
+	m_mRotation = Math::Matrix::CreateFromYawPitchRoll(
+		DirectX::XMConvertToRadians(m_smoothDegAng.y),
+		DirectX::XMConvertToRadians(m_smoothDegAng.x),
+		DirectX::XMConvertToRadians(m_smoothDegAng.z));
+	// 注視点は平滑化した追従位置を使う
+	Math::Matrix _targetMat = Math::Matrix::CreateTranslation(m_smoothFollowPos);
 	m_mWorld = m_mLocalPos * m_mRotation * _targetMat;
 
 	// ↓めり込み防止の為の座標補正計算↓

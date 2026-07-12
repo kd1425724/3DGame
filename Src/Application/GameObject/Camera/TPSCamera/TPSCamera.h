@@ -38,4 +38,16 @@ private:
 
 	// ロックオン対象(向きの計算専用。追従対象とは別)
 	std::weak_ptr<KdGameObject> m_wpLockOnTarget;
+
+	// === スイング酔い対策のスムージング用の内部状態(すべてDebugParamsで強さ調整) ===
+	// 初回フレームだけ現在値に合わせる(起動直後のスムージング暴れ防止)
+	bool          m_smoothInit     = false;
+	// A: 遅れて追従するカメラ注視点(プレイヤーへLerpで寄せる)
+	Math::Vector3 m_smoothFollowPos = {};
+	// B: 遅れて追従する視点回転(度。ロックオンのスナップやマウスの急変を和らげる)
+	Math::Vector3 m_smoothDegAng    = {};
+	// C: 対象の移動速度算出用の前フレーム位置
+	Math::Vector3 m_prevTargetPos   = {};
+	// C: 速度に応じてカメラを後ろへ引く量(平滑化後)
+	float         m_smoothPullback  = 0.0f;
 };
