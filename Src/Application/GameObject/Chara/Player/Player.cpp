@@ -37,6 +37,24 @@ void Player::Update()
 {
 	const float dt = Application::Instance().GetDeltaTime();
 
+	// ワイヤーの発射/解除
+	UpdateWireInput();
+
+	// ワイヤー接続中はスイング物理だけ行い、通常移動・ジャンプ・レーザーは止める
+	if (m_upWire->IsAttached())
+	{
+		UpdateWireSwing(dt);
+		return;
+	}
+
+	// 通常移動 → ジャンプ → レーザー
+	UpdateMove(dt);
+	UpdateJump();
+	UpdateLaser();
+}
+
+void Player::UpdateWireInput()
+{
 	// === ワイヤーの発射 / 解除 ===
 	if (KdInputManager::Instance().IsPress("WireShoot"))
 	{
@@ -60,37 +78,39 @@ void Player::Update()
 		// 離しても速度(m_velocity)はそのまま=スイングの勢いで飛んでいける(フリング)
 		m_upWire->Release();
 	}
+}
 
+void Player::UpdateWireSwing(float dt)
+{
 	// === ワイヤー中の物理(スイング) ===
-	if (m_upWire->IsAttached())
-	{
-		// 重力を3D速度に加える
-		float gravity = DebugParams::Instance().Float(U8("キャラ/重力"), 20.0f, 0.0f, 100.0f);
-		m_velocity.y -= gravity * dt;
+	// 重力を3D速度に加える
+	float gravity = DebugParams::Instance().Float(U8("キャラ/重力"), 20.0f, 0.0f, 100.0f);
+	m_velocity.y -= gravity * dt;
 
-		// 速度で進めてから、ワイヤーの距離拘束を解く
-		Math::Vector3 pos = GetPos();
-		Math::Vector3 startPos = pos;   // 移動前の位置(スイープの始点)
-		pos += m_velocity * dt;
+	// 速度で進めてから、ワイヤーの距離拘束を解く
+	Math::Vector3 pos = GetPos();
+	Math::Vector3 startPos = pos;   // 移動前の位置(スイープの始点)
+	pos += m_velocity * dt;
 
-		// W(+1)でたぐり寄せ / S(-1)で伸ばし
-		float reel = KdInputManager::Instance().GetAxisState("Move").y;
-		m_upWire->Update(pos, m_velocity, dt, reel);
+	// W(+1)でたぐり寄せ / S(-1)で伸ばし
+	float reel = KdInputManager::Instance().GetAxisState("Move").y;
+	m_upWire->Update(pos, m_velocity, dt, reel);
 
-		// 地面に潜らないよう押し上げる(ワイヤー中もすり抜け防止)
-		// ※ m_isGroundedもここで更新される。空中を振っている間は接地false=離した時のフリングが残る
-		ResolveGround(pos);
+	// 地面に潜らないよう押し上げる(ワイヤー中もすり抜け防止)
+	// ※ m_isGroundedもここで更新される。空中を振っている間は接地false=離した時のフリングが残る
+	ResolveGround(pos);
 
-		// スイングは高速なので、まず壁を飛び越えるトンネリングを止める(startPos→posを掃引)
-		ResolveBumpSweep(startPos, pos);
+	// スイングは高速なので、まず壁を飛び越えるトンネリングを止める(startPos→posを掃引)
+	ResolveBumpSweep(startPos, pos);
 
-		// 塔(Block)にめり込まないよう水平に押し出す(スイングで塔に突っ込んでもすり抜けない)
-		ResolveBump(pos);
+	// 塔(Block)にめり込まないよう水平に押し出す(スイングで塔に突っ込んでもすり抜けない)
+	ResolveBump(pos);
 
-		SetPos(pos);
-		return;   // ワイヤー中は通常移動・ジャンプ・レーザーは止める
-	}
+	SetPos(pos);
+}
 
+void Player::UpdateMove(float dt)
+{
 	// === 通常移動(velocityベース。接地=キビキビ、空中=勢いを保つ) ===
 	// ※ Forward/Backwardの定義上、見た目と前後が逆に感じたため入れ替え済み
 	Math::Vector2 moveAxis = KdInputManager::Instance().GetAxisState("Move");
@@ -135,13 +155,19 @@ void Player::Update()
 	}
 
 	// 実際の移動・着地はPostUpdateのGroundCheckがm_velocityを積分して解決する
+}
 
+void Player::UpdateJump()
+{
 	// SPACEでジャンプ(接地中のみ有効。上下移動・着地はGroundCheckで解決)
 	if (KdInputManager::Instance().IsPress("Jump"))
 	{
 		Jump();
 	}
+}
 
+void Player::UpdateLaser()
+{
 	// Eキーでプレイヤーの正面にレーザー(当たり判定つき)を発射する
 	if (KdInputManager::Instance().IsPress("FireLaser"))
 	{
@@ -173,6 +199,12 @@ void Player::PostUpdate()
 		GroundCheck();
 	}
 
+	// ロックオンの切り替え
+	UpdateLockOn();
+}
+
+void Player::UpdateLockOn()
+{
 	// ロックオンの切り替え(右クリックはワイヤー発射に使うので、ロックオンは別入力"LockOn")
 	std::shared_ptr<TPSCamera> spTpsCamera = std::dynamic_pointer_cast<TPSCamera>(m_wpCamera.lock());
 

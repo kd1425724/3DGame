@@ -35,6 +35,20 @@ public:
 
 private:
 
+	// --- Update()の中身を仕事ごとに分けたもの(挙動は分割前と同じ。Updateは流れだけ) ---
+	// ワイヤーの発射/解除の入力を処理する
+	void UpdateWireInput();
+	// ワイヤー接続中のスイング物理(重力→移動→距離拘束→当たり解決→SetPos)
+	void UpdateWireSwing(float dt);
+	// 通常移動(接地=入力に即セット/空中=エアアクセル。カメラの水平向き基準)
+	void UpdateMove(float dt);
+	// SPACEでジャンプ(接地中のみ)
+	void UpdateJump();
+	// Eキーで正面にレーザーを発射する
+	void UpdateLaser();
+	// ロックオンの切替(PostUpdateから呼ぶ。"LockOn"押下で最寄りの敵をロックオン/離すと解除)
+	void UpdateLockOn();
+
 	// ※ 移動速度はDebugParams("プレイヤー/移動速度")で調整する
 
 	// 移動方向の基準にするカメラ
