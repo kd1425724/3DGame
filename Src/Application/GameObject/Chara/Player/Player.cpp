@@ -6,6 +6,7 @@
 #include "../../Magic/LaserShot/LaserShot.h"
 #include "../../../Scene/SceneManager.h"
 #include "../../../Debug/DebugParams/DebugParams.h"
+#include "../../../Debug/DebugFlags/DebugFlags.h"
 
 #include"../../Wire/WireAction.h"
 
@@ -95,6 +96,46 @@ void Player::UpdateWireSwing(float dt)
 	// W(+1)でたぐり寄せ / S(-1)で伸ばし
 	float reel = KdInputManager::Instance().GetAxisState("Move").y;
 	m_upWire->Update(pos, m_velocity, dt, reel);
+
+	// === 漕ぎ(ポンプ) ===
+	// DebugFlags「ワイヤー/漕ぎ(ポンプ)」でON/OFF。
+	//   OFF … 元の純粋な振り子(下りで加速→上りで減速。地面すれすれは速度が落ちる)
+	//   ON  … 振り子に接線方向の加速を足す(ブランコを漕ぐイメージ)。上限速度まで勢いを
+	//          維持できるので、Spider-Man風に地面すれすれでも速度が落ちにくくなる
+	if (DebugFlags::Instance().Get(U8("ワイヤー/漕ぎ(ポンプ)"), false))
+	{
+		// 今の進行方向(水平)
+		Math::Vector3 horiz(m_velocity.x, 0.0f, m_velocity.z);
+		float sp = horiz.Length();
+		if (sp > 0.0001f)
+		{
+			Math::Vector3 tdir = horiz / sp;
+
+			// アンカーから外向き(半径方向)の水平成分を除き、接線方向だけに加速する。
+			// (半径方向へ足しても距離拘束で打ち消されるだけ＝弧に沿ってのみ漕ぐ)
+			Math::Vector3 radial = pos - m_upWire->GetAnchor();
+			radial.y = 0.0f;
+			if (radial.LengthSquared() > 0.0001f)
+			{
+				radial.Normalize();
+				tdir -= radial * tdir.Dot(radial);
+				if (tdir.LengthSquared() > 0.0001f) { tdir.Normalize(); }
+				else                                { tdir = Math::Vector3::Zero; }
+			}
+
+			float pumpMax = DebugParams::Instance().Float(U8("ワイヤー/ポンプ上限速度"), 20.0f, 0.0f, 60.0f);
+			float pumpAcc = DebugParams::Instance().Float(U8("ワイヤー/ポンプ加速"),     15.0f, 0.0f, 100.0f);
+
+			float add = pumpMax - sp;   // 上限速度まであとどれだけ足せるか(それ以上は加速しない)
+			if (add > 0.0f && tdir.LengthSquared() > 0.0f)
+			{
+				float a = pumpAcc * dt;
+				if (a > add) { a = add; }
+				m_velocity.x += tdir.x * a;
+				m_velocity.z += tdir.z * a;
+			}
+		}
+	}
 
 	// 地面に潜らないよう押し上げる(ワイヤー中もすり抜け防止)
 	// ※ m_isGroundedもここで更新される。空中を振っている間は接地false=離した時のフリングが残る
