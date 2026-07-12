@@ -7,6 +7,7 @@
 #include "../../../Scene/SceneManager.h"
 #include "../../../Debug/DebugParams/DebugParams.h"
 #include "../../../Debug/DebugFlags/DebugFlags.h"
+#include "../../Camera/CameraShake.h"
 
 #include"../../Wire/WireAction.h"
 
@@ -239,6 +240,15 @@ void Player::PostUpdate()
 	{
 		GroundCheck();
 	}
+
+	// === 着地・壁ヒットの手応え(カメラを揺らす) ===
+	// CharaBaseが記録した衝撃をConsumeし、一定以上ならtraumaを加える(小さすぎる衝撃は無視)。
+	// ※ Playerだけが発火する。Enemyも同じ記録はするが読まないのでカメラは揺れない
+	float landing = ConsumeLandingImpact();
+	if (landing > 3.0f) { CameraShake::Instance().AddTrauma(std::clamp(landing / 20.0f, 0.0f, 0.6f)); }
+
+	float wall = ConsumeWallImpact();
+	if (wall > 4.0f) { CameraShake::Instance().AddTrauma(std::clamp(wall / 25.0f, 0.0f, 0.7f)); }
 
 	// ロックオンの切り替え
 	UpdateLockOn();

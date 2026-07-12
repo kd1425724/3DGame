@@ -46,6 +46,9 @@ void CharaBase::ResolveGround(Math::Vector3& pos)
 {
 	float deltaTime = Application::Instance().GetDeltaTime();
 
+	// この呼び出しの前に接地していたか(着地の"瞬間"だけ手応えを出すためのエッジ検出用)
+	bool wasGrounded = m_isGrounded;
+
 	// あたる側の設定＝＝＝＝＝＝＝＝＝＝
 	// レイの始点は少し上(rayStartUp)、長さは「開始高さ + モデルの半分 + このフレームの落下量 + 余裕」
 	// で可変にする。落下量を足すことで、高速落下しても地面をすり抜けにくくする(=可変レイ判定)
@@ -97,6 +100,9 @@ void CharaBase::ResolveGround(Math::Vector3& pos)
 		float standY = hitPos.y + (GetScale().y * 0.5f);
 		if (pos.y <= standY)
 		{
+			// 空中から着地した"瞬間"だけ、落下の速さを手応え(カメラ揺れ)用に記録する
+			if (!wasGrounded) { m_landingImpact = -m_velocity.y; }
+
 			pos.y = standY;
 			m_velocity.y = 0.0f;   // 縦の勢いだけ止める(横の勢いはそのまま=着地滑りは各キャラのUpdate側で制御)
 			m_isGrounded = true;
@@ -225,7 +231,11 @@ void CharaBase::ResolveBumpSweep(const Math::Vector3& fromPos, Math::Vector3& po
 
 	// 壁へ向かう水平速度成分を消して、壁に沿って滑るようにする
 	float into = m_velocity.Dot(dir);
-	if (into > 0.0f) { m_velocity -= dir * into; }
+	if (into > 0.0f)
+	{
+		m_wallImpact = into;   // 手応え(カメラ揺れ)用に、壁で殺した速さを記録
+		m_velocity -= dir * into;
+	}
 }
 
 void CharaBase::Jump()

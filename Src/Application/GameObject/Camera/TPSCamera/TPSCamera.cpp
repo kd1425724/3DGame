@@ -3,6 +3,7 @@
 #include "../../../main.h"
 #include "../../../Scene/SceneManager.h"
 #include "../../../Debug/DebugParams/DebugParams.h"
+#include "../CameraShake.h"
 
 void TPSCamera::Init()
 {
@@ -18,6 +19,9 @@ void TPSCamera::Init()
 void TPSCamera::PostUpdate()
 {
 	const float dt = Application::Instance().GetDeltaTime();
+
+	// カメラの手応え(着地・壁ヒットの揺れ)を減衰させる
+	CameraShake::Instance().Update(dt);
 
 	const std::shared_ptr<const KdGameObject>	_spTarget = m_wpTarget.lock();
 
@@ -156,5 +160,14 @@ void TPSCamera::PostUpdate()
 		Math::Vector3 _hitPos = hitPos;
 		_hitPos += rayInfo.m_dir * 0.4f;
 		SetPos(_hitPos);
+	}
+
+	// 手応え(着地・壁ヒット)の揺れを最後に加える。オフセットは視点ローカルなので
+	// カメラの回転で世界方向へ直してから平行移動に足す
+	Math::Vector3 shakeOffset = CameraShake::Instance().GetOffset();
+	if (shakeOffset.LengthSquared() > 0.0f)
+	{
+		Math::Vector3 shakeWorld = Math::Vector3::TransformNormal(shakeOffset, m_mRotation);
+		SetPos(GetPos() + shakeWorld);
 	}
 }
