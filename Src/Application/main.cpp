@@ -5,6 +5,7 @@
 #include "Debug/DebugParams/DebugParams.h"
 #include "Debug/DebugFlags/DebugFlags.h"
 #include "LevelEditor/LevelEditorManager.h"
+#include "UI/HudEditor/HudEditorManager.h"
 #include "GameObject/Block/Block.h"
 #include "GameObject/Ground/Ground.h"
 #include "GameObject/Chara/Enemy/Enemy.h"
@@ -159,6 +160,9 @@ void Application::PostDraw()
 void Application::DrawSprite()
 {
 	SceneManager::Instance().DrawSprite();
+
+	// HUD(画面2D)スプライトをシーンのスプライトの上に重ねて描画する
+	HudEditorManager::Instance().DrawSprites();
 }
 
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
@@ -325,6 +329,11 @@ bool Application::Init(int w, int h)
 	//  登録する前にLoadしておくと、保存値がpendingとして既定値より優先される)
 	//===================================================================
 	DebugParams::Instance().Load();
+
+	//===================================================================
+	// HUD(画面2D)レイアウトをファイルから復元する(無ければ何も置かない)
+	//===================================================================
+	HudEditorManager::Instance().Load("Asset/Data/Hud/Hud.json");
 
 	//===================================================================
 	// シーンの初期化(開始シーンの生成。SceneManagerのコンストラクタでは行わない)

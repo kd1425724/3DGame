@@ -298,6 +298,8 @@
     <ClInclude Include="Src\Application\LevelEditor\LevelInspector\LevelInspector.h" />
     <ClInclude Include="Src\Application\LevelEditor\LevelObjectPanel\LevelObjectPanel.h" />
     <ClInclude Include="Src\Application\LevelEditor\LevelPicker\LevelPicker.h" />
+    <ClInclude Include="Src\Application\GameObject\UI\HudSprite.h" />
+    <ClInclude Include="Src\Application\UI\HudEditor\HudEditorManager.h" />
     <ClInclude Include="Src\Application\main.h" />
     <ClInclude Include="Src\Application\Scene\BaseScene\BaseScene.h" />
     <ClInclude Include="Src\Application\Scene\GameScene\GameScene.h" />
@@ -375,6 +377,8 @@
     <ClCompile Include="Src\Application\LevelEditor\LevelInspector\LevelInspector.cpp" />
     <ClCompile Include="Src\Application\LevelEditor\LevelObjectPanel\LevelObjectPanel.cpp" />
     <ClCompile Include="Src\Application\LevelEditor\LevelPicker\LevelPicker.cpp" />
+    <ClCompile Include="Src\Application\GameObject\UI\HudSprite.cpp" />
+    <ClCompile Include="Src\Application\UI\HudEditor\HudEditorManager.cpp" />
     <ClCompile Include="Src\Application\main.cpp" />
     <ClCompile Include="Src\Application\Scene\BaseScene\BaseScene.cpp" />
     <ClCompile Include="Src\Application\Scene\GameScene\GameScene.cpp" />

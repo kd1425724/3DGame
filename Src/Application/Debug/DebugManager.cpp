@@ -5,6 +5,7 @@
 #include "DebugParams/DebugParams.h"
 #include "DebugEffect/DebugEffect.h"
 #include "../LevelEditor/LevelEditorManager.h"
+#include "../UI/HudEditor/HudEditorManager.h"
 
 void DebugManager::BeginFrame()
 {
@@ -29,6 +30,7 @@ void DebugManager::Draw()
 	if (m_showWatch)	{ DebugWatch::Instance().Draw(); }
 	if (m_showParams)	{ DebugParams::Instance().Draw(); }
 	if (m_showEffect)	{ DebugEffect::Instance().Draw(); }
+	if (m_showHud)		{ HudEditorManager::Instance().Draw(); }
 
 	// レベルエディタ(配置ツール)のパネルもF3の一括トグルで隠す
 	// (エディタモード自体のON/OFF・カメラ・3Dギズモは従来どおりF1で制御。ここは表示だけ)
@@ -46,16 +48,17 @@ void DebugManager::DrawMenuBar()
 		ImGui::MenuItem(U8("DebugWatch"), nullptr, &m_showWatch);
 		ImGui::MenuItem(U8("DebugParams"), nullptr, &m_showParams);
 		ImGui::MenuItem(U8("DebugEffect"), nullptr, &m_showEffect);
+		ImGui::MenuItem(U8("HUDエディタ"), nullptr, &m_showHud);
 
 		ImGui::Separator();
 
 		if (ImGui::MenuItem(U8("すべて表示")))
 		{
-			m_showFlags = m_showWatch = m_showParams = m_showEffect = true;
+			m_showFlags = m_showWatch = m_showParams = m_showEffect = m_showHud = true;
 		}
 		if (ImGui::MenuItem(U8("すべて非表示")))
 		{
-			m_showFlags = m_showWatch = m_showParams = m_showEffect = false;
+			m_showFlags = m_showWatch = m_showParams = m_showEffect = m_showHud = false;
 		}
 
 		ImGui::EndMenu();
