@@ -45,8 +45,8 @@ private:
 	void UpdateWireSwing(float dt);
 	// 通常移動(接地=入力に即セット/空中=エアアクセル。カメラの水平向き基準)
 	void UpdateMove(float dt);
-	// SPACEでジャンプ(接地中のみ)
-	void UpdateJump();
+	// SPACEでジャンプ。コヨーテタイム(接地を離れた直後の猶予)＋先行入力(着地寸前の入力先読み)つき
+	void UpdateJump(float dt);
 	// Eキーで正面にレーザーを発射する
 	void UpdateLaser();
 	// ロックオンの切替(PostUpdateから呼ぶ。"LockOn"押下で最寄りの敵をロックオン/離すと解除)
@@ -62,6 +62,10 @@ private:
 
 	// リスポーンの復帰先(開始位置)
 	Math::Vector3 m_spawnPos = {};
+
+	// ジャンプの操作補助タイマー
+	float m_coyoteTimer = 999.0f;     // 接地を離れてからの経過時間(小さいうちは空中でも跳べる)
+	float m_jumpBufferTimer = 0.0f;   // ジャンプ入力を先読みして保持する残り時間
 
 	//ワイヤー
 	std::unique_ptr<WireAction> m_upWire;

@@ -59,7 +59,7 @@ void Player::Update()
 
 	// 通常移動 → ジャンプ → レーザー
 	UpdateMove(dt);
-	UpdateJump();
+	UpdateJump(dt);
 	UpdateLaser();
 }
 
@@ -207,12 +207,27 @@ void Player::UpdateMove(float dt)
 	// 実際の移動・着地はPostUpdateのGroundCheckがm_velocityを積分して解決する
 }
 
-void Player::UpdateJump()
+void Player::UpdateJump(float dt)
 {
-	// SPACEでジャンプ(接地中のみ有効。上下移動・着地はGroundCheckで解決)
-	if (KdInputManager::Instance().IsPress("Jump"))
+	// コヨーテタイム：接地を離れた直後の少しの間はまだ跳べる(崖際の取りこぼし対策)
+	// 先行入力：着地寸前に押した入力を覚えておき、着地した瞬間に跳ぶ
+	float coyoteTime = DebugParams::Instance().Float(U8("プレイヤー/コヨーテ時間"), 0.12f, 0.0f, 0.5f);
+	float bufferTime = DebugParams::Instance().Float(U8("プレイヤー/ジャンプ先行入力"), 0.12f, 0.0f, 0.5f);
+
+	// タイマー更新：接地中はコヨーテを0に、空中では増やす
+	if (m_isGrounded) { m_coyoteTimer = 0.0f; } else { m_coyoteTimer += dt; }
+
+	// 入力があればバッファを満タンに、なければ減らす
+	if (KdInputManager::Instance().IsPress("Jump")) { m_jumpBufferTimer = bufferTime; }
+	else { m_jumpBufferTimer -= dt; if (m_jumpBufferTimer < 0.0f) { m_jumpBufferTimer = 0.0f; } }
+
+	// 「先行入力が生きている」かつ「接地中 or コヨーテ猶予内」なら跳ぶ
+	bool canJump = (m_jumpBufferTimer > 0.0f) && (m_isGrounded || m_coyoteTimer <= coyoteTime);
+	if (canJump)
 	{
-		Jump();
+		DoJump();
+		m_jumpBufferTimer = 0.0f;    // 入力を消費(1回で1ジャンプ)
+		m_coyoteTimer = 999.0f;      // コヨーテも消費して空中で連続ジャンプしないようにする
 	}
 }
 

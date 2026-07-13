@@ -242,8 +242,12 @@ void CharaBase::Jump()
 {
 	// 接地しているときだけジャンプできる
 	if (!m_isGrounded) { return; }
+	DoJump();
+}
 
-	// ジャンプ初速はDebugParamsで調整可能(垂直速度に初速を与える)
+void CharaBase::DoJump()
+{
+	// ジャンプ初速はDebugParamsで調整可能(垂直速度に初速を与える)。接地判定はしない
 	m_velocity.y = DebugParams::Instance().Float(U8("キャラ/ジャンプ力"), 8.0f, 0.0f, 30.0f);
 	m_isGrounded = false;
 }

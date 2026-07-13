@@ -50,6 +50,10 @@ protected:
 	// 接地中ならジャンプする(垂直速度に初速を与える。初速はDebugParams"キャラ/ジャンプ力")
 	void Jump();
 
+	// 接地判定を無視して実際にジャンプ初速を与える。
+	// 接地の可否は呼び出し側で判断する用(コヨーテタイム/先行入力など)
+	void DoJump();
+
 	// 接地しているか
 	bool IsGrounded() const { return m_isGrounded; }
 
