@@ -32,6 +32,10 @@ void Player::Init()
 	//ワイヤー
 	m_upWire = std::make_unique<WireAction>();
 
+	// ワイヤーの見た目(板ポリ)。白テクスチャを土台に、描画時に色を乗せる
+	m_upWirePoly = std::make_unique<KdSquarePolygon>("Asset/Textures/System/WhiteNoise.png");
+	m_upWirePoly->Set2DObject(false);   // 画面2Dではなくワールドに置く板として扱う
+
 	m_pDebugWire = std::make_unique<KdDebugWireFrame>();
 }
 
@@ -331,44 +335,49 @@ void Player::DrawUnLit()
 
 void Player::DrawWire()
 {
-	// ============================================================================
-	// 【#1 ワイヤーの見た目 — 土台のみ。中身は自分で実装する】
-	//
-	//  役割分担:
-	//   ・物理(振り子/距離拘束)    … WireAction  (触らない。見た目は持たない設計)
-	//   ・見た目(描画)             … ここ Player::DrawWire()
-	//
-	//  描く条件:
-	//   ・繋がっている間だけ描く:  if (!m_upWire || !m_upWire->IsAttached()) return;
-	//
-	//  ワイヤーの両端:
-	//   ・手元(from)  … 発射位置に合わせる。Shoot時は GetPos() + Vector3(0,1,0) を使っている
-	//   ・アンカー(to) … m_upWire->GetAnchor()
-	//     Math::Vector3 from = GetPos() + Math::Vector3(0.0f, 1.0f, 0.0f);
-	//     Math::Vector3 to   = m_upWire->GetAnchor();
-	//
-	//  段階を追って作ると楽:
-	//
-	//  ステップ1: まず「専用の線」を出す(デバッグ用 m_pDebugWire とは別物として)
-	//   ・とりあえず1本の線で from→to を描いて、位置が合っているか確認する
-	//   ・KdDebugWireFrame の AddDebugLine + Draw でも良いし、専用に持っても良い
-	//
-	//  ステップ2: 板ポリ(ビルボード)にして「太さ」と「見た目」を持たせる
-	//   ・from→to を軸に、カメラの方を向く細長い四角形(クアッド)を作る
-	//   ・向き: dir = (to - from) を正規化。長さ len = (to - from).Length()
-	//   ・カメラ位置(m_wpCameraのGetPos()等)への向きを使い、dir と視線に垂直な
-	//     方向へ幅を持たせるとビルボード(常に正面)になる
-	//   ・KdSquarePolygon / KdPolygon にテクスチャを貼って
-	//     KdShaderManager::Instance().m_StandardShader.DrawPolygon(...) で描く想定
-	//   ・ここ(DrawUnLit)は StandardShader の BeginUnLit～EndUnLit の間で呼ばれるので、
-	//     陰影なしの発光っぽいワイヤーに向いている
-	//
-	//  ステップ3: 質感・演出(任意)
-	//   ・UVスクロールで「伸びる/流れる」感じ、発射→到達のアニメ、太さの調整 など
-	//
-	//  ※ 見た目用のメンバ(板ポリ/テクスチャ)は Player.h の該当コメント位置に追加する
-	//     (前方宣言＋.cppでinclude。命名は m_up〜/m_sp〜 の規約に合わせる)
-	// ============================================================================
+	// 繋がっている間だけ描く
+	if (!m_upWire || !m_upWire->IsAttached() || !m_upWirePoly) { return; }
+
+	// ワイヤーの両端(手元→アンカー)。手元は発射位置に近い高さに合わせる
+	Math::Vector3 from = GetPos() + Math::Vector3(0.0f, 0.25f, 0.0f);
+	Math::Vector3 to   = m_upWire->GetAnchor();
+
+	// 軸(=ワイヤー方向)と長さ
+	Math::Vector3 axis = to - from;
+	float length = axis.Length();
+	if (length < 0.001f) { return; }   // 長さ0は描けない
+	axis /= length;
+
+	// 中点＆カメラへの向き(板の面をカメラに向けるビルボード用)
+	Math::Vector3 mid = (from + to) * 0.5f;
+	Math::Vector3 toCam = Math::Vector3::Backward;
+	if (std::shared_ptr<CameraBase> spCam = m_wpCamera.lock())
+	{
+		toCam = spCam->GetPos() - mid;
+	}
+	if (toCam.LengthSquared() > 0.0001f) { toCam.Normalize(); }
+
+	// 幅方向=軸と視線に垂直 / 法線=幅と軸に垂直(軸固定ビルボード)
+	Math::Vector3 side = axis.Cross(toCam);
+	if (side.LengthSquared() < 0.0001f) { side = Math::Vector3::Right; }   // 軸と視線が平行な時の保険
+	side.Normalize();
+	Math::Vector3 normal = side.Cross(axis);
+
+	// 板の寸法(幅=太さ / 高さ=ワイヤー長)。太さはDebugParamsで調整
+	float thickness = DebugParams::Instance().Float(U8("ワイヤー/見た目の太さ"), 0.08f, 0.01f, 1.0f);
+	m_upWirePoly->SetScale(Math::Vector2(thickness, length));
+
+	// 姿勢行列(ローカル X=side / Y=axis / Z=normal)＋中点へ配置
+	Math::Matrix world = Math::Matrix::Identity;
+	world.Right(side);
+	world.Up(axis);
+	world.Backward(normal);
+	world.Translation(mid);
+
+	// 発光っぽい水色のワイヤーとして描く(DrawPolygonはCullNoneなので裏表は気にしなくてよい)
+	Math::Color   col(0.4f, 0.85f, 1.0f, 1.0f);
+	Math::Vector3 emissive(0.1f, 0.4f, 0.7f);
+	KdShaderManager::Instance().m_StandardShader.DrawPolygon(*m_upWirePoly, world, col, emissive);
 }
 
 void Player::DrawDebug()

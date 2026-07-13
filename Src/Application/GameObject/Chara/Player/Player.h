@@ -4,6 +4,7 @@
 
 class CameraBase;
 class WireAction;
+class KdSquarePolygon;
 
 //====================================================
 //
@@ -76,9 +77,8 @@ private:
 	//ワイヤー
 	std::unique_ptr<WireAction> m_upWire;
 
-	// 【#1 自分で実装】ワイヤーの見た目用メンバをここに置く(必要になったら追加)。
-	//  例) 板ポリ/ビルボードで描くなら:  std::unique_ptr<KdSquarePolygon> m_upWirePoly;
-	//      (前方宣言＋.cppでinclude。テクスチャは KdTexture を持たせる等)
+	// ワイヤーの見た目(板ポリを線に沿わせカメラへ向ける軸固定ビルボード)
+	std::unique_ptr<KdSquarePolygon> m_upWirePoly;
 
 	// ※ 移動用の速度は基底CharaBaseの m_velocity(3D) を共通で使う
 };
