@@ -297,6 +297,9 @@ bool Application::Init(int w, int h)
 		// Playerのロックオン：中クリック(右クリックはワイヤーに使うため分離)
 		pKeyboardMouse->AddButton("LockOn", new KdInputButtonForWindows(VK_MBUTTON));
 
+		// Playerのリセット(開始位置へ即復帰)
+		pKeyboardMouse->AddButton("Respawn", new KdInputButtonForWindows('R'));
+
 		// 加速(EditorCamera)
 		pKeyboardMouse->AddButton("Boost", new KdInputButtonForWindows(VK_SHIFT));
 

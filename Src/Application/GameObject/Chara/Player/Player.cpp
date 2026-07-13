@@ -39,6 +39,14 @@ void Player::Update()
 {
 	const float dt = Application::Instance().GetDeltaTime();
 
+	// リセット：Rキー、または一定Y以下に落ちたら開始位置へ復帰
+	float fallResetY = DebugParams::Instance().Float(U8("プレイヤー/落下リセットY"), -20.0f, -200.0f, 0.0f);
+	if (KdInputManager::Instance().IsPress("Respawn") || GetPos().y < fallResetY)
+	{
+		Respawn();
+		return;   // この行以降(移動・ワイヤー等)はスキップ
+	}
+
 	// ワイヤーの発射/解除
 	UpdateWireInput();
 
@@ -230,6 +238,15 @@ void Player::UpdateLaser()
 		spLaser->Fire(firePos, front);
 		SceneManager::Instance().AddObject(spLaser);
 	}
+}
+
+void Player::Respawn()
+{
+	// 開始位置へ戻し、勢い・接地・ワイヤーをすべてリセットする
+	SetPos(m_spawnPos);
+	m_velocity = Math::Vector3::Zero;
+	m_isGrounded = false;
+	if (m_upWire) { m_upWire->Release(); }
 }
 
 void Player::PostUpdate()

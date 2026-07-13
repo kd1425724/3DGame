@@ -33,6 +33,9 @@ public:
 	// 移動方向の基準にするカメラを設定する(未設定ならワールド座標軸のまま移動する)
 	void SetCameraReference(const std::shared_ptr<CameraBase>& camera) { m_wpCamera = camera; }
 
+	// リスポーン(落下リセット/Rキー)の復帰先を設定する
+	void SetSpawnPos(const Math::Vector3& _pos) { m_spawnPos = _pos; }
+
 private:
 
 	// --- Update()の中身を仕事ごとに分けたもの(挙動は分割前と同じ。Updateは流れだけ) ---
@@ -49,10 +52,16 @@ private:
 	// ロックオンの切替(PostUpdateから呼ぶ。"LockOn"押下で最寄りの敵をロックオン/離すと解除)
 	void UpdateLockOn();
 
+	// 開始位置へ復帰する(速度リセット・接地解除・ワイヤー解除)。落下時とRキーで呼ぶ
+	void Respawn();
+
 	// ※ 移動速度はDebugParams("プレイヤー/移動速度")で調整する
 
 	// 移動方向の基準にするカメラ
 	std::weak_ptr<CameraBase> m_wpCamera;
+
+	// リスポーンの復帰先(開始位置)
+	Math::Vector3 m_spawnPos = {};
 
 	//ワイヤー
 	std::unique_ptr<WireAction> m_upWire;

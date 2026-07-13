@@ -31,6 +31,7 @@ void GameScene::Init()
 	std::shared_ptr<Player> spPlayer = std::make_shared<Player>();
 	spPlayer->Init();
 	spPlayer->SetPos(Math::Vector3(0, 20.0f, 0));
+	spPlayer->SetSpawnPos(Math::Vector3(0, 20.0f, 0));   // 落下リセット/Rキーの復帰先
 	AddObject(spPlayer);
 
 	// TPSカメラ(プレイヤーを追従、地面との当たり判定でめり込み防止)
