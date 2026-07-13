@@ -59,6 +59,7 @@ void TPSCamera::PostUpdate()
 		m_smoothFollowPos = targetPos;
 		m_smoothDegAng    = m_DegAng;
 		m_prevTargetPos   = targetPos;
+		m_smoothFov       = DebugParams::Instance().Float(U8("カメラ/基準FOV"), 60.0f, 30.0f, 120.0f);
 		m_smoothInit      = true;
 	}
 
@@ -93,6 +94,15 @@ void TPSCamera::PostUpdate()
 	float pullTarget   = std::clamp(targetSpeed * pullPerSpeed, 0.0f, pullMax);
 	// 引き量も急に変えると酔うので、追従と同じレートで滑らかに寄せる
 	m_smoothPullback  += (pullTarget - m_smoothPullback) * followT;
+
+	// === F: 速度に応じてFOVを少し広げる(疾走感) ===
+	// 広げすぎると酔うので上限つき＋追従と同レートで平滑化。FOV自体はDebugParamsで無効化(量0)も可
+	float fovBase     = DebugParams::Instance().Float(U8("カメラ/基準FOV"),     60.0f, 30.0f, 120.0f);
+	float fovPerSpeed = DebugParams::Instance().Float(U8("カメラ/速度FOV量"),    0.4f,  0.0f,  3.0f);
+	float fovMaxAdd   = DebugParams::Instance().Float(U8("カメラ/速度FOV上限"), 12.0f,  0.0f, 40.0f);
+	float fovTarget   = fovBase + std::clamp(targetSpeed * fovPerSpeed, 0.0f, fovMaxAdd);
+	m_smoothFov      += (fovTarget - m_smoothFov) * followT;
+	if (m_spCamera) { m_spCamera->SetProjectionMatrix(m_smoothFov); }
 
 	// === カメラ行列の構築 ===
 	// ローカル位置(基準 z=-4.0)に、速度ぶんの引きを足して後ろへ下げる

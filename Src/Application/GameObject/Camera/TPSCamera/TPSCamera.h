@@ -50,4 +50,6 @@ private:
 	Math::Vector3 m_prevTargetPos   = {};
 	// C: 速度に応じてカメラを後ろへ引く量(平滑化後)
 	float         m_smoothPullback  = 0.0f;
+	// F: 速度に応じて広げるFOV(度。平滑化後)
+	float         m_smoothFov       = 60.0f;
 };
