@@ -157,6 +157,18 @@
     <Filter Include="Src\Application\GameObject\Camera\EditorCamera">
       <UniqueIdentifier>{c9242ed4-e404-455e-9728-17824f660407}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Application\GameObject\UI">
+      <UniqueIdentifier>{f7614cae-7c36-4b98-a163-7b7ce02a3f60}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Src\Application\UI">
+      <UniqueIdentifier>{37f5e8f1-798e-423c-8b6c-cfecd95970a4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Src\Application\UI\HudEditor">
+      <UniqueIdentifier>{eeceef3a-0558-439a-89fc-b0db0b7174bd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Src\Application\UI\GameHud">
+      <UniqueIdentifier>{8f40741b-4a83-4fd5-b143-cd5e4aaec3b6}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\Pch.h">
@@ -335,6 +347,18 @@
     </ClInclude>
     <ClInclude Include="Src\Application\GameObject\Camera\CameraBase.h">
       <Filter>Src\Application\GameObject\Camera</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\Application\GameObject\Camera\CameraShake.h">
+      <Filter>Src\Application\GameObject\Camera</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\Application\GameObject\UI\HudSprite.h">
+      <Filter>Src\Application\GameObject\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\Application\UI\HudEditor\HudEditorManager.h">
+      <Filter>Src\Application\UI\HudEditor</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\Application\UI\GameHud\GameHud.h">
+      <Filter>Src\Application\UI\GameHud</Filter>
     </ClInclude>
     <ClInclude Include="Src\Application\GameObject\Camera\TPSCamera\TPSCamera.h">
       <Filter>Src\Application\GameObject\Camera\TPSCamera</Filter>
@@ -556,6 +580,18 @@
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Camera\CameraBase.cpp">
       <Filter>Src\Application\GameObject\Camera</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\GameObject\Camera\CameraShake.cpp">
+      <Filter>Src\Application\GameObject\Camera</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\GameObject\UI\HudSprite.cpp">
+      <Filter>Src\Application\GameObject\UI</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\UI\HudEditor\HudEditorManager.cpp">
+      <Filter>Src\Application\UI\HudEditor</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\UI\GameHud\GameHud.cpp">
+      <Filter>Src\Application\UI\GameHud</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Camera\TPSCamera\TPSCamera.cpp">
       <Filter>Src\Application\GameObject\Camera\TPSCamera</Filter>
