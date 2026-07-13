@@ -34,7 +34,8 @@ void Player::Init()
 
 	// ワイヤーの見た目(板ポリ)。白テクスチャを土台に、描画時に色を乗せる
 	m_upWirePoly = std::make_unique<KdSquarePolygon>("Asset/Textures/System/WhiteNoise.png");
-	m_upWirePoly->Set2DObject(false);   // 画面2Dではなくワールドに置く板として扱う
+	// Lit(陰影あり)描画時に法線を光へ向ける設定。今回はUnLitで描くので実質効かない(任意)
+	m_upWirePoly->Set2DObject(false);
 
 	m_pDebugWire = std::make_unique<KdDebugWireFrame>();
 }
@@ -385,7 +386,7 @@ void Player::DrawDebug()
 	if (m_upWire && m_upWire->IsAttached())        // 繋がっている間だけ
 	{
 		if (!m_pDebugWire) { m_pDebugWire = std::make_unique<KdDebugWireFrame>(); }
-		m_pDebugWire->AddDebugLine(m_pos, m_upWire->GetAnchor(),kBlueColor);
+		//m_pDebugWire->AddDebugLine(m_pos, m_upWire->GetAnchor(),kBlueColor);
 		m_pDebugWire->Draw();
 	}
 	KdGameObject::DrawDebug();
