@@ -20,7 +20,17 @@ public:
 
 	int		GetNowFPS()			const	{ return m_fpsController.m_nowfps; }
 	int		GetMaxFPS()			const	{ return m_fpsController.m_maxFps; }
-	float	GetDeltaTime()		const	{ return m_fpsController.GetDeltaTime(); }
+
+	// デルタタイム。フレーム落ち・ウィンドウ操作・ロード等でdtが跳ねると、
+	// pos += velocity*dt が一気に進んで物理が暴発(壁すり抜け/大フリング)しうる。
+	// それを防ぐため上限(1/30秒=約2フレームぶん)で頭打ちにする。
+	// ※ 遅い時は「スロー再生」になるが、暴発するよりは安全という定番の対処
+	float	GetDeltaTime()		const
+	{
+		constexpr float kMaxDeltaTime = 1.0f / 30.0f;
+		float dt = m_fpsController.GetDeltaTime();
+		return (dt > kMaxDeltaTime) ? kMaxDeltaTime : dt;
+	}
 private:
 
 	void KdBeginUpdate();
