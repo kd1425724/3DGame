@@ -25,6 +25,7 @@ public:
 	void Init()			override;
 	void Update()		override;
 	void PostUpdate()	override;
+	void DrawUnLit()	override;   // ワイヤーの見た目(陰影なしパス)。中身は DrawWire() に委譲
 	void DrawDebug()	override;
 
 	// 種別タグ：シーン内からPlayerを探すときの判定に使う(dynamic_pointer_castの代わり)
@@ -55,6 +56,11 @@ private:
 	// 開始位置へ復帰する(速度リセット・接地解除・ワイヤー解除)。落下時とRキーで呼ぶ
 	void Respawn();
 
+	// 【#1 自分で実装】ワイヤーの見た目を描く。DrawUnLitから呼ぶ土台のみ用意(中身はコメント)
+	//  ・物理はWireAction(距離拘束)、見た目はここ、と役割を分ける
+	//  ・繋がっている間だけ、手元→アンカーに沿ってワイヤーを描く
+	void DrawWire();
+
 	// ※ 移動速度はDebugParams("プレイヤー/移動速度")で調整する
 
 	// 移動方向の基準にするカメラ
@@ -69,6 +75,10 @@ private:
 
 	//ワイヤー
 	std::unique_ptr<WireAction> m_upWire;
+
+	// 【#1 自分で実装】ワイヤーの見た目用メンバをここに置く(必要になったら追加)。
+	//  例) 板ポリ/ビルボードで描くなら:  std::unique_ptr<KdSquarePolygon> m_upWirePoly;
+	//      (前方宣言＋.cppでinclude。テクスチャは KdTexture を持たせる等)
 
 	// ※ 移動用の速度は基底CharaBaseの m_velocity(3D) を共通で使う
 };
