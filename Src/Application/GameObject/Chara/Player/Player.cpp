@@ -37,8 +37,8 @@ void Player::Init()
 	// Lit(陰影あり)描画時に法線を光へ向ける設定。今回はUnLitで描くので実質効かない(任意)
 	m_upWirePoly->Set2DObject(false);
 
-	// 自動ターゲットのマーカー(カメラを向く板ポリ)
-	m_upMarkerPoly = std::make_unique<KdSquarePolygon>("Asset/Textures/System/WhiteNoise.png");
+	// 自動ターゲットのマーカー(照準テクスチャ・カメラを向く板ポリ)
+	m_upMarkerPoly = std::make_unique<KdSquarePolygon>("Asset/Textures/System/Reticle.png");
 	m_upMarkerPoly->Set2DObject(false);
 
 	m_pDebugWire = std::make_unique<KdDebugWireFrame>();
@@ -375,6 +375,9 @@ void Player::PostUpdate()
 
 void Player::UpdateTargeting()
 {
+	// マーカーのアニメ用に時間を進める
+	m_markerTime += Application::Instance().GetDeltaTime();
+
 	// カメラの向き(=画面中心の方向)に一番近い敵を選ぶ。カメラ自体は回さない。
 	std::shared_ptr<CameraBase> spCam = m_wpCamera.lock();
 	if (!spCam) { m_wpLockOnTarget.reset(); return; }
@@ -415,17 +418,23 @@ void Player::DrawTargetMarker()
 	std::shared_ptr<CameraBase> spCam = m_wpCamera.lock();
 	if (!spCam) { return; }
 
-	// マーカーサイズ
-	float size = DebugParams::Instance().Float(U8("照準/マーカーサイズ"), 0.7f, 0.1f, 3.0f);
+	// マーカーサイズ＋脈動(sinで軽く拡縮=ロック中の呼吸感)
+	float baseSize  = DebugParams::Instance().Float(U8("照準/マーカーサイズ"), 0.7f, 0.1f, 3.0f);
+	float pulseAmp  = DebugParams::Instance().Float(U8("照準/脈動"),          0.15f, 0.0f, 1.0f);
+	float size = baseSize * (1.0f + pulseAmp * sinf(m_markerTime * 6.0f));
 	m_upMarkerPoly->SetScale(Math::Vector2(size, size));
 
-	// カメラの回転をそのまま姿勢に使う=常に画面へ正対(ビルボード)。敵の少し上に置く
-	Math::Matrix world = spCam->GetRotationMatrix();
+	// 回転角(照準がゆっくり回る)
+	float rotSpeed = DebugParams::Instance().Float(U8("照準/回転速度"), 60.0f, 0.0f, 360.0f);
+	float rotRad   = DirectX::XMConvertToRadians(m_markerTime * rotSpeed);
+
+	// 面内で回転(local Z軸まわり)→カメラ回転で正対(ビルボード)→敵の少し上へ配置
+	Math::Matrix world = Math::Matrix::CreateRotationZ(rotRad) * spCam->GetRotationMatrix();
 	world.Translation(spTarget->GetPos() + Math::Vector3(0.0f, 0.9f, 0.0f));
 
-	// 赤いマーカーとして描く(DrawPolygonはCullNoneなので裏表は不問)
-	Math::Color   col(1.0f, 0.3f, 0.2f, 1.0f);
-	Math::Vector3 emissive(0.6f, 0.1f, 0.05f);
+	// 発光色つきで描く(DrawPolygonはCullNoneなので裏表は不問。テクスチャの透過で照準形に抜ける)
+	Math::Color   col(1.0f, 0.5f, 0.25f, 1.0f);
+	Math::Vector3 emissive(0.8f, 0.35f, 0.1f);
 	KdShaderManager::Instance().m_StandardShader.DrawPolygon(*m_upMarkerPoly, world, col, emissive);
 }
 

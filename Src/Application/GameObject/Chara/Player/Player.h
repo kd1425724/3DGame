@@ -97,6 +97,8 @@ private:
 
 	// 自動ターゲットのマーカー(カメラを向く板ポリ)
 	std::unique_ptr<KdSquarePolygon> m_upMarkerPoly;
+	// マーカーの回転/脈動アニメ用の経過時間
+	float m_markerTime = 0.0f;
 
 	// ※ 移動用の速度は基底CharaBaseの m_velocity(3D) を共通で使う
 };
