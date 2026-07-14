@@ -402,7 +402,11 @@ void Player::UpdateTargeting()
 		if (to.LengthSquared() < 0.0001f) { continue; }
 		to.Normalize();
 		float d = to.Dot(camFwd);   // 1に近いほど画面中心
-		if (d > bestDot) { bestDot = d; best = spEnemy; }
+		if (d > bestDot) 
+		{
+			bestDot = d;
+			best = spEnemy;
+		}
 	}
 
 	m_wpLockOnTarget = best;   // 中心に一番近い敵(いなければ空)。落下攻撃の突撃先になる
