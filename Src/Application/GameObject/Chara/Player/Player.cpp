@@ -38,7 +38,7 @@ void Player::Init()
 	m_upWirePoly->Set2DObject(false);
 
 	// 自動ターゲットのマーカー(照準テクスチャ・カメラを向く板ポリ)
-	m_upMarkerPoly = std::make_unique<KdSquarePolygon>("Asset/Textures/System/Reticle.png");
+	m_upMarkerPoly = std::make_unique<KdSquarePolygon>("Asset/Textures/UI/Reticle.png");
 	m_upMarkerPoly->Set2DObject(false);
 
 	m_pDebugWire = std::make_unique<KdDebugWireFrame>();
