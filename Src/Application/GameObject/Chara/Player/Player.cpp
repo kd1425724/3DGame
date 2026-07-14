@@ -36,10 +36,14 @@ void Player::Init()
 	m_upWirePoly = std::make_unique<KdSquarePolygon>("Asset/Textures/System/WhiteNoise.png");
 	// Lit(陰影あり)描画時に法線を光へ向ける設定。今回はUnLitで描くので実質効かない(任意)
 	m_upWirePoly->Set2DObject(false);
+	// 軸固定ビルボード：軸(ワイヤー方向)まわりだけカメラを向く。面の向きはDrawPolygonが計算する
+	m_upWirePoly->SetBillboardMode(KdPolygon::BillboardMode::eAxis);
 
 	// 自動ターゲットのマーカー(照準テクスチャ・カメラを向く板ポリ)
 	m_upMarkerPoly = std::make_unique<KdSquarePolygon>("Asset/Textures/UI/Reticle.png");
 	m_upMarkerPoly->Set2DObject(false);
+	// 点ビルボード：常にカメラへ正対する。面内回転(spin)はworld側で与える
+	m_upMarkerPoly->SetBillboardMode(KdPolygon::BillboardMode::eScreen);
 
 	m_pDebugWire = std::make_unique<KdDebugWireFrame>();
 }
@@ -419,9 +423,6 @@ void Player::DrawTargetMarker()
 	std::shared_ptr<KdGameObject> spTarget = m_wpLockOnTarget.lock();
 	if (!spTarget) { return; }
 
-	std::shared_ptr<CameraBase> spCam = m_wpCamera.lock();
-	if (!spCam) { return; }
-
 	// マーカーサイズ＋脈動(sinで軽く拡縮=ロック中の呼吸感)
 	float baseSize  = DebugParams::Instance().Float(U8("照準/マーカーサイズ"), 0.7f, 0.1f, 3.0f);
 	float pulseAmp  = DebugParams::Instance().Float(U8("照準/脈動"),          0.15f, 0.0f, 1.0f);
@@ -432,8 +433,8 @@ void Player::DrawTargetMarker()
 	float rotSpeed = DebugParams::Instance().Float(U8("照準/回転速度"), 60.0f, 0.0f, 360.0f);
 	float rotRad   = DirectX::XMConvertToRadians(m_markerTime * rotSpeed);
 
-	// 面内で回転(local Z軸まわり)→カメラ回転で正対(ビルボード)→敵の少し上へ配置
-	Math::Matrix world = Math::Matrix::CreateRotationZ(rotRad) * spCam->GetRotationMatrix();
+	// 面内回転(local Z軸まわり)だけ作って敵の少し上へ配置。カメラへの正対はeScreenビルボードに任せる
+	Math::Matrix world = Math::Matrix::CreateRotationZ(rotRad);
 	world.Translation(spTarget->GetPos() + Math::Vector3(0.0f, 0.9f, 0.0f));
 
 	// 発光色つきで描く(DrawPolygonはCullNoneなので裏表は不問。テクスチャの透過で照準形に抜ける)
@@ -465,31 +466,14 @@ void Player::DrawWire()
 	if (length < 0.001f) { return; }   // 長さ0は描けない
 	axis /= length;
 
-	// 中点＆カメラへの向き(板の面をカメラに向けるビルボード用)
-	Math::Vector3 mid = (from + to) * 0.5f;
-	Math::Vector3 toCam = Math::Vector3::Backward;
-	if (std::shared_ptr<CameraBase> spCam = m_wpCamera.lock())
-	{
-		toCam = spCam->GetPos() - mid;
-	}
-	if (toCam.LengthSquared() > 0.0001f) { toCam.Normalize(); }
-
-	// 幅方向=軸と視線に垂直 / 法線=幅と軸に垂直(軸固定ビルボード)
-	Math::Vector3 side = axis.Cross(toCam);
-	if (side.LengthSquared() < 0.0001f) { side = Math::Vector3::Right; }   // 軸と視線が平行な時の保険
-	side.Normalize();
-	Math::Vector3 normal = side.Cross(axis);
-
 	// 板の寸法(幅=太さ / 高さ=ワイヤー長)。太さはDebugParamsで調整
 	float thickness = DebugParams::Instance().Float(U8("ワイヤー/見た目の太さ"), 0.08f, 0.01f, 1.0f);
 	m_upWirePoly->SetScale(Math::Vector2(thickness, length));
 
-	// 姿勢行列(ローカル X=side / Y=axis / Z=normal)＋中点へ配置
+	// 軸(Y=ワイヤー方向)と中点だけ入れる。面をカメラへ向ける計算はeAxisビルボードでDrawPolygonが行う
 	Math::Matrix world = Math::Matrix::Identity;
-	world.Right(side);
 	world.Up(axis);
-	world.Backward(normal);
-	world.Translation(mid);
+	world.Translation((from + to) * 0.5f);
 
 	// 発光っぽい水色のワイヤーとして描く(DrawPolygonはCullNoneなので裏表は気にしなくてよい)
 	Math::Color   col(0.4f, 0.85f, 1.0f, 1.0f);
