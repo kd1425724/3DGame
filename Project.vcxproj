@@ -281,6 +281,7 @@
     <ClInclude Include="Src\Application\Debug\DebugUtility\DebugUtility.h" />
     <ClInclude Include="Src\Application\Debug\DebugWatch\DebugWatch.h" />
     <ClInclude Include="Src\Application\GameObject\Block\Block.h" />
+    <ClInclude Include="Src\Application\GameObject\EnemySpawner\EnemySpawner.h" />
     <ClInclude Include="Src\Application\GameObject\Camera\CameraBase.h" />
     <ClInclude Include="Src\Application\GameObject\Camera\CameraShake.h" />
     <ClInclude Include="Src\Application\GameObject\Camera\EditorCamera\EditorCamera.h" />
@@ -362,6 +363,7 @@
     <ClCompile Include="Src\Application\Debug\DebugEffect\DebugEffect.cpp" />
     <ClCompile Include="Src\Application\Debug\DebugWatch\DebugWatch.cpp" />
     <ClCompile Include="Src\Application\GameObject\Block\Block.cpp" />
+    <ClCompile Include="Src\Application\GameObject\EnemySpawner\EnemySpawner.cpp" />
     <ClCompile Include="Src\Application\GameObject\Camera\CameraBase.cpp" />
     <ClCompile Include="Src\Application\GameObject\Camera\CameraShake.cpp" />
     <ClCompile Include="Src\Application\GameObject\Camera\EditorCamera\EditorCamera.cpp" />

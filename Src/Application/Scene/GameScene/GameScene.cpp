@@ -4,6 +4,7 @@
 #include "../../GameObject/Ground/Ground.h"
 #include "../../GameObject/Chara/Player/Player.h"
 #include "../../GameObject/Chara/Enemy/Enemy.h"
+#include "../../GameObject/EnemySpawner/EnemySpawner.h"
 #include "../../GameObject/Camera/TPSCamera/TPSCamera.h"
 
 #include "../../LevelEditor/LevelFileIO/LevelFileIO.h"
@@ -49,12 +50,10 @@ void GameScene::Init()
 	// プレイヤーの移動をカメラの水平方向の向き基準にする
 	spPlayer->SetCameraReference(spCamera);
 
-	// 敵(プレイヤーにゆっくり追従し、接触すると消滅する)
-	std::shared_ptr<Enemy> spEnemy = std::make_shared<Enemy>();
-	spEnemy->Init();
-	spEnemy->SetPos(Math::Vector3(3.0f, 1.0f, 3.0f));
-	spEnemy->SetTarget(spPlayer);
-	AddObject(spEnemy);
+	// 【仮処理】敵を次々にスポーンする簡易スポナー(本実装のスポーン設計に置き換える前提)
+	// ※ 生成された敵は自分でPlayerをタグ検索して追従する。数/間隔はDebugParams「敵スポナー/…」
+	std::shared_ptr<EnemySpawner> spSpawner = std::make_shared<EnemySpawner>();
+	AddObject(spSpawner);
 
 	// 保存済みレベル(レベルエディタで配置したBlock等)を読み込んで上に足す
 	// ※ 追加ロードなので上のGround/Player/Enemyはそのまま。ファイルが無ければ何も足さない
