@@ -65,7 +65,7 @@ void Player::Update()
 	// 通常移動 → ジャンプ → 落下攻撃 → レーザー
 	UpdateMove(dt);
 	UpdateJump(dt);
-	UpdateDive();
+	UpdateDive(dt);
 	UpdateLaser();
 }
 
@@ -237,17 +237,54 @@ void Player::UpdateJump(float dt)
 	}
 }
 
-void Player::UpdateDive()
+void Player::UpdateDive(float dt)
 {
-	// 空中で攻撃入力(左クリック)を押したら急降下を開始する。
-	// 実際の撃破は着地時のDiveImpact(PostUpdateから呼ぶ)が行う。
-	if (m_isDiving) { return; }                          // 既に降下中なら何もしない
-	if (m_isGrounded) { return; }                        // 地上では発動しない(空中専用)
+	float diveSpeed = DebugParams::Instance().Float(U8("落下攻撃/降下速度"), 30.0f, 5.0f, 100.0f);
+	float radius    = DebugParams::Instance().Float(U8("落下攻撃/範囲"),     3.0f, 0.5f, 15.0f);
+
+	// === 突撃中(ホーミング) ===
+	if (m_isDiving)
+	{
+		std::shared_ptr<KdGameObject> spTarget = m_wpDiveTarget.lock();
+		if (spTarget)
+		{
+			// 対象へ毎フレーム向き直して直進(3D速度を上書き)。近づいたら着弾
+			Math::Vector3 to = spTarget->GetPos() - GetPos();
+			float dist = to.Length();
+			if (dist <= radius) { DiveImpact(); return; }   // 到達＝着弾(周囲ごと撃破)
+			if (dist > 0.0001f)
+			{
+				to /= dist;
+				m_velocity = to * diveSpeed;   // 対象へ直進(ロックオン突撃)
+			}
+		}
+		// 対象がいない(未ロック真下ダイブ or 対象消滅)は、そのまま落ちて着地時にDiveImpact
+		return;
+	}
+
+	// === 開始判定 ===
+	if (m_isGrounded) { return; }                                        // 空中専用
 	if (!KdInputManager::Instance().IsPress("DiveAttack")) { return; }
 
-	float diveSpeed = DebugParams::Instance().Float(U8("落下攻撃/降下速度"), 30.0f, 5.0f, 100.0f);
-	m_velocity.y = -diveSpeed;   // 一気に下へ。水平の勢いはそのまま(狙って突っ込める)
 	m_isDiving = true;
+
+	// ロックオン対象がいればそこへ突撃、いなければ真下へ急降下
+	std::shared_ptr<KdGameObject> spLock = m_wpLockOnTarget.lock();
+	if (spLock)
+	{
+		m_wpDiveTarget = spLock;   // ホーミングの狙い先(=ロックオンした所にアンカーを刺して突撃するイメージ)
+		Math::Vector3 to = spLock->GetPos() - GetPos();
+		if (to.LengthSquared() > 0.0001f)
+		{
+			to.Normalize();
+			m_velocity = to * diveSpeed;
+		}
+	}
+	else
+	{
+		m_wpDiveTarget.reset();
+		m_velocity.y = -diveSpeed;   // 真下(水平の勢いは残す)
+	}
 }
 
 void Player::DiveImpact()
@@ -264,10 +301,11 @@ void Player::DiveImpact()
 		}
 	}
 
-	// 着地衝撃の手応え
+	// 着弾の手応え
 	CameraShake::Instance().AddTrauma(0.6f);
 
 	m_isDiving = false;
+	m_wpDiveTarget.reset();
 }
 
 void Player::UpdateLaser()
@@ -358,12 +396,14 @@ void Player::UpdateLockOn()
 			{
 				spTpsCamera->SetLockOnTarget(nearestEnemy);
 				spTpsCamera->SetLockOn(true);
+				m_wpLockOnTarget = nearestEnemy;   // 落下攻撃の突撃先に使うのでPlayerでも保持
 			}
 		}
 		else if (KdInputManager::Instance().IsRelease("LockOn"))
 		{
 			// 離した瞬間：ロックオン解除
 			spTpsCamera->SetLockOn(false);
+			m_wpLockOnTarget.reset();
 		}
 	}
 }

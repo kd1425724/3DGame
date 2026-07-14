@@ -51,9 +51,9 @@ private:
 	void UpdateJump(float dt);
 	// Eキーで正面にレーザーを発射する
 	void UpdateLaser();
-	// 落下攻撃：空中で攻撃入力→下方向へ急降下する(命中判定はDiveImpact)
-	void UpdateDive();
-	// 落下攻撃の着地衝撃：周囲の敵を範囲撃破し、カメラを揺らす
+	// 落下攻撃：空中で攻撃入力→急降下(ロックオン中は対象へ突撃するホーミング/未ロックは真下)
+	void UpdateDive(float dt);
+	// 落下攻撃の着弾：周囲の敵を範囲撃破し、カメラを揺らす
 	void DiveImpact();
 	// ロックオンの切替(PostUpdateから呼ぶ。"LockOn"押下で最寄りの敵をロックオン/離すと解除)
 	void UpdateLockOn();
@@ -78,8 +78,13 @@ private:
 	float m_coyoteTimer = 999.0f;     // 接地を離れてからの経過時間(小さいうちは空中でも跳べる)
 	float m_jumpBufferTimer = 0.0f;   // ジャンプ入力を先読みして保持する残り時間
 
-	// 落下攻撃中フラグ(急降下→着地でDiveImpact)
+	// 落下攻撃中フラグ(急降下→着弾でDiveImpact)
 	bool m_isDiving = false;
+
+	// ロックオン中の対象(UpdateLockOnで設定。落下攻撃の突撃先に使う)
+	std::weak_ptr<KdGameObject> m_wpLockOnTarget;
+	// 落下攻撃で突撃中の対象(ロックオンからコピー。ホーミングの狙い先)
+	std::weak_ptr<KdGameObject> m_wpDiveTarget;
 
 	//ワイヤー
 	std::unique_ptr<WireAction> m_upWire;
