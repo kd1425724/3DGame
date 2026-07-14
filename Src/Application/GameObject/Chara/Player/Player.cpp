@@ -37,6 +37,10 @@ void Player::Init()
 	// Lit(陰影あり)描画時に法線を光へ向ける設定。今回はUnLitで描くので実質効かない(任意)
 	m_upWirePoly->Set2DObject(false);
 
+	// 自動ターゲットのマーカー(カメラを向く板ポリ)
+	m_upMarkerPoly = std::make_unique<KdSquarePolygon>("Asset/Textures/System/WhiteNoise.png");
+	m_upMarkerPoly->Set2DObject(false);
+
 	m_pDebugWire = std::make_unique<KdDebugWireFrame>();
 }
 
@@ -365,53 +369,72 @@ void Player::PostUpdate()
 	float wall = ConsumeWallImpact();
 	if (wall > 4.0f) { CameraShake::Instance().AddTrauma(std::clamp(wall / 25.0f, 0.0f, 0.7f)); }
 
-	// ロックオンの切り替え
-	UpdateLockOn();
+	// 照準：画面中心に一番近い敵を自動ターゲット(カメラは回さない)
+	UpdateTargeting();
 }
 
-void Player::UpdateLockOn()
+void Player::UpdateTargeting()
 {
-	// ロックオンの切り替え(右クリックはワイヤー発射に使うので、ロックオンは別入力"LockOn")
-	std::shared_ptr<TPSCamera> spTpsCamera = std::dynamic_pointer_cast<TPSCamera>(m_wpCamera.lock());
+	// カメラの向き(=画面中心の方向)に一番近い敵を選ぶ。カメラ自体は回さない。
+	std::shared_ptr<CameraBase> spCam = m_wpCamera.lock();
+	if (!spCam) { m_wpLockOnTarget.reset(); return; }
 
-	if (spTpsCamera)
+	// カメラの発射方向(ピッチ込み)。ワイヤー発射と同じ「フルの向き」
+	Math::Vector3 camPos = spCam->GetPos();
+	Math::Vector3 camFwd = Math::Vector3::TransformNormal(Math::Vector3::Backward, spCam->GetRotationMatrix());
+	if (camFwd.LengthSquared() < 0.0001f) { return; }
+	camFwd.Normalize();
+
+	// 画面中心からの許容角度。これより外の敵は対象にしない
+	float limitDeg = DebugParams::Instance().Float(U8("照準/有効角度"), 40.0f, 5.0f, 90.0f);
+	float minDot = cosf(DirectX::XMConvertToRadians(limitDeg));
+
+	// カメラの前方向に一番よく揃っている(=中心に近い)敵を探す
+	std::shared_ptr<KdGameObject> best;
+	float bestDot = minDot;   // これ未満は中心から外れすぎなので対象外
+	for (auto& spEnemy : SceneManager::Instance().FindObjectsWithTag(ObjectTag::Enemy))
 	{
-		if (KdInputManager::Instance().IsPress("LockOn"))
-		{
-			// 押した瞬間：一番近い敵を探してロックオンする
-			std::shared_ptr<KdGameObject> nearestEnemy;
-			float nearestDist = FLT_MAX;
-
-			for (auto& spEnemy : SceneManager::Instance().FindObjectsWithTag(ObjectTag::Enemy))
-			{
-				float dist = Math::Vector3::Distance(GetPos(), spEnemy->GetPos());
-				if (dist < nearestDist)
-				{
-					nearestDist = dist;
-					nearestEnemy = spEnemy;
-				}
-			}
-
-			if (nearestEnemy)
-			{
-				spTpsCamera->SetLockOnTarget(nearestEnemy);
-				spTpsCamera->SetLockOn(true);
-				m_wpLockOnTarget = nearestEnemy;   // 落下攻撃の突撃先に使うのでPlayerでも保持
-			}
-		}
-		else if (KdInputManager::Instance().IsRelease("LockOn"))
-		{
-			// 離した瞬間：ロックオン解除
-			spTpsCamera->SetLockOn(false);
-			m_wpLockOnTarget.reset();
-		}
+		if (!spEnemy) { continue; }
+		Math::Vector3 to = spEnemy->GetPos() - camPos;
+		if (to.LengthSquared() < 0.0001f) { continue; }
+		to.Normalize();
+		float d = to.Dot(camFwd);   // 1に近いほど画面中心
+		if (d > bestDot) { bestDot = d; best = spEnemy; }
 	}
+
+	m_wpLockOnTarget = best;   // 中心に一番近い敵(いなければ空)。落下攻撃の突撃先になる
+}
+
+void Player::DrawTargetMarker()
+{
+	if (!m_upMarkerPoly) { return; }
+
+	std::shared_ptr<KdGameObject> spTarget = m_wpLockOnTarget.lock();
+	if (!spTarget) { return; }
+
+	std::shared_ptr<CameraBase> spCam = m_wpCamera.lock();
+	if (!spCam) { return; }
+
+	// マーカーサイズ
+	float size = DebugParams::Instance().Float(U8("照準/マーカーサイズ"), 0.7f, 0.1f, 3.0f);
+	m_upMarkerPoly->SetScale(Math::Vector2(size, size));
+
+	// カメラの回転をそのまま姿勢に使う=常に画面へ正対(ビルボード)。敵の少し上に置く
+	Math::Matrix world = spCam->GetRotationMatrix();
+	world.Translation(spTarget->GetPos() + Math::Vector3(0.0f, 0.9f, 0.0f));
+
+	// 赤いマーカーとして描く(DrawPolygonはCullNoneなので裏表は不問)
+	Math::Color   col(1.0f, 0.3f, 0.2f, 1.0f);
+	Math::Vector3 emissive(0.6f, 0.1f, 0.05f);
+	KdShaderManager::Instance().m_StandardShader.DrawPolygon(*m_upMarkerPoly, world, col, emissive);
 }
 
 void Player::DrawUnLit()
 {
-	// キャラのモデルは CharaBase::DrawLit が描く。ここ(陰影なしパス)ではワイヤーの見た目を描く。
+	// キャラのモデルは CharaBase::DrawLit が描く。ここ(陰影なしパス)では
+	// ワイヤーの見た目と、自動ターゲットのマーカーを描く。
 	DrawWire();
+	DrawTargetMarker();
 }
 
 void Player::DrawWire()

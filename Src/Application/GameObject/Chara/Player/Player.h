@@ -55,8 +55,11 @@ private:
 	void UpdateDive(float dt);
 	// 落下攻撃の着弾：周囲の敵を範囲撃破し、カメラを揺らす
 	void DiveImpact();
-	// ロックオンの切替(PostUpdateから呼ぶ。"LockOn"押下で最寄りの敵をロックオン/離すと解除)
-	void UpdateLockOn();
+	// 照準：カメラの向き(画面中心)に一番近い敵を毎フレーム自動ターゲットにする(カメラは回さない)。
+	// PostUpdateから呼ぶ。選ばれた敵はマーカー表示され、落下攻撃の突撃先になる
+	void UpdateTargeting();
+	// 自動ターゲット中の敵にマーカー(カメラを向く板ポリ)を描く
+	void DrawTargetMarker();
 
 	// 開始位置へ復帰する(速度リセット・接地解除・ワイヤー解除)。落下時とRキーで呼ぶ
 	void Respawn();
@@ -91,6 +94,9 @@ private:
 
 	// ワイヤーの見た目(板ポリを線に沿わせカメラへ向ける軸固定ビルボード)
 	std::unique_ptr<KdSquarePolygon> m_upWirePoly;
+
+	// 自動ターゲットのマーカー(カメラを向く板ポリ)
+	std::unique_ptr<KdSquarePolygon> m_upMarkerPoly;
 
 	// ※ 移動用の速度は基底CharaBaseの m_velocity(3D) を共通で使う
 };
