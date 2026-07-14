@@ -62,9 +62,10 @@ void Player::Update()
 		return;
 	}
 
-	// 通常移動 → ジャンプ → レーザー
+	// 通常移動 → ジャンプ → 落下攻撃 → レーザー
 	UpdateMove(dt);
 	UpdateJump(dt);
+	UpdateDive();
 	UpdateLaser();
 }
 
@@ -236,6 +237,39 @@ void Player::UpdateJump(float dt)
 	}
 }
 
+void Player::UpdateDive()
+{
+	// 空中で攻撃入力(左クリック)を押したら急降下を開始する。
+	// 実際の撃破は着地時のDiveImpact(PostUpdateから呼ぶ)が行う。
+	if (m_isDiving) { return; }                          // 既に降下中なら何もしない
+	if (m_isGrounded) { return; }                        // 地上では発動しない(空中専用)
+	if (!KdInputManager::Instance().IsPress("DiveAttack")) { return; }
+
+	float diveSpeed = DebugParams::Instance().Float(U8("落下攻撃/降下速度"), 30.0f, 5.0f, 100.0f);
+	m_velocity.y = -diveSpeed;   // 一気に下へ。水平の勢いはそのまま(狙って突っ込める)
+	m_isDiving = true;
+}
+
+void Player::DiveImpact()
+{
+	// 着地の瞬間：周囲の敵をまとめて撃破し、手応えとしてカメラを揺らす
+	float radius = DebugParams::Instance().Float(U8("落下攻撃/範囲"), 3.0f, 0.5f, 15.0f);
+
+	for (auto& spEnemy : SceneManager::Instance().FindObjectsWithTag(ObjectTag::Enemy))
+	{
+		if (!spEnemy) { continue; }
+		if (Math::Vector3::Distance(GetPos(), spEnemy->GetPos()) <= radius)
+		{
+			spEnemy->OnHit(this);   // 今の敵はOnHitで消滅(=一掃)
+		}
+	}
+
+	// 着地衝撃の手応え
+	CameraShake::Instance().AddTrauma(0.6f);
+
+	m_isDiving = false;
+}
+
 void Player::UpdateLaser()
 {
 	// Eキーでプレイヤーの正面にレーザー(当たり判定つき)を発射する
@@ -276,6 +310,12 @@ void Player::PostUpdate()
 	if (!m_upWire->IsAttached())
 	{
 		GroundCheck();
+	}
+
+	// 落下攻撃中に着地したら、その瞬間に範囲撃破する
+	if (m_isDiving && IsGrounded())
+	{
+		DiveImpact();
 	}
 
 	// === 着地・壁ヒットの手応え(カメラを揺らす) ===

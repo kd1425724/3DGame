@@ -300,6 +300,9 @@ bool Application::Init(int w, int h)
 		// Playerのリセット(開始位置へ即復帰)
 		pKeyboardMouse->AddButton("Respawn", new KdInputButtonForWindows('R'));
 
+		// Playerの落下攻撃(空中で急降下)：左クリック
+		pKeyboardMouse->AddButton("DiveAttack", new KdInputButtonForWindows(VK_LBUTTON));
+
 		// 加速(EditorCamera)
 		pKeyboardMouse->AddButton("Boost", new KdInputButtonForWindows(VK_SHIFT));
 
