@@ -259,6 +259,50 @@ void KdStandardShader::DrawModel(KdModelWork& rModel, const Math::Matrix& mWorld
 	}
 }
 
+// ビルボード用にworld行列をカメラ基準で作り直す（追加 2026/07/14）
+// ・板ポリはスケールを頂点側に持ち、world行列は純粋な回転＋平行移動なので、
+//   回転部分だけカメラで置き換えれば正対/軸固定のビルボードになる
+// ・eNoneは何もせずそのまま返す（従来のDrawPolygon呼び出しは挙動不変）
+static Math::Matrix ApplyBillboardToWorld(const KdPolygon& rPolygon, const Math::Matrix& mWorld)
+{
+	KdPolygon::BillboardMode mode = rPolygon.GetBillboardMode();
+	if (mode == KdPolygon::BillboardMode::eNone) { return mWorld; }
+
+	// カメラのワールド行列（ビュー行列の逆行列）
+	Math::Matrix mCam = KdShaderManager::Instance().GetCameraCB().mView.Invert();
+	Math::Vector3 pos = mWorld.Translation();
+
+	if (mode == KdPolygon::BillboardMode::eScreen)
+	{
+		// 点ビルボード：カメラ回転へ差し替え。world側の回転(spin等)は面内の先回転として温存
+		Math::Matrix rotOnly = mWorld;
+		rotOnly.Translation(Math::Vector3::Zero);
+		Math::Matrix camRot = mCam;
+		camRot.Translation(Math::Vector3::Zero);
+
+		Math::Matrix result = rotOnly * camRot;
+		result.Translation(pos);
+		return result;
+	}
+
+	// eAxis：軸固定ビルボード（world.Up()を軸として保持し、軸まわりだけカメラを向く）
+	Math::Vector3 axis = mWorld.Up();
+	axis.Normalize();
+
+	Math::Vector3 toCam = mCam.Translation() - pos;
+	Math::Vector3 side = axis.Cross(toCam);
+	if (side.LengthSquared() < 1e-6f) { side = Math::Vector3::Right; }	// 軸と視線が平行な時の保険
+	side.Normalize();
+	Math::Vector3 normal = side.Cross(axis);
+
+	Math::Matrix result = Math::Matrix::Identity;
+	result.Right(side);
+	result.Up(axis);
+	result.Backward(normal);
+	result.Translation(pos);
+	return result;
+}
+
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
 // ポリゴンを描画（モデル以外のプログラム上で生成された頂点の集合体
 // ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
@@ -268,6 +312,9 @@ void KdStandardShader::DrawPolygon(const KdPolygon& rPolygon, const Math::Matrix
 	const Math::Color& colRate, const Math::Vector3& emissive)
 {
 	if (!rPolygon.IsEnable()) { return; }
+
+	// ビルボード指定があればworld行列をカメラ基準に作り直す（追加 2026/07/14）
+	Math::Matrix mDrawWorld = ApplyBillboardToWorld(rPolygon, mWorld);
 
 	// ポリゴン描画用の頂点取得
 	auto& vertices = rPolygon.GetVertices();
@@ -281,8 +328,8 @@ void KdStandardShader::DrawPolygon(const KdPolygon& rPolygon, const Math::Matrix
 		m_cb0_Obj.Write();
 	}
 
-	// 3Dワールド行列転送
-	m_cb1_Mesh.Work().mW = mWorld;
+	// 3Dワールド行列転送（ビルボード適用後の行列を使う。追加 2026/07/14）
+	m_cb1_Mesh.Work().mW = mDrawWorld;
 	m_cb1_Mesh.Write();
 
 	// マテリアルの転送
@@ -319,7 +366,7 @@ void KdStandardShader::DrawPolygon(const KdPolygon& rPolygon, const Math::Matrix
 		std::vector<KdPolygon::Vertex> _2DVertices = vertices;
 
 		// ポリゴンの法線を光に向ける処理：どの方向に向いていても光の影響を正面からに受けるように変換
-		ConvertNormalsFor2D(_2DVertices, mWorld);
+		ConvertNormalsFor2D(_2DVertices, mDrawWorld);	// ビルボード適用後の行列を使う（追加 2026/07/14）
 
 		// 2DObject用に変換した頂点配列を描画
 		KdDirect3D::Instance().DrawVertices(D3D_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP, (signed)_2DVertices.size(), &_2DVertices[0], sizeof(KdPolygon::Vertex));

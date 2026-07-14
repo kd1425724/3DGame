@@ -20,6 +20,15 @@ public:
 		float			_blank[6]	= { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
 	};
 
+	// ビルボードの種類（追加 2026/07/14）
+	// DrawPolygonが描画直前にworld行列をカメラ基準で作り直す。既定eNoneは従来どおり(挙動不変)
+	enum class BillboardMode
+	{
+		eNone,		// 通常：渡されたworld行列そのまま
+		eScreen,	// 点ビルボード：常にカメラへ正対（world回転は面内の先回転として温存）
+		eAxis,		// 軸固定ビルボード：world.Up()を軸に、軸まわりだけカメラを向く（帯/ワイヤー向け）
+	};
+
 	KdPolygon() {}
 	KdPolygon(const std::shared_ptr<KdTexture>& spBaseColTex) { SetMaterial(spBaseColTex); }
 	KdPolygon(const std::string& baseColTexName) { SetMaterial(baseColTexName); }
@@ -48,6 +57,10 @@ public:
 	bool Is2DObject() const { return m_2DObject; }
 	void Set2DObject(bool is2DObject) { m_2DObject = is2DObject; }
 
+	// ビルボードモードの取得/設定（追加 2026/07/14）
+	BillboardMode GetBillboardMode() const { return m_billboardMode; }
+	void SetBillboardMode(BillboardMode mode) { m_billboardMode = mode; }
+
 protected:
 
 	// ポリゴンに描画するテクスチャ
@@ -61,4 +74,7 @@ protected:
 
 	// 2Dオブジェクトかどうか
 	bool m_2DObject = true;
+
+	// ビルボードの種類（追加 2026/07/14）
+	BillboardMode m_billboardMode = BillboardMode::eNone;
 };
