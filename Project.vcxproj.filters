@@ -115,6 +115,9 @@
     <Filter Include="Src\Application\GameObject\Wire">
       <UniqueIdentifier>{a7e1c2d3-1122-4b33-9c44-5d6e7f809aa1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Application\GameObject\Targeting">
+      <UniqueIdentifier>{d4e5f6a7-b8c9-4d0e-9f1a-3b4c5d6e7f80}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\Application\Debug">
       <UniqueIdentifier>{81b7a301-0093-415a-895f-4f6d7d620939}</UniqueIdentifier>
     </Filter>
@@ -384,8 +387,8 @@
     <ClInclude Include="Src\Application\GameObject\Chara\Player\Player.h">
       <Filter>Src\Application\GameObject\Chara\Player</Filter>
     </ClInclude>
-    <ClInclude Include="Src\Application\GameObject\Chara\Player\Targeting.h">
-      <Filter>Src\Application\GameObject\Chara\Player</Filter>
+    <ClInclude Include="Src\Application\GameObject\Targeting\Targeting.h">
+      <Filter>Src\Application\GameObject\Targeting</Filter>
     </ClInclude>
     <ClInclude Include="Src\Application\GameObject\Chara\Enemy\Enemy.h">
       <Filter>Src\Application\GameObject\Chara\Enemy</Filter>
@@ -623,8 +626,8 @@
     <ClCompile Include="Src\Application\GameObject\Chara\Player\Player.cpp">
       <Filter>Src\Application\GameObject\Chara\Player</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Application\GameObject\Chara\Player\Targeting.cpp">
-      <Filter>Src\Application\GameObject\Chara\Player</Filter>
+    <ClCompile Include="Src\Application\GameObject\Targeting\Targeting.cpp">
+      <Filter>Src\Application\GameObject\Targeting</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Chara\Enemy\Enemy.cpp">
       <Filter>Src\Application\GameObject\Chara\Enemy</Filter>

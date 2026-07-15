@@ -8,7 +8,7 @@
 #include "../../../Debug/DebugFlags/DebugFlags.h"
 #include "../../Camera/CameraShake.h"
 #include "../../../Effect/EffectManager.h"
-#include "Targeting.h"
+#include "../../Targeting/Targeting.h"
 
 #include"../../Wire/WireAction.h"
 

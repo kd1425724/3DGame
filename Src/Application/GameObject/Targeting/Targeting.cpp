@@ -1,8 +1,8 @@
 ﻿#include "Targeting.h"
 
-#include "../../Camera/CameraBase.h"
-#include "../../../Scene/SceneManager.h"
-#include "../../../Debug/DebugParams/DebugParams.h"
+#include "../Camera/CameraBase.h"
+#include "../../Scene/SceneManager.h"
+#include "../../Debug/DebugParams/DebugParams.h"
 
 // 板ポリ(KdSquarePolygon)はPch経由で見える。unique_ptr(前方宣言)の生成/破棄を
 // ここ(完全な型が見える.cpp)で行うため、ctor/dtorを定義する
