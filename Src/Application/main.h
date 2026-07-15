@@ -21,16 +21,27 @@ public:
 	int		GetNowFPS()			const	{ return m_fpsController.m_nowfps; }
 	int		GetMaxFPS()			const	{ return m_fpsController.m_maxFps; }
 
-	// デルタタイム。フレーム落ち・ウィンドウ操作・ロード等でdtが跳ねると、
+	// 実時間デルタタイム。フレーム落ち・ウィンドウ操作・ロード等でdtが跳ねると、
 	// pos += velocity*dt が一気に進んで物理が暴発(壁すり抜け/大フリング)しうる。
 	// それを防ぐため上限(1/30秒=約2フレームぶん)で頭打ちにする。
-	// ※ 遅い時は「スロー再生」になるが、暴発するよりは安全という定番の対処
-	float	GetDeltaTime()		const
+	// ※ タイムスケール(スロー)は掛けない。フォーカスゲージなど"現実の時間"で測るものに使う
+	float	GetRealDeltaTime()	const
 	{
 		constexpr float kMaxDeltaTime = 1.0f / 30.0f;
 		float dt = m_fpsController.GetDeltaTime();
 		return (dt > kMaxDeltaTime) ? kMaxDeltaTime : dt;
 	}
+
+	// ゲーム用デルタタイム。実時間dtにタイムスケールを掛けたもの。ゲームロジック(移動/敵/
+	// エフェクト/カメラ等)はこれを使うので、SetTimeScaleで全体を一括スローにできる(空中スロー)
+	float	GetDeltaTime()		const
+	{
+		return GetRealDeltaTime() * m_timeScale;
+	}
+
+	// タイムスケール設定(1.0=等速 / 例:0.3=スロー)。空中スロー(エアフォーカス)で使う
+	void	SetTimeScale(float _scale)	{ m_timeScale = _scale; }
+	float	GetTimeScale()		const	{ return m_timeScale; }
 private:
 
 	void KdBeginUpdate();
@@ -60,6 +71,9 @@ private:
 
 	// ゲーム終了フラグ trueで終了する
 	bool		m_endFlag = false;
+
+	// タイムスケール(1.0=等速)。空中スロー中はPlayerが小さくして全体をスローにする
+	float		m_timeScale = 1.0f;
 
 //=====================================================
 // シングルトンパターン

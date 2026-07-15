@@ -51,8 +51,11 @@ private:
 	void UpdateDodge(float dt);
 	// スキル「振り回し一掃」：Eで周囲の敵を一掃する(クールダウンあり)
 	void UpdateSweep(float dt);
-	// 落下攻撃：空中で攻撃入力→対象へワイヤーで引き寄せ突撃(未ロックは真下ダイブ)。
-	// 斬ったら周りの敵へ続けて突撃する連続攻撃(自動連鎖ダッシュ)
+	// 空中スロー(エアフォーカス)：空中で左クリック長押し中は時間をスローにして狙う。
+	// フォーカスゲージで制限。離した瞬間に突撃(UpdateDiveがrelease発火)する
+	void UpdateAirFocus();
+	// 落下攻撃：空中で左クリックを離した瞬間→対象へワイヤーで引き寄せ突撃(未ロックは真下ダイブ)。
+	// 斬ったら受付窓中に長押し→離して周りの敵へ続けて突撃する連続攻撃
 	void UpdateDive(float dt);
 	// 範囲内で最も近い生きている敵を返す(連続攻撃の次の突撃先選び)。いなければnull
 	std::shared_ptr<KdGameObject> FindNearestEnemy(const Math::Vector3& center, float range) const;
@@ -95,10 +98,10 @@ private:
 	bool m_isDiving = false;
 	// チェイン数：一撃ごとに増える(手応えを段階的に強く/将来のコンボUI用)。接地・待機でリセット
 	int m_diveChainCount = 0;
-	// 突撃入力の先行入力バッファ(連打でグラップルが繋がりやすいように少しの間押下を覚える)
-	float m_diveBufferTimer = 0.0f;
-	// 斬った後、次の突撃入力を受け付ける残り時間(この間にキーを押せば次の敵へ続けて突撃)
+	// 斬った後、次の突撃入力を受け付ける残り時間(この間に長押し→離しで次の敵へ続けて突撃)
 	float m_comboWindowTimer = 0.0f;
+	// 空中スローのフォーカスゲージ(秒)。スロー中は実時間で減り、地上/未使用で回復
+	float m_focusGauge = 1.5f;
 
 	// 落下攻撃で突撃中の対象(Targetingの選択からコピー。ホーミングの狙い先)
 	std::weak_ptr<KdGameObject> m_wpDiveTarget;

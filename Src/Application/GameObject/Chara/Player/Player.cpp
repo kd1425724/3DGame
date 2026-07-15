@@ -51,6 +51,9 @@ void Player::Update()
 		return;   // この行以降(移動・ワイヤー等)はスキップ
 	}
 
+	// 空中スロー(左クリック長押しで時間をスロー＋狙う)。毎フレームtimeScaleを管理する
+	UpdateAirFocus();
+
 	// ワイヤーの発射/解除(入力・狙いはPlayer側。スイング物理はWireActionに委譲)
 	UpdateWireInput();
 
@@ -221,6 +224,36 @@ void Player::UpdateDodge(float dt)
 	m_invincibleTimer    = DebugParams::Instance().Float(U8("回避/無敵時間"),     0.2f,  0.0f,  1.0f);
 }
 
+void Player::UpdateAirFocus()
+{
+	float maxGauge = DebugParams::Instance().Float(U8("空中スロー/最大時間"), 1.5f, 0.2f, 5.0f);
+	float slowVal  = DebugParams::Instance().Float(U8("空中スロー/遅さ"),     0.3f, 0.05f, 1.0f);
+	float refill   = DebugParams::Instance().Float(U8("空中スロー/回復速度"), 0.5f, 0.0f, 3.0f);
+
+	// フォーカスゲージは"現実の時間"で増減させる(スローで薄まらないように実時間dtを使う)
+	float realDt = Application::Instance().GetRealDeltaTime();
+
+	// スロー可能：空中(ワイヤー未接続) && 左クリック長押し && 「突撃していない or 継続受付中」 && ゲージ残
+	//   ※ 突撃で実際にダッシュしている間(受付窓なし)はスローしない(突撃自体は等速)
+	bool airborne = !m_isGrounded && !m_upWire->IsAttached();
+	bool canAim   = airborne && (!m_isDiving || m_comboWindowTimer > 0.0f);
+	bool holding  = KdInputManager::Instance().IsHold("DiveAttack");
+	bool slowing  = canAim && holding && m_focusGauge > 0.0f;
+
+	if (slowing)
+	{
+		Application::Instance().SetTimeScale(slowVal);   // 世界をスローに
+		m_focusGauge -= realDt;
+		if (m_focusGauge < 0.0f) { m_focusGauge = 0.0f; }
+	}
+	else
+	{
+		Application::Instance().SetTimeScale(1.0f);       // 等速に戻す
+		m_focusGauge += refill * realDt;                  // 未使用/地上で回復
+		if (m_focusGauge > maxGauge) { m_focusGauge = maxGauge; }
+	}
+}
+
 void Player::UpdateDive(float dt)
 {
 	float radius     = DebugParams::Instance().Float(U8("落下攻撃/斬撃範囲"), 1.5f, 0.5f, 15.0f);
@@ -242,9 +275,9 @@ void Player::UpdateDive(float dt)
 			float windowDamp = DebugParams::Instance().Float(U8("連続攻撃/継続中の減速"), 8.0f, 0.0f, 30.0f);
 			m_velocity *= std::clamp(1.0f - windowDamp * dt, 0.0f, 1.0f);
 
-			if (KdInputManager::Instance().IsPress("DiveAttack"))
+			if (KdInputManager::Instance().IsRelease("DiveAttack"))
 			{
-				spTarget = FindNearestEnemy(GetPos(), chainRange);   // 押した時だけ次の敵へ
+				spTarget = FindNearestEnemy(GetPos(), chainRange);   // 離した瞬間に次の敵へ
 				if (spTarget) { m_wpDiveTarget = spTarget; m_comboWindowTimer = 0.0f; }
 			}
 
@@ -293,20 +326,12 @@ void Player::UpdateDive(float dt)
 		return;
 	}
 
-	// === 突撃入力の先行入力バッファ ===
-	// 押した瞬間を少しの間覚えておく。突撃中に押しても覚えるので、着弾直後に消費されて
-	// 次のターゲットへ即チェインできる(連打でグラップルが繋がる)
-	float diveBuffer = DebugParams::Instance().Float(U8("落下攻撃/先行入力"), 0.15f, 0.0f, 0.5f);
-	if (KdInputManager::Instance().IsPress("DiveAttack")) { m_diveBufferTimer = diveBuffer; }
-	else { m_diveBufferTimer -= dt; if (m_diveBufferTimer < 0.0f) { m_diveBufferTimer = 0.0f; } }
-
-	// === 開始判定 ===
+	// === 開始判定：空中で左クリックを"離した瞬間"に突撃(長押し中はUpdateAirFocusがスロー＋狙い) ===
 	if (m_isGrounded) { return; }                                        // 空中専用
-	if (m_diveBufferTimer <= 0.0f) { return; }                           // 先行入力が生きている時だけ
+	if (!KdInputManager::Instance().IsRelease("DiveAttack")) { return; } // 離した瞬間だけ発火
 
-	m_diveBufferTimer = 0.0f;   // 入力を消費
 	m_isDiving = true;
-	m_comboWindowTimer = 0.0f;   // 初弾はすぐ突撃(前回の受付が残っていても消す)
+	m_comboWindowTimer = 0.0f;
 
 	// 自動ターゲットがいれば「対象へワイヤーで引き寄せ」、いなければ従来の真下ダイブ
 	std::shared_ptr<KdGameObject> spLock = m_upTargeting->GetTarget();
@@ -382,8 +407,8 @@ void Player::Respawn()
 	m_isDiving = false;
 	m_wpDiveTarget.reset();
 	m_diveChainCount = 0;
-	m_diveBufferTimer = 0.0f;
 	m_comboWindowTimer = 0.0f;
+	Application::Instance().SetTimeScale(1.0f);   // スローを解除(スロー中に落下リセットしても等速へ)
 	m_isDodging = false;
 	m_dodgeTimer = 0.0f;
 	m_invincibleTimer = 0.0f;
