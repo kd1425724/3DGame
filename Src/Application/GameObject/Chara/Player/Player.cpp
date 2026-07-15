@@ -3,7 +3,6 @@
 #include "../../../main.h"
 #include "../../Camera/CameraBase.h"
 #include "../../Camera/TPSCamera/TPSCamera.h"
-#include "../../Magic/LaserShot/LaserShot.h"
 #include "../../../Scene/SceneManager.h"
 #include "../../../Debug/DebugParams/DebugParams.h"
 #include "../../../Debug/DebugFlags/DebugFlags.h"
@@ -88,9 +87,7 @@ void Player::Update()
 		UpdateJump(dt);
 	}
 	UpdateDive(dt);
-	// Eキーはスキル「振り回し一掃」に割り当て。旧レーザー(UpdateLaser)は残置だが未使用
-	//UpdateLaser();
-	UpdateSweep(dt);
+	UpdateSweep(dt);   // Eキーのスキル「振り回し一掃」
 }
 
 void Player::UpdateWireInput()
@@ -419,30 +416,6 @@ std::shared_ptr<KdGameObject> Player::FindNearestEnemy(const Math::Vector3& cent
 		if (d < bestDist) { bestDist = d; best = spEnemy; }
 	}
 	return best;
-}
-
-void Player::UpdateLaser()
-{
-	// Eキーでプレイヤーの正面にレーザー(当たり判定つき)を発射する
-	if (KdInputManager::Instance().IsPress("FireLaser"))
-	{
-		// プレイヤーの正面方向(カメラの水平向きが基準。移動のBackward基準と合わせてある)
-		Math::Vector3 front = Math::Vector3::Backward;
-
-		std::shared_ptr<CameraBase> spCamera = m_wpCamera.lock();
-		if (spCamera)
-		{
-			front = Math::Vector3::TransformNormal(front, spCamera->GetRotationYMatrix());
-		}
-
-		Math::Vector3 firePos = GetPos() + Math::Vector3(0, 1.0f, 0) + front * 1.0f;
-
-		// LaserShotを生成してシーンに追加する(エフェクト再生・寿命・当たり判定は
-		// LaserShot自身が管理するので、Player側は生成して渡すだけ)
-		std::shared_ptr<LaserShot> spLaser = std::make_shared<LaserShot>();
-		spLaser->Fire(firePos, front);
-		SceneManager::Instance().AddObject(spLaser);
-	}
 }
 
 void Player::UpdateSweep(float dt)

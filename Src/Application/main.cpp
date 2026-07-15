@@ -285,9 +285,6 @@ bool Application::Init(int w, int h)
 		pKeyboardMouse->AddButton("MoveUp", new KdInputButtonForWindows('E'));
 		pKeyboardMouse->AddButton("MoveDown", new KdInputButtonForWindows('Q'));
 
-		// Playerのレーザー発射(EditorCameraのMoveUpと同じキーだが別名で登録、用途が異なるので問題ない)
-		pKeyboardMouse->AddButton("FireLaser", new KdInputButtonForWindows('E'));
-
 		// Playerのスキル「振り回し一掃」(周囲の敵を一掃)：E
 		pKeyboardMouse->AddButton("Skill", new KdInputButtonForWindows('E'));
 

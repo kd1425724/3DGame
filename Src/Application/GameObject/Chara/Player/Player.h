@@ -51,8 +51,6 @@ private:
 	void UpdateJump(float dt);
 	// 回避ダッシュ：Shiftで移動入力方向(なければカメラ前方)へ短距離クイックムーブ＋無敵＋クールダウン
 	void UpdateDodge(float dt);
-	// Eキーで正面にレーザーを発射する(現在はスキル「振り回し一掃」に置き換えて未使用)
-	void UpdateLaser();
 	// スキル「振り回し一掃」：Eで周囲の敵を一掃する(クールダウンあり)
 	void UpdateSweep(float dt);
 	// 落下攻撃：空中で攻撃入力→対象へワイヤーで引き寄せ突撃(未ロックは真下ダイブ)。
