@@ -70,9 +70,14 @@ void Player::Update()
 		return;
 	}
 
-	// 通常移動 → ジャンプ → 落下攻撃 → レーザー
-	UpdateMove(dt);
-	UpdateJump(dt);
+	// 落下攻撃(突撃/連続攻撃)中は通常移動・ジャンプを止める。
+	// ※ UpdateMoveは接地中に水平速度を入力値(無入力なら0)へ上書きするため、
+	//   突撃中に走ると追撃ディレイの流しや突撃の勢いが地面で殺されてしまう
+	if (!m_isDiving)
+	{
+		UpdateMove(dt);
+		UpdateJump(dt);
+	}
 	UpdateDive(dt);
 	UpdateLaser();
 }
