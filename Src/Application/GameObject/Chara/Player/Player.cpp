@@ -247,72 +247,47 @@ void Player::UpdateJump(float dt)
 
 void Player::UpdateDive(float dt)
 {
-	// === 連続攻撃(フルリー)中：止まった場所で周りの敵を自動ロックオンして連続で斬る ===
-	if (m_isFlurry)
-	{
-		float interval = DebugParams::Instance().Float(U8("連続攻撃/間隔"), 0.08f, 0.02f, 0.5f);
-		float range    = DebugParams::Instance().Float(U8("連続攻撃/範囲"), 5.0f, 1.0f, 20.0f);
+	float radius     = DebugParams::Instance().Float(U8("落下攻撃/斬撃範囲"), 3.0f, 0.5f, 15.0f);
+	float chainRange = DebugParams::Instance().Float(U8("連続攻撃/範囲"),   8.0f, 1.0f, 30.0f);
 
-		// その場に留まる(勢いを止めて止まったまま連続攻撃)
-		SetPos(m_flurryPos);
-		m_velocity = Math::Vector3::Zero;
-
-		m_flurryTimer    -= dt;
-		m_flurryHitTimer -= dt;
-
-		if (m_flurryHitTimer <= 0.0f)
-		{
-			// 周りの敵を自動ロックオン(最も近い1体)して斬る
-			std::shared_ptr<KdGameObject> spNear;
-			float best = range;
-			for (auto& spEnemy : SceneManager::Instance().FindObjectsWithTag(ObjectTag::Enemy))
-			{
-				if (!spEnemy) { continue; }
-				float d = Math::Vector3::Distance(m_flurryPos, spEnemy->GetPos());
-				if (d < best) { best = d; spNear = spEnemy; }
-			}
-
-			if (spNear)
-			{
-				spNear->OnHit(this);   // 斬る(今の敵はOnHitで消滅)
-				m_diveChainCount++;
-				CameraShake::Instance().AddTrauma(std::clamp(0.15f + 0.03f * m_diveChainCount, 0.0f, 0.6f));
-			}
-			// 敵がいなくても連続攻撃/時間の間はその場に留まる(=止まって見える)。
-			// 間隔ごとに再探索し、範囲に入ってきた敵を斬り続ける
-			m_flurryHitTimer = interval;
-		}
-
-		if (m_flurryTimer <= 0.0f) { m_isFlurry = false; }   // 時間切れで終了→落下に戻る
-		return;
-	}
-
-	float radius = DebugParams::Instance().Float(U8("落下攻撃/斬撃範囲"), 3.0f, 0.5f, 15.0f);
-
-	// === 突撃中(対象へワイヤーで引き寄せ) ===
+	// === 突撃中(対象へ引き寄せ、斬ったら周りの敵へ続けて突撃＝連続攻撃) ===
 	if (m_isDiving)
 	{
 		std::shared_ptr<KdGameObject> spTarget = m_wpDiveTarget.lock();
-		if (spTarget)
+
+		// 対象がいない/斬って消えたら、周りの敵を自動ロックオンして次の突撃先にする
+		if (!spTarget || spTarget->IsExpired())
 		{
-			float pullAccel = DebugParams::Instance().Float(U8("落下攻撃/引き寄せ加速"),     80.0f, 5.0f, 300.0f);
-			float pullMax   = DebugParams::Instance().Float(U8("落下攻撃/引き寄せ上限速度"), 45.0f, 5.0f, 150.0f);
-
-			// 対象(少し上=胴の高さ)へのベクトル。対象は動くので毎フレーム狙い直す(ホーミング)
-			Math::Vector3 aim = spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f);
-			Math::Vector3 to  = aim - GetPos();
-			float dist = to.Length();
-			if (dist <= radius) { StartFlurry(aim); return; }   // 到達＝敵の場所で止まって連続攻撃へ
-
-			to /= dist;
-			// リールで引かれるように、速さを加速でrampしつつ常に対象へまっすぐ向ける
-			// (周回せず素直に引き込まれる=「引っ張られて飛んでいく」感じ)
-			float sp = m_velocity.Length() + pullAccel * dt;
-			if (sp > pullMax) { sp = pullMax; }
-			m_velocity = to * sp;
-			return;
+			spTarget = FindNearestEnemy(GetPos(), chainRange);
+			if (spTarget) { m_wpDiveTarget = spTarget; }
+			else { return; }   // 近くに敵なし→そのまま落下(真下ダイブ継続。着地でPostUpdateが処理)
 		}
-		// 対象が消えた：そのまま落ちて着地時にフルリー(PostUpdateでStartFlurry)
+
+		float pullAccel = DebugParams::Instance().Float(U8("落下攻撃/引き寄せ加速"),     80.0f, 5.0f, 300.0f);
+		float pullMax   = DebugParams::Instance().Float(U8("落下攻撃/引き寄せ上限速度"), 45.0f, 5.0f, 150.0f);
+
+		// 対象(少し上=胴の高さ)へのベクトル。対象は動くので毎フレーム狙い直す(ホーミング)
+		Math::Vector3 aim = spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f);
+		Math::Vector3 to  = aim - GetPos();
+		float dist = to.Length();
+
+		if (dist <= radius)
+		{
+			// 斬る → 続けて次に近い敵へ突撃(連続攻撃＝そっちへ飛ぶ)
+			spTarget->OnHit(this);
+			m_diveChainCount++;
+			CameraShake::Instance().AddTrauma(std::clamp(0.2f + 0.05f * m_diveChainCount, 0.0f, 0.7f));
+
+			std::shared_ptr<KdGameObject> spNext = FindNearestEnemy(GetPos(), chainRange);
+			if (spNext) { m_wpDiveTarget = spNext; return; }        // 続けて突撃
+			m_isDiving = false; m_wpDiveTarget.reset(); return;     // 周りに敵なし→終了
+		}
+
+		to /= dist;
+		// リールで引かれるように、速さを加速でrampしつつ常に対象へまっすぐ向ける
+		float sp = m_velocity.Length() + pullAccel * dt;
+		if (sp > pullMax) { sp = pullMax; }
+		m_velocity = to * sp;
 		return;
 	}
 
@@ -345,19 +320,18 @@ void Player::UpdateDive(float dt)
 	}
 }
 
-void Player::StartFlurry(const Math::Vector3& atPos)
+std::shared_ptr<KdGameObject> Player::FindNearestEnemy(const Math::Vector3& center, float range) const
 {
-	// 敵の場所で一旦止まり、周りの敵への連続攻撃(フルリー)に移行する
-	m_flurryPos = atPos;
-	SetPos(atPos);                       // 止まる場所へスナップ
-	m_velocity = Math::Vector3::Zero;    // 斬り抜け/スタンプと違い、ここで勢いを止める
-
-	m_isDiving = false;
-	m_wpDiveTarget.reset();
-
-	m_isFlurry = true;
-	m_flurryTimer    = DebugParams::Instance().Float(U8("連続攻撃/時間"), 0.6f, 0.1f, 3.0f);
-	m_flurryHitTimer = 0.0f;             // すぐ1発目(最初のロックオン対象=止まった敵)
+	// 範囲内で最も近い「生きている」敵を返す(斬った直後の敵はIsExpiredで除外)
+	std::shared_ptr<KdGameObject> best;
+	float bestDist = range;
+	for (auto& spEnemy : SceneManager::Instance().FindObjectsWithTag(ObjectTag::Enemy))
+	{
+		if (!spEnemy || spEnemy->IsExpired()) { continue; }
+		float d = Math::Vector3::Distance(center, spEnemy->GetPos());
+		if (d < bestDist) { bestDist = d; best = spEnemy; }
+	}
+	return best;
 }
 
 void Player::UpdateLaser()
@@ -392,7 +366,6 @@ void Player::Respawn()
 	m_isGrounded = false;
 	if (m_upWire) { m_upWire->Release(); }
 	m_isDiving = false;
-	m_isFlurry = false;
 	m_wpDiveTarget.reset();
 	m_diveChainCount = 0;
 	m_diveBufferTimer = 0.0f;
@@ -407,14 +380,17 @@ void Player::PostUpdate()
 		GroundCheck();
 	}
 
-	// 突撃中に着地したら(未ロックの真下ダイブ等)、その場で連続攻撃(フルリー)へ移行する
+	// 突撃中に着地したら(未ロックの真下ダイブ等)、近くに敵がいれば続けて突撃、いなければ終了
 	if (m_isDiving && IsGrounded())
 	{
-		StartFlurry(GetPos());
+		float chainRange = DebugParams::Instance().Float(U8("連続攻撃/範囲"), 8.0f, 1.0f, 30.0f);
+		std::shared_ptr<KdGameObject> spNext = FindNearestEnemy(GetPos(), chainRange);
+		if (spNext) { m_wpDiveTarget = spNext; }              // 続けて突撃(この敵へ飛ぶ)
+		else        { m_isDiving = false; m_wpDiveTarget.reset(); }
 	}
 
-	// 接地して待機(突撃/連続攻撃していない)状態ならチェインは途切れる(次は1から数え直す)
-	if (IsGrounded() && !m_isDiving && !m_isFlurry) { m_diveChainCount = 0; }
+	// 接地して待機(突撃していない)状態ならチェインは途切れる(次は1から数え直す)
+	if (IsGrounded() && !m_isDiving) { m_diveChainCount = 0; }
 
 	// === 着地・壁ヒットの手応え(カメラを揺らす) ===
 	// CharaBaseが記録した衝撃をConsumeし、一定以上ならtraumaを加える(小さすぎる衝撃は無視)。
