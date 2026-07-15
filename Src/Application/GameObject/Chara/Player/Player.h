@@ -66,8 +66,10 @@ private:
 
 	// 【#1 自分で実装】ワイヤーの見た目を描く。DrawUnLitから呼ぶ土台のみ用意(中身はコメント)
 	//  ・物理はWireAction(距離拘束)、見た目はここ、と役割を分ける
-	//  ・繋がっている間だけ、手元→アンカーに沿ってワイヤーを描く
+	//  ・スイング中はアンカーへ、突撃(グラップル)中は対象へ、手元から線を引く
 	void DrawWire();
+	// 手元(from)→終点(to)に沿ってワイヤーの板ポリを1本描く(スイング/突撃の共通処理)
+	void DrawWireSegment(const Math::Vector3& from, const Math::Vector3& to);
 
 	// ※ 移動速度はDebugParams("プレイヤー/移動速度")で調整する
 

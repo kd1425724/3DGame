@@ -247,26 +247,31 @@ void Player::UpdateJump(float dt)
 
 void Player::UpdateDive(float dt)
 {
-	float diveSpeed = DebugParams::Instance().Float(U8("落下攻撃/降下速度"), 30.0f, 5.0f, 100.0f);
-	float radius    = DebugParams::Instance().Float(U8("落下攻撃/範囲"),     3.0f, 0.5f, 15.0f);
+	float radius = DebugParams::Instance().Float(U8("落下攻撃/範囲"), 3.0f, 0.5f, 15.0f);
 
-	// === 突撃中(ホーミング) ===
+	// === 突撃中(対象へワイヤーで引き寄せ) ===
 	if (m_isDiving)
 	{
 		std::shared_ptr<KdGameObject> spTarget = m_wpDiveTarget.lock();
 		if (spTarget)
 		{
-			// 対象へ毎フレーム向き直して直進(3D速度を上書き)。近づいたら着弾
-			Math::Vector3 to = spTarget->GetPos() - GetPos();
+			float pullAccel = DebugParams::Instance().Float(U8("落下攻撃/引き寄せ加速"),     80.0f, 5.0f, 300.0f);
+			float pullMax   = DebugParams::Instance().Float(U8("落下攻撃/引き寄せ上限速度"), 45.0f, 5.0f, 150.0f);
+
+			// 対象(少し上=胴の高さ)へのベクトル。対象は動くので毎フレーム狙い直す(ホーミング)
+			Math::Vector3 to = (spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f)) - GetPos();
 			float dist = to.Length();
 			if (dist <= radius) { DiveImpact(); return; }   // 到達＝着弾(周囲ごと撃破)
-			if (dist > 0.0001f)
-			{
-				to /= dist;
-				m_velocity = to * diveSpeed;   // 対象へ直進(ロックオン突撃)
-			}
+
+			to /= dist;
+			// リールで引かれるように、速さを加速でrampしつつ常に対象へまっすぐ向ける
+			// (周回せず素直に引き込まれる=「引っ張られて飛んでいく」感じ)
+			float sp = m_velocity.Length() + pullAccel * dt;
+			if (sp > pullMax) { sp = pullMax; }
+			m_velocity = to * sp;
+			return;
 		}
-		// 対象がいない(未ロック真下ダイブ or 対象消滅)は、そのまま落ちて着地時にDiveImpact
+		// 対象が消えた：そのまま落ちて着地時にDiveImpact(PostUpdate)
 		return;
 	}
 
@@ -276,21 +281,17 @@ void Player::UpdateDive(float dt)
 
 	m_isDiving = true;
 
-	// ロックオン対象がいればそこへ突撃、いなければ真下へ急降下
+	// 自動ターゲットがいれば「対象へワイヤーで引き寄せ」、いなければ従来の真下ダイブ
 	std::shared_ptr<KdGameObject> spLock = m_wpLockOnTarget.lock();
 	if (spLock)
 	{
-		m_wpDiveTarget = spLock;   // ホーミングの狙い先(=ロックオンした所にアンカーを刺して突撃するイメージ)
-		Math::Vector3 to = spLock->GetPos() - GetPos();
-		if (to.LengthSquared() > 0.0001f)
-		{
-			to.Normalize();
-			m_velocity = to * diveSpeed;
-		}
+		// 以降UpdateDiveが対象へ引き寄せ、ワイヤーの線はDrawWireが手元→対象に描く
+		m_wpDiveTarget = spLock;
 	}
 	else
 	{
 		m_wpDiveTarget.reset();
+		float diveSpeed = DebugParams::Instance().Float(U8("落下攻撃/降下速度"), 30.0f, 5.0f, 100.0f);
 		m_velocity.y = -diveSpeed;   // 真下(水平の勢いは残す)
 	}
 }
@@ -453,13 +454,30 @@ void Player::DrawUnLit()
 
 void Player::DrawWire()
 {
-	// 繋がっている間だけ描く
-	if (!m_upWire || !m_upWire->IsAttached() || !m_upWirePoly) { return; }
+	if (!m_upWirePoly) { return; }
 
-	// ワイヤーの両端(手元→アンカー)。手元は発射位置に近い高さに合わせる
+	// ワイヤーの手元(発射位置に近い高さ)
 	Math::Vector3 from = GetPos() + Math::Vector3(0.0f, 0.25f, 0.0f);
-	Math::Vector3 to   = m_upWire->GetAnchor();
 
+	// スイング中：アンカーへ線を引く
+	if (m_upWire && m_upWire->IsAttached())
+	{
+		DrawWireSegment(from, m_upWire->GetAnchor());
+		return;
+	}
+
+	// 突撃(グラップル)中：引き寄せている対象へ線を引く
+	if (m_isDiving)
+	{
+		if (std::shared_ptr<KdGameObject> spTarget = m_wpDiveTarget.lock())
+		{
+			DrawWireSegment(from, spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f));
+		}
+	}
+}
+
+void Player::DrawWireSegment(const Math::Vector3& from, const Math::Vector3& to)
+{
 	// 軸(=ワイヤー方向)と長さ
 	Math::Vector3 axis = to - from;
 	float length = axis.Length();
