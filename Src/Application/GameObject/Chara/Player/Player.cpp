@@ -277,15 +277,13 @@ void Player::UpdateDive(float dt)
 				spNear->OnHit(this);   // 斬る(今の敵はOnHitで消滅)
 				m_diveChainCount++;
 				CameraShake::Instance().AddTrauma(std::clamp(0.15f + 0.03f * m_diveChainCount, 0.0f, 0.6f));
-				m_flurryHitTimer = interval;
 			}
-			else
-			{
-				m_flurryTimer = 0.0f;   // 周りに敵がいなくなったら連続攻撃終了
-			}
+			// 敵がいなくても連続攻撃/時間の間はその場に留まる(=止まって見える)。
+			// 間隔ごとに再探索し、範囲に入ってきた敵を斬り続ける
+			m_flurryHitTimer = interval;
 		}
 
-		if (m_flurryTimer <= 0.0f) { m_isFlurry = false; }   // 終了→落下に戻る
+		if (m_flurryTimer <= 0.0f) { m_isFlurry = false; }   // 時間切れで終了→落下に戻る
 		return;
 	}
 
