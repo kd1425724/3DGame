@@ -247,12 +247,20 @@ void Player::UpdateJump(float dt)
 
 void Player::UpdateDive(float dt)
 {
-	float radius     = DebugParams::Instance().Float(U8("落下攻撃/斬撃範囲"), 3.0f, 0.5f, 15.0f);
+	float radius     = DebugParams::Instance().Float(U8("落下攻撃/斬撃範囲"), 1.5f, 0.5f, 15.0f);
 	float chainRange = DebugParams::Instance().Float(U8("連続攻撃/範囲"),   8.0f, 1.0f, 30.0f);
 
 	// === 突撃中(対象へ引き寄せ、斬ったら周りの敵へ続けて突撃＝連続攻撃) ===
 	if (m_isDiving)
 	{
+		// 斬った後の追撃待ち：この間は再加速せず、減速した勢いのまま少し流す(タン…タンの"間")
+		if (m_attackDelayTimer > 0.0f)
+		{
+			m_attackDelayTimer -= dt;
+			if (m_attackDelayTimer > 0.0f) { return; }   // まだ待ち中
+			// 待ち終わり→下へ流れて次の敵をFindNearestEnemyで拾い、追撃する
+		}
+
 		std::shared_ptr<KdGameObject> spTarget = m_wpDiveTarget.lock();
 
 		// 対象がいない/斬って消えたら、周りの敵を自動ロックオンして次の突撃先にする
@@ -283,9 +291,10 @@ void Player::UpdateDive(float dt)
 			float slowRate = DebugParams::Instance().Float(U8("連続攻撃/斬り後の速度残し"), 0.4f, 0.0f, 1.0f);
 			m_velocity *= slowRate;
 
-			std::shared_ptr<KdGameObject> spNext = FindNearestEnemy(GetPos(), chainRange);
-			if (spNext) { m_wpDiveTarget = spNext; return; }        // 続けて突撃
-			m_isDiving = false; m_wpDiveTarget.reset(); return;     // 周りに敵なし→終了
+			// すぐには追撃せず、少し間を置いてから次の敵へ突撃する(タン…タンのリズム)
+			m_attackDelayTimer = DebugParams::Instance().Float(U8("連続攻撃/追撃ディレイ"), 0.15f, 0.0f, 1.0f);
+			m_wpDiveTarget.reset();   // 斬った対象は解除。次の敵は待ち終わりにFindNearestEnemyで拾う
+			return;
 		}
 
 		to /= dist;
@@ -309,6 +318,7 @@ void Player::UpdateDive(float dt)
 
 	m_diveBufferTimer = 0.0f;   // 入力を消費
 	m_isDiving = true;
+	m_attackDelayTimer = 0.0f;   // 初弾はすぐ突撃(前回の追撃待ちが残っていても消す)
 
 	// 自動ターゲットがいれば「対象へワイヤーで引き寄せ」、いなければ従来の真下ダイブ
 	std::shared_ptr<KdGameObject> spLock = m_wpLockOnTarget.lock();
@@ -374,6 +384,7 @@ void Player::Respawn()
 	m_wpDiveTarget.reset();
 	m_diveChainCount = 0;
 	m_diveBufferTimer = 0.0f;
+	m_attackDelayTimer = 0.0f;
 }
 
 void Player::PostUpdate()
