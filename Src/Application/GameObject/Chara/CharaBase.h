@@ -61,6 +61,11 @@ protected:
 	// 接地しているか
 	bool IsGrounded() const { return m_isGrounded; }
 
+	// from→to の間に壁(TypeBump=塔など)があるか(遮蔽判定)。
+	// ワイヤー/突撃が壁を貫通しないための判定に使う。marginぶん手前までを見る
+	// (to地点の壁＝対象自身が張り付いている壁は無視して、途中の壁だけ拾う)
+	static bool IsWallBetween(const Math::Vector3& from, const Math::Vector3& to, float margin = 0.5f);
+
 	// 直近フレームの着地/壁ヒットの衝撃の大きさを取り出す(読むと0に戻すConsume方式)。
 	// カメラの手応え(CameraShake)の発火に使う。ResolveGround/ResolveBumpSweepが記録する。
 	// ※ 記録は全キャラ共通だが、実際にカメラを揺らすのはPlayerだけ(Enemyは呼ばない)

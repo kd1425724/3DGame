@@ -23,6 +23,15 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, float _reel)
 {
 	if (!m_isAttached) { return; }
 
+	// 手元とアンカーの間に壁(塔など)が入ったら、線が壁を突き抜けるのでワイヤーを外す(貫通させない)。
+	// 外した瞬間の速度はそのまま残るので、スイングの勢いで飛んでいける(フリング)
+	Math::Vector3 hand = _body.GetPos() + Math::Vector3(0.0f, 1.0f, 0.0f);
+	if (CharaBase::IsWallBetween(hand, m_anchor))
+	{
+		Release();
+		return;
+	}
+
 	// 重力を3D速度に加える
 	float gravity = DebugParams::Instance().Float(U8("キャラ/重力"), 20.0f, 0.0f, 100.0f);
 	_body.m_velocity.y -= gravity * _dt;

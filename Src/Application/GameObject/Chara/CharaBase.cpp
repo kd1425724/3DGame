@@ -16,6 +16,24 @@ void CharaBase::DrawLit()
 	KdShaderManager::Instance().m_StandardShader.DrawModel(m_modelWork, m_mWorld, m_color);
 }
 
+bool CharaBase::IsWallBetween(const Math::Vector3& from, const Math::Vector3& to, float margin)
+{
+	Math::Vector3 seg = to - from;
+	float len = seg.Length();
+	if (len <= margin) { return false; }   // ほぼ同じ位置なら遮蔽なし
+
+	Math::Vector3 dir = seg / len;
+	// marginぶん手前で止めることで、to地点の壁(対象が張り付いている壁)は拾わない
+	KdCollider::RayInfo ray(KdCollider::TypeBump, from, dir, len - margin);
+
+	std::list<KdCollider::CollisionResult> results;
+	for (auto& obj : SceneManager::Instance().GetObjList())
+	{
+		if (obj) { obj->Intersects(ray, &results); }
+	}
+	return !results.empty();   // 途中に壁があれば遮蔽されている
+}
+
 void CharaBase::GroundCheck()
 {
 	float deltaTime = Application::Instance().GetDeltaTime();

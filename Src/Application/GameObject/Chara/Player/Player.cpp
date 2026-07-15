@@ -297,6 +297,16 @@ void Player::UpdateDive(float dt)
 
 		// 対象(少し上=胴の高さ)へのベクトル。対象は動くので毎フレーム狙い直す(ホーミング)
 		Math::Vector3 aim = spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f);
+
+		// 対象が壁(塔)の裏＝遮蔽されていたら突撃を中断(壁に突っ込んで操作不能になるのを防ぐ)
+		if (IsWallBetween(GetPos(), aim))
+		{
+			m_isDiving = false;
+			m_wpDiveTarget.reset();
+			m_comboWindowTimer = 0.0f;
+			return;
+		}
+
 		Math::Vector3 to  = aim - GetPos();
 		float dist = to.Length();
 
