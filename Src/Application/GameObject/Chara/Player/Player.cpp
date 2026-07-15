@@ -51,13 +51,14 @@ void Player::Update()
 		return;   // この行以降(移動・ワイヤー等)はスキップ
 	}
 
-	// ワイヤーの発射/解除
+	// ワイヤーの発射/解除(入力・狙いはPlayer側。スイング物理はWireActionに委譲)
 	UpdateWireInput();
 
-	// ワイヤー接続中はスイング物理だけ行い、通常移動・ジャンプ・レーザーは止める
+	// ワイヤー接続中はスイング物理だけ行い、通常移動・ジャンプ・レーザーは止める。
+	// たぐり寄せ入力(W/S=Move.y)を渡し、実際の移動はWireAction::UpdateSwingがこのキャラを動かす
 	if (m_upWire->IsAttached())
 	{
-		UpdateWireSwing(dt);
+		m_upWire->UpdateSwing(*this, dt, KdInputManager::Instance().GetAxisState("Move").y);
 		return;
 	}
 
@@ -102,75 +103,6 @@ void Player::UpdateWireInput()
 		// 離しても速度(m_velocity)はそのまま=スイングの勢いで飛んでいける(フリング)
 		m_upWire->Release();
 	}
-}
-
-void Player::UpdateWireSwing(float dt)
-{
-	// === ワイヤー中の物理(スイング) ===
-	// 重力を3D速度に加える
-	float gravity = DebugParams::Instance().Float(U8("キャラ/重力"), 20.0f, 0.0f, 100.0f);
-	m_velocity.y -= gravity * dt;
-
-	// 速度で進めてから、ワイヤーの距離拘束を解く
-	Math::Vector3 pos = GetPos();
-	Math::Vector3 startPos = pos;   // 移動前の位置(スイープの始点)
-	pos += m_velocity * dt;
-
-	// W(+1)でたぐり寄せ / S(-1)で伸ばし
-	float reel = KdInputManager::Instance().GetAxisState("Move").y;
-	m_upWire->Update(pos, m_velocity, dt, reel);
-
-	// === 漕ぎ(ポンプ) ===
-	// DebugFlags「ワイヤー/漕ぎ(ポンプ)」でON/OFF。
-	//   OFF … 元の純粋な振り子(下りで加速→上りで減速。地面すれすれは速度が落ちる)
-	//   ON  … 振り子に接線方向の加速を足す(ブランコを漕ぐイメージ)。上限速度まで勢いを
-	//          維持できるので、Spider-Man風に地面すれすれでも速度が落ちにくくなる
-	if (DebugFlags::Instance().Get(U8("ワイヤー/漕ぎ(ポンプ)"), false))
-	{
-		// 今の進行方向(水平)
-		Math::Vector3 horiz(m_velocity.x, 0.0f, m_velocity.z);
-		float sp = horiz.Length();
-		if (sp > 0.0001f)
-		{
-			Math::Vector3 tdir = horiz / sp;
-
-			// アンカーから外向き(半径方向)の水平成分を除き、接線方向だけに加速する。
-			// (半径方向へ足しても距離拘束で打ち消されるだけ＝弧に沿ってのみ漕ぐ)
-			Math::Vector3 radial = pos - m_upWire->GetAnchor();
-			radial.y = 0.0f;
-			if (radial.LengthSquared() > 0.0001f)
-			{
-				radial.Normalize();
-				tdir -= radial * tdir.Dot(radial);
-				if (tdir.LengthSquared() > 0.0001f) { tdir.Normalize(); }
-				else                                { tdir = Math::Vector3::Zero; }
-			}
-
-			float pumpMax = DebugParams::Instance().Float(U8("ワイヤー/ポンプ上限速度"), 20.0f, 0.0f, 60.0f);
-			float pumpAcc = DebugParams::Instance().Float(U8("ワイヤー/ポンプ加速"),     15.0f, 0.0f, 100.0f);
-
-			float add = pumpMax - sp;   // 上限速度まであとどれだけ足せるか(それ以上は加速しない)
-			if (add > 0.0f && tdir.LengthSquared() > 0.0f)
-			{
-				float a = pumpAcc * dt;
-				if (a > add) { a = add; }
-				m_velocity.x += tdir.x * a;
-				m_velocity.z += tdir.z * a;
-			}
-		}
-	}
-
-	// 地面に潜らないよう押し上げる(ワイヤー中もすり抜け防止)
-	// ※ m_isGroundedもここで更新される。空中を振っている間は接地false=離した時のフリングが残る
-	ResolveGround(pos);
-
-	// スイングは高速なので、まず壁を飛び越えるトンネリングを止める(startPos→posを掃引)
-	ResolveBumpSweep(startPos, pos);
-
-	// 塔(Block)にめり込まないよう水平に押し出す(スイングで塔に突っ込んでもすり抜けない)
-	ResolveBump(pos);
-
-	SetPos(pos);
 }
 
 void Player::UpdateMove(float dt)

@@ -12,6 +12,10 @@ class CharaBase : public KdGameObject
 {
 public:
 
+	// ワイヤー(移動技)はスイングでこのキャラの速度・位置・当たり解決を直接動かすため、
+	// 再利用できる部品として CharaBase& を操作する。protectedへアクセスするのでfriendにする
+	friend class WireAction;
+
 	CharaBase()				{}
 	virtual ~CharaBase() override {}
 

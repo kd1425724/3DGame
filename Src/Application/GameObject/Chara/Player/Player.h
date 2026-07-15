@@ -41,10 +41,8 @@ public:
 private:
 
 	// --- Update()の中身を仕事ごとに分けたもの(挙動は分割前と同じ。Updateは流れだけ) ---
-	// ワイヤーの発射/解除の入力を処理する
+	// ワイヤーの発射/解除の入力を処理する(スイング物理はWireAction::UpdateSwingに委譲)
 	void UpdateWireInput();
-	// ワイヤー接続中のスイング物理(重力→移動→距離拘束→当たり解決→SetPos)
-	void UpdateWireSwing(float dt);
 	// 通常移動(接地=入力に即セット/空中=エアアクセル。カメラの水平向き基準)
 	void UpdateMove(float dt);
 	// SPACEでジャンプ。コヨーテタイム(接地を離れた直後の猶予)＋先行入力(着地寸前の入力先読み)つき

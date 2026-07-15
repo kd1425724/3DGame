@@ -1,8 +1,9 @@
 ﻿#include "WireAction.h"
 
-// 実装するときに必要になりそうなinclude(今はコメント。使う時にコメントを外す)
-#include "../../Scene/SceneManager.h"       // ... Shootのレイ判定で全オブジェクトを走査する
-#include "../../Debug/DebugParams/DebugParams.h"// ... リール速度・引き込み力などの調整値を外部化する
+#include "../../Scene/SceneManager.h"           // Shootのレイ判定で全オブジェクトを走査する
+#include "../../Debug/DebugParams/DebugParams.h"// リール速度・引き込み力などの調整値
+#include "../../Debug/DebugFlags/DebugFlags.h"  // 漕ぎ(ポンプ)のON/OFF
+#include "../Chara/CharaBase.h"                 // スイングで動かすキャラ(速度・位置・当たり解決)
 
 // 見た目の板ポリ(KdSquarePolygon)はPch経由で見える。unique_ptr(前方宣言)の生成/破棄を
 // ここ(完全な型が見える.cpp)で行うため、ctor/dtorを定義する
@@ -15,6 +16,74 @@ WireAction::WireAction()
 }
 
 WireAction::~WireAction() = default;
+
+void WireAction::UpdateSwing(CharaBase& _body, float _dt, float _reel)
+{
+	if (!m_isAttached) { return; }
+
+	// 重力を3D速度に加える
+	float gravity = DebugParams::Instance().Float(U8("キャラ/重力"), 20.0f, 0.0f, 100.0f);
+	_body.m_velocity.y -= gravity * _dt;
+
+	// 速度で進めてから、ワイヤーの距離拘束を解く
+	Math::Vector3 pos = _body.GetPos();
+	Math::Vector3 startPos = pos;   // 移動前の位置(スイープの始点)
+	pos += _body.m_velocity * _dt;
+
+	// たぐり寄せ/伸ばし(入力はキャラ側が決めて_reelで渡す)
+	Update(pos, _body.m_velocity, _dt, _reel);
+
+	// === 漕ぎ(ポンプ) ===
+	// DebugFlags「ワイヤー/漕ぎ(ポンプ)」でON/OFF。
+	//   OFF … 元の純粋な振り子(下りで加速→上りで減速。地面すれすれは速度が落ちる)
+	//   ON  … 振り子に接線方向の加速を足す(ブランコを漕ぐイメージ)。上限速度まで勢いを
+	//          維持できるので、Spider-Man風に地面すれすれでも速度が落ちにくくなる
+	if (DebugFlags::Instance().Get(U8("ワイヤー/漕ぎ(ポンプ)"), false))
+	{
+		// 今の進行方向(水平)
+		Math::Vector3 horiz(_body.m_velocity.x, 0.0f, _body.m_velocity.z);
+		float sp = horiz.Length();
+		if (sp > 0.0001f)
+		{
+			Math::Vector3 tdir = horiz / sp;
+
+			// アンカーから外向き(半径方向)の水平成分を除き、接線方向だけに加速する。
+			// (半径方向へ足しても距離拘束で打ち消されるだけ＝弧に沿ってのみ漕ぐ)
+			Math::Vector3 radial = pos - m_anchor;
+			radial.y = 0.0f;
+			if (radial.LengthSquared() > 0.0001f)
+			{
+				radial.Normalize();
+				tdir -= radial * tdir.Dot(radial);
+				if (tdir.LengthSquared() > 0.0001f) { tdir.Normalize(); }
+				else                                { tdir = Math::Vector3::Zero; }
+			}
+
+			float pumpMax = DebugParams::Instance().Float(U8("ワイヤー/ポンプ上限速度"), 20.0f, 0.0f, 60.0f);
+			float pumpAcc = DebugParams::Instance().Float(U8("ワイヤー/ポンプ加速"),     15.0f, 0.0f, 100.0f);
+
+			float add = pumpMax - sp;   // 上限速度まであとどれだけ足せるか(それ以上は加速しない)
+			if (add > 0.0f && tdir.LengthSquared() > 0.0f)
+			{
+				float a = pumpAcc * _dt;
+				if (a > add) { a = add; }
+				_body.m_velocity.x += tdir.x * a;
+				_body.m_velocity.z += tdir.z * a;
+			}
+		}
+	}
+
+	// 地面に潜らないよう押し上げる(ワイヤー中もすり抜け防止)。m_isGroundedもここで更新される
+	_body.ResolveGround(pos);
+
+	// スイングは高速なので、まず壁を飛び越えるトンネリングを止める(startPos→posを掃引)
+	_body.ResolveBumpSweep(startPos, pos);
+
+	// 塔(Block)にめり込まないよう水平に押し出す
+	_body.ResolveBump(pos);
+
+	_body.SetPos(pos);
+}
 
 void WireAction::Draw(const Math::Vector3& _from, const Math::Vector3& _to)
 {

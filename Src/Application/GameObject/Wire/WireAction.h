@@ -13,6 +13,7 @@
 #pragma once
 
 class KdSquarePolygon;
+class CharaBase;
 
 class WireAction
 {
@@ -21,6 +22,11 @@ public:
 	// 板ポリ(見た目)をunique_ptr(前方宣言)で持つため、ctor/dtorは.cpp側で定義する
 	WireAction();
 	~WireAction();
+
+	// ワイヤー中のスイング物理。接続中に毎フレーム呼び、_body(どのキャラでも)の速度・位置を
+	// 動かす：重力→積分→距離拘束→漕ぎ→当たり解決→SetPos。_reelはたぐり寄せ入力(+1縮む/-1伸ばす)。
+	// 入力・狙いはキャラ側が決めてShoot/この呼び出しを行う(=部品として再利用可能)
+	void UpdateSwing(CharaBase& _body, float _dt, float _reel);
 
 	// ワイヤーの線(手元from→終点to)を描く。見た目もワイヤーの責務としてここに持つ。
 	// スイング中はアンカーへ、グラップル突撃中は対象へ、とfrom/toは呼び出し側が決める
