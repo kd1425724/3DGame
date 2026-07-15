@@ -278,6 +278,11 @@ void Player::UpdateDive(float dt)
 			m_diveChainCount++;
 			CameraShake::Instance().AddTrauma(std::clamp(0.2f + 0.05f * m_diveChainCount, 0.0f, 0.7f));
 
+			// 斬った直後は減速する。次の突撃で再加速するのでメリハリが付き、
+			// 連鎖終了後もこの減速が残るので高速で飛び去りにくい(0=止まる/1=減速なし)
+			float slowRate = DebugParams::Instance().Float(U8("連続攻撃/斬り後の速度残し"), 0.4f, 0.0f, 1.0f);
+			m_velocity *= slowRate;
+
 			std::shared_ptr<KdGameObject> spNext = FindNearestEnemy(GetPos(), chainRange);
 			if (spNext) { m_wpDiveTarget = spNext; return; }        // 続けて突撃
 			m_isDiving = false; m_wpDiveTarget.reset(); return;     // 周りに敵なし→終了
