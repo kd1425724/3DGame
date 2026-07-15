@@ -20,18 +20,20 @@ bool CharaBase::IsWallBetween(const Math::Vector3& from, const Math::Vector3& to
 {
 	Math::Vector3 seg = to - from;
 	float len = seg.Length();
-	if (len <= margin) { return false; }   // ほぼ同じ位置なら遮蔽なし
+	if (len <= margin * 2.0f) { return false; }   // 両端marginを除くと区間が無い＝遮蔽なし
 
 	Math::Vector3 dir = seg / len;
-	// marginぶん手前で止めることで、to地点の壁(対象が張り付いている壁)は拾わない
-	KdCollider::RayInfo ray(KdCollider::TypeBump, from, dir, len - margin);
+	// 両端をmarginぶん無視する。こうしないと「アンカーが付いている塔自身」や
+	// 「足元/対象のすぐ手前の壁」を拾ってしまい、かすっただけで遮蔽判定になる
+	Math::Vector3 start = from + dir * margin;
+	KdCollider::RayInfo ray(KdCollider::TypeBump, start, dir, len - margin * 2.0f);
 
 	std::list<KdCollider::CollisionResult> results;
 	for (auto& obj : SceneManager::Instance().GetObjList())
 	{
 		if (obj) { obj->Intersects(ray, &results); }
 	}
-	return !results.empty();   // 途中に壁があれば遮蔽されている
+	return !results.empty();   // 途中(両端margin除く)に壁があれば遮蔽されている
 }
 
 void CharaBase::GroundCheck()

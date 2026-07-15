@@ -24,9 +24,15 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, float _reel)
 	if (!m_isAttached) { return; }
 
 	// 手元とアンカーの間に壁(塔など)が入ったら、線が壁を突き抜けるのでワイヤーを外す(貫通させない)。
+	// ただし一瞬のかすりで外れないよう、一定時間(自動リリース猶予)遮蔽が続いた時だけ外す(デバウンス)。
 	// 外した瞬間の速度はそのまま残るので、スイングの勢いで飛んでいける(フリング)
 	Math::Vector3 hand = _body.GetPos() + Math::Vector3(0.0f, 1.0f, 0.0f);
-	if (CharaBase::IsWallBetween(hand, m_anchor))
+	float occMargin = DebugParams::Instance().Float(U8("ワイヤー/遮蔽の余白"),     1.0f, 0.0f, 5.0f);
+	if (CharaBase::IsWallBetween(hand, m_anchor, occMargin)) { m_occludedTime += _dt; }
+	else                                                     { m_occludedTime = 0.0f; }
+
+	float releaseDelay = DebugParams::Instance().Float(U8("ワイヤー/自動リリース猶予"), 0.2f, 0.0f, 1.0f);
+	if (m_occludedTime >= releaseDelay)
 	{
 		Release();
 		return;
@@ -165,6 +171,7 @@ bool WireAction::Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, fl
 		m_length = Math::Vector3::Distance(_from,m_anchor);
 		m_maxLength = m_length;   // 撃った瞬間の長さをリールアウトの上限にする
 		m_isAttached = true;
+		m_occludedTime = 0.0f;    // 遮蔽デバウンスをリセット
 	}
 
 	// TODO: 上の①〜④を実装する
@@ -173,8 +180,8 @@ bool WireAction::Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, fl
 
 void WireAction::Release()
 {
-	// m_isAttached を false にするだけ
 	m_isAttached = false;
+	m_occludedTime = 0.0f;   // 遮蔽デバウンスをリセット
 }
 
 bool WireAction::IsAttached() const
