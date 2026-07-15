@@ -247,7 +247,7 @@ void Player::UpdateJump(float dt)
 
 void Player::UpdateDive(float dt)
 {
-	float radius = DebugParams::Instance().Float(U8("落下攻撃/範囲"), 3.0f, 0.5f, 15.0f);
+	float radius = DebugParams::Instance().Float(U8("落下攻撃/斬撃範囲"), 3.0f, 0.5f, 15.0f);
 
 	// === 突撃中(対象へワイヤーで引き寄せ) ===
 	if (m_isDiving)
@@ -261,7 +261,7 @@ void Player::UpdateDive(float dt)
 			// 対象(少し上=胴の高さ)へのベクトル。対象は動くので毎フレーム狙い直す(ホーミング)
 			Math::Vector3 to = (spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f)) - GetPos();
 			float dist = to.Length();
-			if (dist <= radius) { DiveImpact(); return; }   // 到達＝着弾(周囲ごと撃破)
+			if (dist <= radius) { DiveImpact(); return; }   // 到達＝斬り抜け(対象を斬って通過)
 
 			to /= dist;
 			// リールで引かれるように、速さを加速でrampしつつ常に対象へまっすぐ向ける
@@ -306,31 +306,24 @@ void Player::UpdateDive(float dt)
 
 void Player::DiveImpact()
 {
-	// 着地の瞬間：周囲の敵をまとめて撃破し、手応えとしてカメラを揺らす
-	float radius = DebugParams::Instance().Float(U8("落下攻撃/範囲"), 3.0f, 0.5f, 15.0f);
+	// 斬り抜け：到達した対象とその周りの敵を斬る。スタンプのように止まらず、勢いのまま飛び抜ける
+	float radius = DebugParams::Instance().Float(U8("落下攻撃/斬撃範囲"), 3.0f, 0.5f, 15.0f);
 
 	for (auto& spEnemy : SceneManager::Instance().FindObjectsWithTag(ObjectTag::Enemy))
 	{
 		if (!spEnemy) { continue; }
 		if (Math::Vector3::Distance(GetPos(), spEnemy->GetPos()) <= radius)
 		{
-			spEnemy->OnHit(this);   // 今の敵はOnHitで消滅(=一掃)
+			spEnemy->OnHit(this);   // 今の敵はOnHitで消滅(=斬る)
 		}
 	}
 
 	// チェイン数を増やす(接地でリセット)。連鎖が伸びるほど手応え(カメラ揺れ)を強くする
 	m_diveChainCount++;
-	CameraShake::Instance().AddTrauma(std::clamp(0.5f + 0.08f * m_diveChainCount, 0.0f, 1.0f));
+	CameraShake::Instance().AddTrauma(std::clamp(0.35f + 0.07f * m_diveChainCount, 0.0f, 1.0f));
 
-	// 次のチェインへ繋ぐための浮き：着弾の勢いを打ち消して少し上へ跳ね、空中時間を作る。
-	// この間に次の自動ターゲットへ突撃入力を出せば、着地せず連続でグラップルできる。
-	// ※ 空中でのグラップル着弾のときだけ。真下ダイブの地面着弾では跳ねさせない
-	if (!IsGrounded())
-	{
-		float pop = DebugParams::Instance().Float(U8("落下攻撃/チェイン浮き"), 6.0f, 0.0f, 20.0f);
-		m_velocity = Math::Vector3(0.0f, pop, 0.0f);
-	}
-
+	// ※ velocityは残す＝スタンプで止まらず斬り抜ける。突撃状態だけ解除し、勢いのまま次へ繋ぐ。
+	//   飛び抜けた先で次の自動ターゲットへ突撃入力を出せば、着地せず連続で斬り抜けられる
 	m_isDiving = false;
 	m_wpDiveTarget.reset();
 }
