@@ -360,6 +360,12 @@
     <ClInclude Include="Src\Application\Effect\EffectManager.h">
       <Filter>Src\Application\Effect</Filter>
     </ClInclude>
+    <ClInclude Include="Src\Application\Effect\EffectBase.h">
+      <Filter>Src\Application\Effect</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\Application\Effect\SlashEffect.h">
+      <Filter>Src\Application\Effect</Filter>
+    </ClInclude>
     <ClInclude Include="Src\Application\Editor\HudEditor\HudEditorManager.h">
       <Filter>Src\Application\Editor\HudEditor</Filter>
     </ClInclude>
@@ -594,6 +600,9 @@
       <Filter>Src\Application\GameObject\EnemySpawner</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\Effect\EffectManager.cpp">
+      <Filter>Src\Application\Effect</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\Effect\SlashEffect.cpp">
       <Filter>Src\Application\Effect</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\Editor\HudEditor\HudEditorManager.cpp">

@@ -1,41 +1,36 @@
 ﻿#include "EffectManager.h"
 
-#include "../Debug/DebugParams/DebugParams.h"
+#include "EffectBase.h"
+#include "SlashEffect.h"
 
-// unique_ptr<KdSquarePolygon>(前方宣言)の破棄にはKdSquarePolygonの完全な定義が要るので
-// デストラクタは.cpp側(Pch経由で板ポリが見える)で定義する
+// unique_ptr<EffectBase>(前方宣言)を持つvectorの破棄には完全な型が要るので
+// デストラクタは.cpp側(EffectBaseが見える)で定義する
 EffectManager::~EffectManager() = default;
 
-void EffectManager::Init()
+void EffectManager::Add(std::unique_ptr<EffectBase> _effect)
 {
-	// 斬撃テクスチャの板ポリ(カメラを向く点ビルボード)
-	m_upSlashPoly = std::make_unique<KdSquarePolygon>("Asset/Textures/Effect/Slash.png");
-	m_upSlashPoly->Set2DObject(false);
-	m_upSlashPoly->SetBillboardMode(KdPolygon::BillboardMode::eScreen);
+	if (_effect) { m_effects.push_back(std::move(_effect)); }
 }
 
-void EffectManager::SpawnSlash(const Math::Vector3& pos)
+void EffectManager::SpawnSlash(const Math::Vector3& _pos)
 {
-	SlashFX fx;
-	fx.pos = pos;
 	// 面内回転は発生数と位置から散らして、毎回違う向きに見せる
-	int seed = (int)(m_spawnCounter++ * 61) + (int)(pos.x * 17.0f) + (int)(pos.z * 29.0f);
-	fx.rot  = DirectX::XMConvertToRadians((float)(((seed % 360) + 360) % 360));
-	fx.age  = 0.0f;
-	fx.life = DebugParams::Instance().Float(U8("斬撃/寿命"), 0.14f, 0.03f, 1.0f);
-	m_slashes.push_back(fx);
+	int seed = (int)(m_spawnCounter++ * 61) + (int)(_pos.x * 17.0f) + (int)(_pos.z * 29.0f);
+	float rot = DirectX::XMConvertToRadians((float)(((seed % 360) + 360) % 360));
+
+	Add(std::make_unique<SlashEffect>(_pos, rot));
 }
 
-void EffectManager::Update(float dt)
+void EffectManager::Update(float _dt)
 {
-	// 経過を進め、寿命が尽きたものはswap&popで取り除く(順序は問わない)
-	for (size_t i = 0; i < m_slashes.size(); )
+	// 経過を進め、終わったものはswap&popで取り除く(順序は問わない)
+	for (size_t i = 0; i < m_effects.size(); )
 	{
-		m_slashes[i].age += dt;
-		if (m_slashes[i].age >= m_slashes[i].life)
+		m_effects[i]->Update(_dt);
+		if (m_effects[i]->IsFinished())
 		{
-			m_slashes[i] = m_slashes.back();
-			m_slashes.pop_back();
+			m_effects[i] = std::move(m_effects.back());
+			m_effects.pop_back();
 		}
 		else { ++i; }
 	}
@@ -43,28 +38,13 @@ void EffectManager::Update(float dt)
 
 void EffectManager::DrawUnLit()
 {
-	if (!m_upSlashPoly) { return; }
-
-	float baseSize = DebugParams::Instance().Float(U8("斬撃/サイズ"), 2.2f, 0.3f, 8.0f);
-
-	for (auto& s : m_slashes)
+	for (auto& up : m_effects)
 	{
-		float t = (s.life > 0.0f) ? (s.age / s.life) : 1.0f;   // 0→1
-		float size  = baseSize * (0.7f + 0.6f * t);            // 少し拡大しながら
-		float alpha = 1.0f - t;                                // フェードアウト
-		m_upSlashPoly->SetScale(Math::Vector2(size, size));
-
-		// 面内回転(散らした向き)＋位置。カメラへの正対はeScreenビルボードに任せる
-		Math::Matrix world = Math::Matrix::CreateRotationZ(s.rot);
-		world.Translation(s.pos);
-
-		Math::Color   col(0.75f, 0.9f, 1.0f, alpha);
-		Math::Vector3 emissive(0.5f, 0.8f, 1.0f);
-		KdShaderManager::Instance().m_StandardShader.DrawPolygon(*m_upSlashPoly, world, col, emissive);
+		up->DrawUnLit();
 	}
 }
 
 void EffectManager::Clear()
 {
-	m_slashes.clear();
+	m_effects.clear();
 }

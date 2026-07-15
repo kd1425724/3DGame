@@ -7,7 +7,6 @@
 #include "Editor/LevelEditor/LevelEditorManager.h"
 #include "Editor/HudEditor/HudEditorManager.h"
 #include "GameObject/UI/GameHud/GameHud.h"
-#include "Effect/EffectManager.h"
 #include "GameObject/Block/Block.h"
 #include "GameObject/Ground/Ground.h"
 #include "GameObject/Chara/Enemy/Enemy.h"
@@ -348,11 +347,6 @@ bool Application::Init(int w, int h)
 	// HUD(画面2D)レイアウトをファイルから復元する(無ければ何も置かない)
 	//===================================================================
 	HudEditorManager::Instance().Load("Asset/Data/Hud/Hud.json");
-
-	//===================================================================
-	// エフェクト管理(斬撃VFX等の板ポリ)の初期化
-	//===================================================================
-	EffectManager::Instance().Init();
 
 	//===================================================================
 	// シーンの初期化(開始シーンの生成。SceneManagerのコンストラクタでは行わない)
