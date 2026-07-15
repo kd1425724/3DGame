@@ -405,7 +405,7 @@ void Player::UpdateTargeting()
 		Math::Vector3 to = spEnemy->GetPos() - camPos;
 		if (to.LengthSquared() < 0.0001f) { continue; }
 		to.Normalize();
-		float d = to.Dot(camFwd);   // 1に近いほど画面中心
+		float d = to.Dot(camFwd);   // （ベクトルA）toと（ベクトルB）camFwdの内積が1に近いほど画面中心 
 		if (d > bestDot) 
 		{
 			bestDot = d;
