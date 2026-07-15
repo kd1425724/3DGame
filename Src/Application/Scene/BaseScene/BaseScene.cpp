@@ -1,7 +1,9 @@
 ﻿#include "BaseScene.h"
 
+#include "../../main.h"
 #include "../../Editor/LevelEditor/LevelEditorManager.h"
 #include "../../GameObject/Camera/EditorCamera/EditorCamera.h"
+#include "../../Effect/EffectManager.h"
 
 void BaseScene::PreUpdate()
 {
@@ -58,6 +60,9 @@ void BaseScene::PostUpdate()
 
 		obj->PostUpdate();
 	}
+
+	// エフェクト(斬撃VFX等)の経過を進める(寿命で自動消滅)
+	EffectManager::Instance().Update(Application::Instance().GetDeltaTime());
 }
 
 void BaseScene::PreDraw()
@@ -89,6 +94,9 @@ void BaseScene::Draw()
 		{
 			obj->DrawUnLit();
 		}
+
+		// エフェクト(斬撃VFX等)も陰影なしパスで描く
+		EffectManager::Instance().DrawUnLit();
 	}
 	KdShaderManager::Instance().m_StandardShader.EndUnLit();
 

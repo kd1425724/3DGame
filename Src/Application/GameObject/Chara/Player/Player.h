@@ -74,11 +74,6 @@ private:
 	// 手元(from)→終点(to)に沿ってワイヤーの板ポリを1本描く(スイング/突撃の共通処理)
 	void DrawWireSegment(const Math::Vector3& from, const Math::Vector3& to);
 
-	// 斬撃エフェクト：斬った位置に一瞬の斬撃(カメラを向く板ポリ)を出す
-	void SpawnSlash(const Math::Vector3& pos);   // 発生
-	void UpdateSlashes(float dt);                // 経過(寿命で消す)
-	void DrawSlashes();                          // 描画(拡大しながらフェード)
-
 	// ※ 移動速度はDebugParams("プレイヤー/移動速度")で調整する
 
 	// 移動方向の基準にするカメラ
@@ -130,11 +125,6 @@ private:
 	std::unique_ptr<KdSquarePolygon> m_upMarkerPoly;
 	// マーカーの回転/脈動アニメ用の経過時間
 	float m_markerTime = 0.0f;
-
-	// 斬撃エフェクト：発生中の斬撃1つ分(位置/面内回転/経過/寿命)と共有の板ポリ
-	struct SlashFX { Math::Vector3 pos; float rot; float age; float life; };
-	std::vector<SlashFX> m_slashes;
-	std::unique_ptr<KdSquarePolygon> m_upSlashPoly;
 
 	// ※ 移動用の速度は基底CharaBaseの m_velocity(3D) を共通で使う
 };

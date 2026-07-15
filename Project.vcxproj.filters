@@ -136,6 +136,9 @@
     <Filter Include="Src\Application\Editor">
       <UniqueIdentifier>{a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Application\Effect">
+      <UniqueIdentifier>{b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\Application\Editor\LevelEditor">
       <UniqueIdentifier>{03cbb0c9-b05e-4c68-833c-94d73c0e29ca}</UniqueIdentifier>
     </Filter>
@@ -353,6 +356,9 @@
     </ClInclude>
     <ClInclude Include="Src\Application\GameObject\EnemySpawner\EnemySpawner.h">
       <Filter>Src\Application\GameObject\EnemySpawner</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\Application\Effect\EffectManager.h">
+      <Filter>Src\Application\Effect</Filter>
     </ClInclude>
     <ClInclude Include="Src\Application\Editor\HudEditor\HudEditorManager.h">
       <Filter>Src\Application\Editor\HudEditor</Filter>
@@ -583,6 +589,9 @@
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\EnemySpawner\EnemySpawner.cpp">
       <Filter>Src\Application\GameObject\EnemySpawner</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\Effect\EffectManager.cpp">
+      <Filter>Src\Application\Effect</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\Editor\HudEditor\HudEditorManager.cpp">
       <Filter>Src\Application\Editor\HudEditor</Filter>
