@@ -51,8 +51,10 @@ private:
 	void UpdateJump(float dt);
 	// 回避ダッシュ：Shiftで移動入力方向(なければカメラ前方)へ短距離クイックムーブ＋無敵＋クールダウン
 	void UpdateDodge(float dt);
-	// Eキーで正面にレーザーを発射する
+	// Eキーで正面にレーザーを発射する(現在はスキル「振り回し一掃」に置き換えて未使用)
 	void UpdateLaser();
+	// スキル「振り回し一掃」：Eで周囲の敵を一掃する(クールダウンあり)
+	void UpdateSweep(float dt);
 	// 落下攻撃：空中で攻撃入力→対象へワイヤーで引き寄せ突撃(未ロックは真下ダイブ)。
 	// 斬ったら周りの敵へ続けて突撃する連続攻撃(自動連鎖ダッシュ)
 	void UpdateDive(float dt);
@@ -93,6 +95,9 @@ private:
 	float m_dodgeCooldownTimer = 0.0f;
 	Math::Vector3 m_dodgeDir = {};
 	float m_invincibleTimer = 0.0f;   // ※ ダメージ実装後に使う想定(今は参照側が無いので無敵は実質未使用)
+
+	// スキル「振り回し一掃」のクールダウン残り時間
+	float m_sweepCooldownTimer = 0.0f;
 
 public:
 	// 無敵中か(回避のiフレーム)。ダメージ処理を入れたらここを見て被弾を無視する

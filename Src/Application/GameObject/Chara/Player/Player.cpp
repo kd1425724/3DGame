@@ -88,7 +88,9 @@ void Player::Update()
 		UpdateJump(dt);
 	}
 	UpdateDive(dt);
-	UpdateLaser();
+	// Eキーはスキル「振り回し一掃」に割り当て。旧レーザー(UpdateLaser)は残置だが未使用
+	//UpdateLaser();
+	UpdateSweep(dt);
 }
 
 void Player::UpdateWireInput()
@@ -443,6 +445,41 @@ void Player::UpdateLaser()
 	}
 }
 
+void Player::UpdateSweep(float dt)
+{
+	// クールダウンを消化
+	if (m_sweepCooldownTimer > 0.0f) { m_sweepCooldownTimer -= dt; }
+
+	// === 発動判定 ===
+	if (m_isDiving) { return; }                                    // 突撃中は使わない
+	if (m_sweepCooldownTimer > 0.0f) { return; }                   // クールダウン中
+	if (!KdInputManager::Instance().IsPress("Skill")) { return; }
+
+	float range = DebugParams::Instance().Float(U8("振り回し/範囲"), 5.0f, 1.0f, 20.0f);
+
+	// 周囲(半径range)の敵をまとめて斬る(振り回しの一掃)
+	for (auto& spEnemy : SceneManager::Instance().FindObjectsWithTag(ObjectTag::Enemy))
+	{
+		if (!spEnemy || spEnemy->IsExpired()) { continue; }
+		if (Math::Vector3::Distance(GetPos(), spEnemy->GetPos()) <= range)
+		{
+			spEnemy->OnHit(this);
+		}
+	}
+
+	// 見た目：プレイヤーの周りに斬撃を輪状に出して"振り回し"を表現
+	const int kNum = 8;
+	float visR = range * 0.6f;
+	for (int i = 0; i < kNum; ++i)
+	{
+		float a = (float)i / (float)kNum * DirectX::XM_2PI;
+		SpawnSlash(GetPos() + Math::Vector3(cosf(a) * visR, 0.6f, sinf(a) * visR));
+	}
+
+	CameraShake::Instance().AddTrauma(0.6f);
+	m_sweepCooldownTimer = DebugParams::Instance().Float(U8("振り回し/クールダウン"), 1.0f, 0.0f, 5.0f);
+}
+
 void Player::Respawn()
 {
 	// 開始位置へ戻し、勢い・接地・ワイヤー・突撃/連続攻撃状態をすべてリセットする
@@ -458,6 +495,7 @@ void Player::Respawn()
 	m_isDodging = false;
 	m_dodgeTimer = 0.0f;
 	m_invincibleTimer = 0.0f;
+	m_sweepCooldownTimer = 0.0f;
 }
 
 void Player::PostUpdate()
