@@ -75,6 +75,10 @@ void Player::Update()
 		return;
 	}
 
+	// 回避ダッシュ(クールダウン消化＋実行中は速度を上書き)。ダッシュ中は他の行動を止める
+	UpdateDodge(dt);
+	if (m_isDodging) { return; }
+
 	// 落下攻撃(突撃/連続攻撃)中は通常移動・ジャンプを止める。
 	// ※ UpdateMoveは接地中に水平速度を入力値(無入力なら0)へ上書きするため、
 	//   突撃中に走ると継続受付中の流しや突撃の勢いが地面で殺されてしまう
@@ -255,6 +259,50 @@ void Player::UpdateJump(float dt)
 	}
 }
 
+void Player::UpdateDodge(float dt)
+{
+	// クールダウンを消化
+	if (m_dodgeCooldownTimer > 0.0f) { m_dodgeCooldownTimer -= dt; }
+
+	// === 回避ダッシュ実行中：水平にフラットに素早く移動(縦は止めて空中でもキレよく) ===
+	if (m_isDodging)
+	{
+		float dodgeSpeed = DebugParams::Instance().Float(U8("回避/速度"), 22.0f, 5.0f, 60.0f);
+		m_velocity.x = m_dodgeDir.x * dodgeSpeed;
+		m_velocity.z = m_dodgeDir.z * dodgeSpeed;
+		m_velocity.y = 0.0f;
+
+		m_dodgeTimer -= dt;
+		if (m_invincibleTimer > 0.0f) { m_invincibleTimer -= dt; }
+		if (m_dodgeTimer <= 0.0f) { m_isDodging = false; }
+		return;
+	}
+
+	// === 開始判定 ===
+	if (m_isDiving) { return; }                                      // 突撃中は回避しない
+	if (m_dodgeCooldownTimer > 0.0f) { return; }                     // クールダウン中
+	if (!KdInputManager::Instance().IsPress("Dodge")) { return; }
+
+	// 方向：移動入力があればその向き(カメラ基準)、無ければカメラ前方(水平)
+	Math::Vector2 moveAxis = KdInputManager::Instance().GetAxisState("Move");
+	Math::Vector3 dir = Math::Vector3::Backward * moveAxis.y + Math::Vector3::Right * moveAxis.x;
+	if (dir.LengthSquared() < 0.0001f) { dir = Math::Vector3::Backward; }   // 入力なし→前方へ
+	if (std::shared_ptr<CameraBase> spCam = m_wpCamera.lock())
+	{
+		dir = Math::Vector3::TransformNormal(dir, spCam->GetRotationYMatrix());
+	}
+	dir.y = 0.0f;
+	if (dir.LengthSquared() < 0.0001f) { dir = Math::Vector3::Backward; }
+	dir.Normalize();
+	m_dodgeDir = dir;
+
+	// 開始：無敵とクールダウンを張り、実行時間だけダッシュする
+	m_isDodging          = true;
+	m_dodgeTimer         = DebugParams::Instance().Float(U8("回避/時間"),         0.18f, 0.05f, 1.0f);
+	m_dodgeCooldownTimer = DebugParams::Instance().Float(U8("回避/クールダウン"), 0.5f,  0.0f,  3.0f);
+	m_invincibleTimer    = DebugParams::Instance().Float(U8("回避/無敵時間"),     0.2f,  0.0f,  1.0f);
+}
+
 void Player::UpdateDive(float dt)
 {
 	float radius     = DebugParams::Instance().Float(U8("落下攻撃/斬撃範囲"), 1.5f, 0.5f, 15.0f);
@@ -407,6 +455,9 @@ void Player::Respawn()
 	m_diveChainCount = 0;
 	m_diveBufferTimer = 0.0f;
 	m_comboWindowTimer = 0.0f;
+	m_isDodging = false;
+	m_dodgeTimer = 0.0f;
+	m_invincibleTimer = 0.0f;
 }
 
 void Player::PostUpdate()

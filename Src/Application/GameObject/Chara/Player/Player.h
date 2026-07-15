@@ -49,6 +49,8 @@ private:
 	void UpdateMove(float dt);
 	// SPACEでジャンプ。コヨーテタイム(接地を離れた直後の猶予)＋先行入力(着地寸前の入力先読み)つき
 	void UpdateJump(float dt);
+	// 回避ダッシュ：Shiftで移動入力方向(なければカメラ前方)へ短距離クイックムーブ＋無敵＋クールダウン
+	void UpdateDodge(float dt);
 	// Eキーで正面にレーザーを発射する
 	void UpdateLaser();
 	// 落下攻撃：空中で攻撃入力→対象へワイヤーで引き寄せ突撃(未ロックは真下ダイブ)。
@@ -84,6 +86,18 @@ private:
 
 	// リスポーンの復帰先(開始位置)
 	Math::Vector3 m_spawnPos = {};
+
+	// 回避ダッシュの状態(実行中フラグ/残り時間/クールダウン残り/ダッシュ方向/無敵残り)
+	bool m_isDodging = false;
+	float m_dodgeTimer = 0.0f;
+	float m_dodgeCooldownTimer = 0.0f;
+	Math::Vector3 m_dodgeDir = {};
+	float m_invincibleTimer = 0.0f;   // ※ ダメージ実装後に使う想定(今は参照側が無いので無敵は実質未使用)
+
+public:
+	// 無敵中か(回避のiフレーム)。ダメージ処理を入れたらここを見て被弾を無視する
+	bool IsInvincible() const { return m_invincibleTimer > 0.0f; }
+private:
 
 	// ジャンプの操作補助タイマー
 	float m_coyoteTimer = 999.0f;     // 接地を離れてからの経過時間(小さいうちは空中でも跳べる)

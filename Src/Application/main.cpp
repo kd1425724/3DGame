@@ -303,6 +303,9 @@ bool Application::Init(int w, int h)
 		// Playerの落下攻撃(空中で急降下)：左クリック
 		pKeyboardMouse->AddButton("DiveAttack", new KdInputButtonForWindows(VK_LBUTTON));
 
+		// Playerの回避ダッシュ(短距離クイックムーブ＋無敵)：Shift
+		pKeyboardMouse->AddButton("Dodge", new KdInputButtonForWindows(VK_SHIFT));
+
 		// 加速(EditorCamera)
 		pKeyboardMouse->AddButton("Boost", new KdInputButtonForWindows(VK_SHIFT));
 
