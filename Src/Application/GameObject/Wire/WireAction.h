@@ -12,9 +12,19 @@
 //=====================================================================
 #pragma once
 
+class KdSquarePolygon;
+
 class WireAction
 {
 public:
+
+	// 板ポリ(見た目)をunique_ptr(前方宣言)で持つため、ctor/dtorは.cpp側で定義する
+	WireAction();
+	~WireAction();
+
+	// ワイヤーの線(手元from→終点to)を描く。見た目もワイヤーの責務としてここに持つ。
+	// スイング中はアンカーへ、グラップル突撃中は対象へ、とfrom/toは呼び出し側が決める
+	void Draw(const Math::Vector3& _from, const Math::Vector3& _to);
 
 	// 照準方向へワイヤーを撃ち、当たった地形をアンカー(固定点)にする
 	//  _from      ... ワイヤーの発射位置(手元など)
@@ -51,4 +61,7 @@ private:
 
 	// 撃った瞬間のワイヤー長(リールアウトの上限。これ以上は伸ばせない)
 	float m_maxLength = 0.0f;
+
+	// ワイヤーの見た目(板ポリを線に沿わせカメラへ向ける軸固定ビルボード)
+	std::unique_ptr<KdSquarePolygon> m_upPoly;
 };

@@ -29,15 +29,8 @@ void Player::Init()
 	// 縮小したGroundとの比率に合わせて小さくする
 	SetScale(Math::Vector3(0.5f, 0.5f, 0.5f));
 
-	//ワイヤー
+	//ワイヤー(物理＋見た目を内包。見た目の板ポリ生成はWireActionのctorが行う)
 	m_upWire = std::make_unique<WireAction>();
-
-	// ワイヤーの見た目(板ポリ)。白テクスチャを土台に、描画時に色を乗せる
-	m_upWirePoly = std::make_unique<KdSquarePolygon>("Asset/Textures/System/WhiteNoise.png");
-	// Lit(陰影あり)描画時に法線を光へ向ける設定。今回はUnLitで描くので実質効かない(任意)
-	m_upWirePoly->Set2DObject(false);
-	// 軸固定ビルボード：軸(ワイヤー方向)まわりだけカメラを向く。面の向きはDrawPolygonが計算する
-	m_upWirePoly->SetBillboardMode(KdPolygon::BillboardMode::eAxis);
 
 	// 自動ターゲットのマーカー(照準テクスチャ・カメラを向く板ポリ)
 	m_upMarkerPoly = std::make_unique<KdSquarePolygon>("Asset/Textures/UI/Reticle.png");
@@ -576,15 +569,15 @@ void Player::DrawUnLit()
 
 void Player::DrawWire()
 {
-	if (!m_upWirePoly) { return; }
+	if (!m_upWire) { return; }
 
-	// ワイヤーの手元(発射位置に近い高さ)
+	// ワイヤーの手元(発射位置に近い高さ)。端点だけ決め、線の描画はWireActionに任せる
 	Math::Vector3 from = GetPos() + Math::Vector3(0.0f, 0.25f, 0.0f);
 
 	// スイング中：アンカーへ線を引く
-	if (m_upWire && m_upWire->IsAttached())
+	if (m_upWire->IsAttached())
 	{
-		DrawWireSegment(from, m_upWire->GetAnchor());
+		m_upWire->Draw(from, m_upWire->GetAnchor());
 		return;
 	}
 
@@ -593,32 +586,9 @@ void Player::DrawWire()
 	{
 		if (std::shared_ptr<KdGameObject> spTarget = m_wpDiveTarget.lock())
 		{
-			DrawWireSegment(from, spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f));
+			m_upWire->Draw(from, spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f));
 		}
 	}
-}
-
-void Player::DrawWireSegment(const Math::Vector3& from, const Math::Vector3& to)
-{
-	// 軸(=ワイヤー方向)と長さ
-	Math::Vector3 axis = to - from;
-	float length = axis.Length();
-	if (length < 0.001f) { return; }   // 長さ0は描けない
-	axis /= length;
-
-	// 板の寸法(幅=太さ / 高さ=ワイヤー長)。太さはDebugParamsで調整
-	float thickness = DebugParams::Instance().Float(U8("ワイヤー/見た目の太さ"), 0.08f, 0.01f, 1.0f);
-	m_upWirePoly->SetScale(Math::Vector2(thickness, length));
-
-	// 軸(Y=ワイヤー方向)と中点だけ入れる。面をカメラへ向ける計算はeAxisビルボードでDrawPolygonが行う
-	Math::Matrix world = Math::Matrix::Identity;
-	world.Up(axis);
-	world.Translation((from + to) * 0.5f);
-
-	// 発光っぽい水色のワイヤーとして描く(DrawPolygonはCullNoneなので裏表は気にしなくてよい)
-	Math::Color   col(0.4f, 0.85f, 1.0f, 1.0f);
-	Math::Vector3 emissive(0.1f, 0.4f, 0.7f);
-	KdShaderManager::Instance().m_StandardShader.DrawPolygon(*m_upWirePoly, world, col, emissive);
 }
 
 void Player::DrawDebug()

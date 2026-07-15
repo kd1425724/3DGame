@@ -4,6 +4,43 @@
 #include "../../Scene/SceneManager.h"       // ... Shootのレイ判定で全オブジェクトを走査する
 #include "../../Debug/DebugParams/DebugParams.h"// ... リール速度・引き込み力などの調整値を外部化する
 
+// 見た目の板ポリ(KdSquarePolygon)はPch経由で見える。unique_ptr(前方宣言)の生成/破棄を
+// ここ(完全な型が見える.cpp)で行うため、ctor/dtorを定義する
+WireAction::WireAction()
+{
+	// 白テクスチャを土台に、描画時に水色＋発光を乗せる。軸(ワイヤー方向)固定ビルボード
+	m_upPoly = std::make_unique<KdSquarePolygon>("Asset/Textures/System/WhiteNoise.png");
+	m_upPoly->Set2DObject(false);
+	m_upPoly->SetBillboardMode(KdPolygon::BillboardMode::eAxis);
+}
+
+WireAction::~WireAction() = default;
+
+void WireAction::Draw(const Math::Vector3& _from, const Math::Vector3& _to)
+{
+	if (!m_upPoly) { return; }
+
+	// 軸(=ワイヤー方向)と長さ
+	Math::Vector3 axis = _to - _from;
+	float length = axis.Length();
+	if (length < 0.001f) { return; }   // 長さ0は描けない
+	axis /= length;
+
+	// 板の寸法(幅=太さ / 高さ=ワイヤー長)。太さはDebugParamsで調整
+	float thickness = DebugParams::Instance().Float(U8("ワイヤー/見た目の太さ"), 0.08f, 0.01f, 1.0f);
+	m_upPoly->SetScale(Math::Vector2(thickness, length));
+
+	// 軸(Y=ワイヤー方向)と中点だけ入れる。面をカメラへ向ける計算はeAxisビルボードでDrawPolygonが行う
+	Math::Matrix world = Math::Matrix::Identity;
+	world.Up(axis);
+	world.Translation((_from + _to) * 0.5f);
+
+	// 発光っぽい水色のワイヤーとして描く(DrawPolygonはCullNoneなので裏表は気にしなくてよい)
+	Math::Color   col(0.4f, 0.85f, 1.0f, 1.0f);
+	Math::Vector3 emissive(0.1f, 0.4f, 0.7f);
+	KdShaderManager::Instance().m_StandardShader.DrawPolygon(*m_upPoly, world, col, emissive);
+}
+
 
 bool WireAction::Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, float _maxLength)
 {

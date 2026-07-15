@@ -67,12 +67,9 @@ private:
 	// 開始位置へ復帰する(速度リセット・接地解除・ワイヤー解除)。落下時とRキーで呼ぶ
 	void Respawn();
 
-	// 【#1 自分で実装】ワイヤーの見た目を描く。DrawUnLitから呼ぶ土台のみ用意(中身はコメント)
-	//  ・物理はWireAction(距離拘束)、見た目はここ、と役割を分ける
-	//  ・スイング中はアンカーへ、突撃(グラップル)中は対象へ、手元から線を引く
+	// ワイヤーの見た目を描く。端点(手元→アンカー/対象)を決めてWireAction::Drawに委譲する。
+	// スイング中はアンカーへ、突撃(グラップル)中は対象へ、手元から線を引く
 	void DrawWire();
-	// 手元(from)→終点(to)に沿ってワイヤーの板ポリを1本描く(スイング/突撃の共通処理)
-	void DrawWireSegment(const Math::Vector3& from, const Math::Vector3& to);
 
 	// ※ 移動速度はDebugParams("プレイヤー/移動速度")で調整する
 
@@ -115,11 +112,8 @@ private:
 	// 落下攻撃で突撃中の対象(ロックオンからコピー。ホーミングの狙い先)
 	std::weak_ptr<KdGameObject> m_wpDiveTarget;
 
-	//ワイヤー
+	//ワイヤー(物理＋見た目を内包)
 	std::unique_ptr<WireAction> m_upWire;
-
-	// ワイヤーの見た目(板ポリを線に沿わせカメラへ向ける軸固定ビルボード)
-	std::unique_ptr<KdSquarePolygon> m_upWirePoly;
 
 	// 自動ターゲットのマーカー(カメラを向く板ポリ)
 	std::unique_ptr<KdSquarePolygon> m_upMarkerPoly;
