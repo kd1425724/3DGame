@@ -2,7 +2,7 @@
 
 #include "../LevelEditorManager.h"
 #include "../LevelEditorHistory/LevelEditorHistory.h"
-#include "../../Scene/SceneManager.h"
+#include "../../../Scene/SceneManager.h"
 
 void LevelObjectPanel::Draw()
 {

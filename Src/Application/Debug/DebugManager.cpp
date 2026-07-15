@@ -4,8 +4,8 @@
 #include "DebugWatch/DebugWatch.h"
 #include "DebugParams/DebugParams.h"
 #include "DebugEffect/DebugEffect.h"
-#include "../LevelEditor/LevelEditorManager.h"
-#include "../UI/HudEditor/HudEditorManager.h"
+#include "../Editor/LevelEditor/LevelEditorManager.h"
+#include "../Editor/HudEditor/HudEditorManager.h"
 
 void DebugManager::BeginFrame()
 {

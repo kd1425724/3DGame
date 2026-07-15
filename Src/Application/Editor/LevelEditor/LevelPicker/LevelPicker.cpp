@@ -2,11 +2,11 @@
 
 #include <cmath>
 
-#include "../../main.h"
+#include "../../../main.h"
 #include "../LevelEditorManager.h"
 #include "../LevelEditorHistory/LevelEditorHistory.h"
-#include "../../Scene/SceneManager.h"
-#include "../../GameObject/Camera/EditorCamera/EditorCamera.h"
+#include "../../../Scene/SceneManager.h"
+#include "../../../GameObject/Camera/EditorCamera/EditorCamera.h"
 
 namespace
 {

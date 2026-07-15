@@ -133,22 +133,25 @@
     <Filter Include="Src\Application\Debug\DebugWatch">
       <UniqueIdentifier>{939ced4a-8aa4-4a04-b070-a135ce55f49c}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Src\Application\LevelEditor">
+    <Filter Include="Src\Application\Editor">
+      <UniqueIdentifier>{a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Src\Application\Editor\LevelEditor">
       <UniqueIdentifier>{03cbb0c9-b05e-4c68-833c-94d73c0e29ca}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Src\Application\LevelEditor\LevelFileIO">
+    <Filter Include="Src\Application\Editor\LevelEditor\LevelFileIO">
       <UniqueIdentifier>{e24b8330-e791-49f0-9e0a-745e801254d5}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Src\Application\LevelEditor\LevelEditorHistory">
+    <Filter Include="Src\Application\Editor\LevelEditor\LevelEditorHistory">
       <UniqueIdentifier>{b5c9d3a4-2f6e-4d51-9c4d-7b9f0e1d2c53}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Src\Application\LevelEditor\LevelInspector">
+    <Filter Include="Src\Application\Editor\LevelEditor\LevelInspector">
       <UniqueIdentifier>{1b16fc79-aca2-4ebb-9d10-f4c1d1c4700d}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Src\Application\LevelEditor\LevelObjectPanel">
+    <Filter Include="Src\Application\Editor\LevelEditor\LevelObjectPanel">
       <UniqueIdentifier>{744abb28-3a28-412e-b644-315612e53c1e}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Src\Application\LevelEditor\LevelPicker">
+    <Filter Include="Src\Application\Editor\LevelEditor\LevelPicker">
       <UniqueIdentifier>{cd909386-5266-43bd-a2b2-d2c312f395fc}</UniqueIdentifier>
     </Filter>
     <Filter Include="Src\Application\GameObject\Camera\EditorCamera">
@@ -157,13 +160,10 @@
     <Filter Include="Src\Application\GameObject\UI">
       <UniqueIdentifier>{f7614cae-7c36-4b98-a163-7b7ce02a3f60}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Src\Application\UI">
-      <UniqueIdentifier>{37f5e8f1-798e-423c-8b6c-cfecd95970a4}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Src\Application\UI\HudEditor">
+    <Filter Include="Src\Application\Editor\HudEditor">
       <UniqueIdentifier>{eeceef3a-0558-439a-89fc-b0db0b7174bd}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Src\Application\UI\GameHud">
+    <Filter Include="Src\Application\GameObject\UI\GameHud">
       <UniqueIdentifier>{8f40741b-4a83-4fd5-b143-cd5e4aaec3b6}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -354,11 +354,11 @@
     <ClInclude Include="Src\Application\GameObject\EnemySpawner\EnemySpawner.h">
       <Filter>Src\Application\GameObject\EnemySpawner</Filter>
     </ClInclude>
-    <ClInclude Include="Src\Application\UI\HudEditor\HudEditorManager.h">
-      <Filter>Src\Application\UI\HudEditor</Filter>
+    <ClInclude Include="Src\Application\Editor\HudEditor\HudEditorManager.h">
+      <Filter>Src\Application\Editor\HudEditor</Filter>
     </ClInclude>
-    <ClInclude Include="Src\Application\UI\GameHud\GameHud.h">
-      <Filter>Src\Application\UI\GameHud</Filter>
+    <ClInclude Include="Src\Application\GameObject\UI\GameHud\GameHud.h">
+      <Filter>Src\Application\GameObject\UI\GameHud</Filter>
     </ClInclude>
     <ClInclude Include="Src\Application\GameObject\Camera\TPSCamera\TPSCamera.h">
       <Filter>Src\Application\GameObject\Camera\TPSCamera</Filter>
@@ -402,23 +402,23 @@
     <ClInclude Include="Src\Application\Debug\DebugFlags\DebugFlags.h">
       <Filter>Src\Application\Debug\DebugFlags</Filter>
     </ClInclude>
-    <ClInclude Include="Src\Application\LevelEditor\LevelEditorManager.h">
-      <Filter>Src\Application\LevelEditor</Filter>
+    <ClInclude Include="Src\Application\Editor\LevelEditor\LevelEditorManager.h">
+      <Filter>Src\Application\Editor\LevelEditor</Filter>
     </ClInclude>
-    <ClInclude Include="Src\Application\LevelEditor\LevelObjectPanel\LevelObjectPanel.h">
-      <Filter>Src\Application\LevelEditor\LevelObjectPanel</Filter>
+    <ClInclude Include="Src\Application\Editor\LevelEditor\LevelObjectPanel\LevelObjectPanel.h">
+      <Filter>Src\Application\Editor\LevelEditor\LevelObjectPanel</Filter>
     </ClInclude>
-    <ClInclude Include="Src\Application\LevelEditor\LevelInspector\LevelInspector.h">
-      <Filter>Src\Application\LevelEditor\LevelInspector</Filter>
+    <ClInclude Include="Src\Application\Editor\LevelEditor\LevelInspector\LevelInspector.h">
+      <Filter>Src\Application\Editor\LevelEditor\LevelInspector</Filter>
     </ClInclude>
-    <ClInclude Include="Src\Application\LevelEditor\LevelFileIO\LevelFileIO.h">
-      <Filter>Src\Application\LevelEditor\LevelFileIO</Filter>
+    <ClInclude Include="Src\Application\Editor\LevelEditor\LevelFileIO\LevelFileIO.h">
+      <Filter>Src\Application\Editor\LevelEditor\LevelFileIO</Filter>
     </ClInclude>
-    <ClInclude Include="Src\Application\LevelEditor\LevelEditorHistory\LevelEditorHistory.h">
-      <Filter>Src\Application\LevelEditor\LevelEditorHistory</Filter>
+    <ClInclude Include="Src\Application\Editor\LevelEditor\LevelEditorHistory\LevelEditorHistory.h">
+      <Filter>Src\Application\Editor\LevelEditor\LevelEditorHistory</Filter>
     </ClInclude>
-    <ClInclude Include="Src\Application\LevelEditor\LevelPicker\LevelPicker.h">
-      <Filter>Src\Application\LevelEditor\LevelPicker</Filter>
+    <ClInclude Include="Src\Application\Editor\LevelEditor\LevelPicker\LevelPicker.h">
+      <Filter>Src\Application\Editor\LevelEditor\LevelPicker</Filter>
     </ClInclude>
     <ClInclude Include="Src\Application\GameObject\Camera\EditorCamera\EditorCamera.h">
       <Filter>Src\Application\GameObject\Camera\EditorCamera</Filter>
@@ -584,11 +584,11 @@
     <ClCompile Include="Src\Application\GameObject\EnemySpawner\EnemySpawner.cpp">
       <Filter>Src\Application\GameObject\EnemySpawner</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Application\UI\HudEditor\HudEditorManager.cpp">
-      <Filter>Src\Application\UI\HudEditor</Filter>
+    <ClCompile Include="Src\Application\Editor\HudEditor\HudEditorManager.cpp">
+      <Filter>Src\Application\Editor\HudEditor</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Application\UI\GameHud\GameHud.cpp">
-      <Filter>Src\Application\UI\GameHud</Filter>
+    <ClCompile Include="Src\Application\GameObject\UI\GameHud\GameHud.cpp">
+      <Filter>Src\Application\GameObject\UI\GameHud</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Camera\TPSCamera\TPSCamera.cpp">
       <Filter>Src\Application\GameObject\Camera\TPSCamera</Filter>
@@ -629,23 +629,23 @@
     <ClCompile Include="Src\Application\Debug\DebugFlags\DebugFlags.cpp">
       <Filter>Src\Application\Debug\DebugFlags</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Application\LevelEditor\LevelEditorManager.cpp">
-      <Filter>Src\Application\LevelEditor</Filter>
+    <ClCompile Include="Src\Application\Editor\LevelEditor\LevelEditorManager.cpp">
+      <Filter>Src\Application\Editor\LevelEditor</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Application\LevelEditor\LevelObjectPanel\LevelObjectPanel.cpp">
-      <Filter>Src\Application\LevelEditor\LevelObjectPanel</Filter>
+    <ClCompile Include="Src\Application\Editor\LevelEditor\LevelObjectPanel\LevelObjectPanel.cpp">
+      <Filter>Src\Application\Editor\LevelEditor\LevelObjectPanel</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Application\LevelEditor\LevelInspector\LevelInspector.cpp">
-      <Filter>Src\Application\LevelEditor\LevelInspector</Filter>
+    <ClCompile Include="Src\Application\Editor\LevelEditor\LevelInspector\LevelInspector.cpp">
+      <Filter>Src\Application\Editor\LevelEditor\LevelInspector</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Application\LevelEditor\LevelFileIO\LevelFileIO.cpp">
-      <Filter>Src\Application\LevelEditor\LevelFileIO</Filter>
+    <ClCompile Include="Src\Application\Editor\LevelEditor\LevelFileIO\LevelFileIO.cpp">
+      <Filter>Src\Application\Editor\LevelEditor\LevelFileIO</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Application\LevelEditor\LevelEditorHistory\LevelEditorHistory.cpp">
-      <Filter>Src\Application\LevelEditor\LevelEditorHistory</Filter>
+    <ClCompile Include="Src\Application\Editor\LevelEditor\LevelEditorHistory\LevelEditorHistory.cpp">
+      <Filter>Src\Application\Editor\LevelEditor\LevelEditorHistory</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Application\LevelEditor\LevelPicker\LevelPicker.cpp">
-      <Filter>Src\Application\LevelEditor\LevelPicker</Filter>
+    <ClCompile Include="Src\Application\Editor\LevelEditor\LevelPicker\LevelPicker.cpp">
+      <Filter>Src\Application\Editor\LevelEditor\LevelPicker</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Camera\EditorCamera\EditorCamera.cpp">
       <Filter>Src\Application\GameObject\Camera\EditorCamera</Filter>

@@ -7,8 +7,8 @@
 #include "../../GameObject/EnemySpawner/EnemySpawner.h"
 #include "../../GameObject/Camera/TPSCamera/TPSCamera.h"
 
-#include "../../LevelEditor/LevelFileIO/LevelFileIO.h"
-#include "../../LevelEditor/LevelEditorManager.h"
+#include "../../Editor/LevelEditor/LevelFileIO/LevelFileIO.h"
+#include "../../Editor/LevelEditor/LevelEditorManager.h"
 
 void GameScene::Event()
 {

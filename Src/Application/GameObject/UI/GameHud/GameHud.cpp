@@ -1,9 +1,9 @@
 ﻿#include "GameHud.h"
 
-#include "../../Scene/SceneManager.h"
-#include "../../GameObject/Chara/CharaBase.h"
-#include "../../Debug/DebugParams/DebugParams.h"
-#include "../../Debug/DebugFlags/DebugFlags.h"
+#include "../../../Scene/SceneManager.h"
+#include "../../../GameObject/Chara/CharaBase.h"
+#include "../../../Debug/DebugParams/DebugParams.h"
+#include "../../../Debug/DebugFlags/DebugFlags.h"
 
 void GameHud::Draw()
 {

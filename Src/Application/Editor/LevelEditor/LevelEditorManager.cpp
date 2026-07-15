@@ -3,8 +3,8 @@
 #include <cmath>
 #include <algorithm>
 
-#include "../Scene/SceneManager.h"
-#include "../GameObject/Camera/EditorCamera/EditorCamera.h"
+#include "../../Scene/SceneManager.h"
+#include "../../GameObject/Camera/EditorCamera/EditorCamera.h"
 #include "LevelObjectPanel/LevelObjectPanel.h"
 #include "LevelInspector/LevelInspector.h"
 #include "LevelFileIO/LevelFileIO.h"
