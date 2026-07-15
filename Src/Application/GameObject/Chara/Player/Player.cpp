@@ -45,6 +45,11 @@ void Player::Init()
 	// 点ビルボード：常にカメラへ正対する。面内回転(spin)はworld側で与える
 	m_upMarkerPoly->SetBillboardMode(KdPolygon::BillboardMode::eScreen);
 
+	// 斬撃エフェクトの板ポリ(斬撃テクスチャ・カメラを向く点ビルボード)
+	m_upSlashPoly = std::make_unique<KdSquarePolygon>("Asset/Textures/Effect/Slash.png");
+	m_upSlashPoly->Set2DObject(false);
+	m_upSlashPoly->SetBillboardMode(KdPolygon::BillboardMode::eScreen);
+
 	m_pDebugWire = std::make_unique<KdDebugWireFrame>();
 }
 
@@ -290,6 +295,7 @@ void Player::UpdateDive(float dt)
 			spTarget->OnHit(this);
 			m_diveChainCount++;
 			CameraShake::Instance().AddTrauma(std::clamp(0.2f + 0.05f * m_diveChainCount, 0.0f, 0.7f));
+			SpawnSlash(aim);   // 斬った位置に斬撃エフェクト
 
 			// 斬った直後は減速する。次の突撃で再加速するのでメリハリが付き、
 			// 連鎖終了後もこの減速が残るので高速で飛び去りにくい(0=止まる/1=減速なし)
@@ -424,6 +430,9 @@ void Player::PostUpdate()
 
 	// 照準：画面中心に一番近い敵を自動ターゲット(カメラは回さない)
 	UpdateTargeting();
+
+	// 斬撃エフェクトの経過を進める(寿命で消える)
+	UpdateSlashes(Application::Instance().GetDeltaTime());
 }
 
 void Player::UpdateTargeting()
@@ -495,9 +504,60 @@ void Player::DrawTargetMarker()
 void Player::DrawUnLit()
 {
 	// キャラのモデルは CharaBase::DrawLit が描く。ここ(陰影なしパス)では
-	// ワイヤーの見た目と、自動ターゲットのマーカーを描く。
+	// ワイヤーの見た目・自動ターゲットのマーカー・斬撃エフェクトを描く。
 	DrawWire();
 	DrawTargetMarker();
+	DrawSlashes();
+}
+
+void Player::SpawnSlash(const Math::Vector3& pos)
+{
+	// 斬った位置に斬撃を1つ追加。面内回転は位置とチェイン数から散らして毎回違う向きに
+	SlashFX fx;
+	fx.pos  = pos;
+	int seed = m_diveChainCount * 61 + (int)(pos.x * 17.0f) + (int)(pos.z * 29.0f);
+	fx.rot  = DirectX::XMConvertToRadians((float)(((seed % 360) + 360) % 360));
+	fx.age  = 0.0f;
+	fx.life = DebugParams::Instance().Float(U8("斬撃/寿命"), 0.14f, 0.03f, 1.0f);
+	m_slashes.push_back(fx);
+}
+
+void Player::UpdateSlashes(float dt)
+{
+	// 経過を進め、寿命が尽きたものはswap&popで取り除く(順序は問わない)
+	for (size_t i = 0; i < m_slashes.size(); )
+	{
+		m_slashes[i].age += dt;
+		if (m_slashes[i].age >= m_slashes[i].life)
+		{
+			m_slashes[i] = m_slashes.back();
+			m_slashes.pop_back();
+		}
+		else { ++i; }
+	}
+}
+
+void Player::DrawSlashes()
+{
+	if (!m_upSlashPoly) { return; }
+
+	float baseSize = DebugParams::Instance().Float(U8("斬撃/サイズ"), 2.2f, 0.3f, 8.0f);
+
+	for (auto& s : m_slashes)
+	{
+		float t = (s.life > 0.0f) ? (s.age / s.life) : 1.0f;   // 0→1
+		float size  = baseSize * (0.7f + 0.6f * t);            // 少し拡大しながら
+		float alpha = 1.0f - t;                                // フェードアウト
+		m_upSlashPoly->SetScale(Math::Vector2(size, size));
+
+		// 面内回転(散らした向き)＋位置。カメラへの正対はeScreenビルボードに任せる
+		Math::Matrix world = Math::Matrix::CreateRotationZ(s.rot);
+		world.Translation(s.pos);
+
+		Math::Color   col(0.75f, 0.9f, 1.0f, alpha);
+		Math::Vector3 emissive(0.5f, 0.8f, 1.0f);
+		KdShaderManager::Instance().m_StandardShader.DrawPolygon(*m_upSlashPoly, world, col, emissive);
+	}
 }
 
 void Player::DrawWire()
