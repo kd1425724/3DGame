@@ -87,5 +87,9 @@ protected:
 	float m_landingImpact = 0.0f;
 	float m_wallImpact = 0.0f;
 
+	// 壁に押し付き続けているか(壁の手応えを"当たった瞬間"だけにするエッジ検出用)。
+	// これが無いと連続攻撃で壁に突っ込み続けたとき毎フレームtraumaが入りシェイクが終わらない
+	bool m_wasHittingWall = false;
+
 	// ※ 重力加速度・ジャンプ初速はDebugParams("キャラ/重力"・"キャラ/ジャンプ力")で調整する
 };

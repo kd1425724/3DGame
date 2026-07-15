@@ -222,7 +222,7 @@ void CharaBase::ResolveBumpSweep(const Math::Vector3& fromPos, Math::Vector3& po
 			hit = true;
 		}
 	}
-	if (!hit) { return; }
+	if (!hit) { m_wasHittingWall = false; return; }   // 壁から離れたら接触フラグを解除
 
 	// 壁の手前(半径ぶん外側)まで水平位置を戻す。縦(y)はいじらない
 	Math::Vector3 stop = hitPos - dir * radius;
@@ -233,8 +233,15 @@ void CharaBase::ResolveBumpSweep(const Math::Vector3& fromPos, Math::Vector3& po
 	float into = m_velocity.Dot(dir);
 	if (into > 0.0f)
 	{
-		m_wallImpact = into;   // 手応え(カメラ揺れ)用に、壁で殺した速さを記録
+		// 手応え(カメラ揺れ)は"壁に当たった瞬間"だけ記録する。押し付け続けても毎フレーム
+		// 揺らさない(連続攻撃で壁の向こうの敵へ突っ込み続けるとシェイクが終わらない不具合の対策)
+		if (!m_wasHittingWall) { m_wallImpact = into; }
+		m_wasHittingWall = true;
 		m_velocity -= dir * into;
+	}
+	else
+	{
+		m_wasHittingWall = false;   // 壁に沿って離れる向きなら接触解除
 	}
 }
 
