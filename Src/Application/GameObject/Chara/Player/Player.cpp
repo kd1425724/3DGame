@@ -77,7 +77,7 @@ void Player::Update()
 
 	// 落下攻撃(突撃/連続攻撃)中は通常移動・ジャンプを止める。
 	// ※ UpdateMoveは接地中に水平速度を入力値(無入力なら0)へ上書きするため、
-	//   突撃中に走ると追撃ディレイの流しや突撃の勢いが地面で殺されてしまう
+	//   突撃中に走ると継続受付中の流しや突撃の勢いが地面で殺されてしまう
 	if (!m_isDiving)
 	{
 		UpdateMove(dt);
@@ -260,26 +260,38 @@ void Player::UpdateDive(float dt)
 	float radius     = DebugParams::Instance().Float(U8("落下攻撃/斬撃範囲"), 1.5f, 0.5f, 15.0f);
 	float chainRange = DebugParams::Instance().Float(U8("連続攻撃/範囲"),   8.0f, 1.0f, 30.0f);
 
-	// === 突撃中(対象へ引き寄せ、斬ったら周りの敵へ続けて突撃＝連続攻撃) ===
+	// === 突撃中(対象へ引き寄せ、斬ったあとはキー入力で次の敵へ続ける＝連続攻撃) ===
 	if (m_isDiving)
 	{
-		// 斬った後の追撃待ち：この間は再加速せず、減速した勢いのまま少し流す(タン…タンの"間")
-		if (m_attackDelayTimer > 0.0f)
-		{
-			m_attackDelayTimer -= dt;
-			if (m_attackDelayTimer > 0.0f) { return; }   // まだ待ち中
-			// 待ち終わり→下へ流れて次の敵をFindNearestEnemyで拾い、追撃する
-		}
-
 		std::shared_ptr<KdGameObject> spTarget = m_wpDiveTarget.lock();
+		if (spTarget && spTarget->IsExpired()) { spTarget = nullptr; m_wpDiveTarget.reset(); }
 
-		// 対象がいない/斬って消えたら、周りの敵を自動ロックオンして次の突撃先にする
-		if (!spTarget || spTarget->IsExpired())
+		// --- 斬った後の継続受付：受付時間内に突撃キーを押したら周りの敵へ続けて突撃する ---
+		//     (自動では向かわない。押さなければ受付終了で落下に戻る)
+		if (!spTarget && m_comboWindowTimer > 0.0f)
 		{
-			spTarget = FindNearestEnemy(GetPos(), chainRange);
-			if (spTarget) { m_wpDiveTarget = spTarget; }
-			else { return; }   // 近くに敵なし→そのまま落下(真下ダイブ継続。着地でPostUpdateが処理)
+			m_comboWindowTimer -= dt;
+
+			// 受付中は減速してほぼ止まって待てるようにする(次を狙う"間")
+			float windowDamp = DebugParams::Instance().Float(U8("連続攻撃/継続中の減速"), 8.0f, 0.0f, 30.0f);
+			m_velocity *= std::clamp(1.0f - windowDamp * dt, 0.0f, 1.0f);
+
+			if (KdInputManager::Instance().IsPress("DiveAttack"))
+			{
+				spTarget = FindNearestEnemy(GetPos(), chainRange);   // 押した時だけ次の敵へ
+				if (spTarget) { m_wpDiveTarget = spTarget; m_comboWindowTimer = 0.0f; }
+			}
+
+			if (!spTarget)
+			{
+				if (m_comboWindowTimer <= 0.0f) { m_isDiving = false; }   // 受付終了→落下へ
+				return;
+			}
+			// 次の対象が決まった → 下のダッシュへ流れる
 		}
+
+		// 対象がいない(受付窓もない)=真下ダイブ：そのまま落下(着地でPostUpdateが終了処理)
+		if (!spTarget) { return; }
 
 		float pullAccel = DebugParams::Instance().Float(U8("落下攻撃/引き寄せ加速"),     80.0f, 5.0f, 300.0f);
 		float pullMax   = DebugParams::Instance().Float(U8("落下攻撃/引き寄せ上限速度"), 45.0f, 5.0f, 150.0f);
@@ -291,20 +303,19 @@ void Player::UpdateDive(float dt)
 
 		if (dist <= radius)
 		{
-			// 斬る → 続けて次に近い敵へ突撃(連続攻撃＝そっちへ飛ぶ)
+			// 斬る
 			spTarget->OnHit(this);
 			m_diveChainCount++;
 			CameraShake::Instance().AddTrauma(std::clamp(0.2f + 0.05f * m_diveChainCount, 0.0f, 0.7f));
 			SpawnSlash(aim);   // 斬った位置に斬撃エフェクト
 
-			// 斬った直後は減速する。次の突撃で再加速するのでメリハリが付き、
-			// 連鎖終了後もこの減速が残るので高速で飛び去りにくい(0=止まる/1=減速なし)
+			// 斬った直後は減速する(0=止まる/1=減速なし)
 			float slowRate = DebugParams::Instance().Float(U8("連続攻撃/斬り後の速度残し"), 0.4f, 0.0f, 1.0f);
 			m_velocity *= slowRate;
 
-			// すぐには追撃せず、少し間を置いてから次の敵へ突撃する(タン…タンのリズム)
-			m_attackDelayTimer = DebugParams::Instance().Float(U8("連続攻撃/追撃ディレイ"), 0.15f, 0.0f, 1.0f);
-			m_wpDiveTarget.reset();   // 斬った対象は解除。次の敵は待ち終わりにFindNearestEnemyで拾う
+			// 斬った対象を解除し、次の突撃を受け付ける窓を開く(この間にキーを押せば継続突撃)
+			m_wpDiveTarget.reset();
+			m_comboWindowTimer = DebugParams::Instance().Float(U8("連続攻撃/継続受付時間"), 0.5f, 0.05f, 2.0f);
 			return;
 		}
 
@@ -329,7 +340,7 @@ void Player::UpdateDive(float dt)
 
 	m_diveBufferTimer = 0.0f;   // 入力を消費
 	m_isDiving = true;
-	m_attackDelayTimer = 0.0f;   // 初弾はすぐ突撃(前回の追撃待ちが残っていても消す)
+	m_comboWindowTimer = 0.0f;   // 初弾はすぐ突撃(前回の受付が残っていても消す)
 
 	// 自動ターゲットがいれば「対象へワイヤーで引き寄せ」、いなければ従来の真下ダイブ
 	std::shared_ptr<KdGameObject> spLock = m_wpLockOnTarget.lock();
@@ -395,7 +406,7 @@ void Player::Respawn()
 	m_wpDiveTarget.reset();
 	m_diveChainCount = 0;
 	m_diveBufferTimer = 0.0f;
-	m_attackDelayTimer = 0.0f;
+	m_comboWindowTimer = 0.0f;
 }
 
 void Player::PostUpdate()
@@ -407,13 +418,12 @@ void Player::PostUpdate()
 		GroundCheck();
 	}
 
-	// 突撃中に着地したら(未ロックの真下ダイブ等)、近くに敵がいれば続けて突撃、いなければ終了
-	if (m_isDiving && IsGrounded())
+	// 突撃中に着地したとき：対象も継続受付窓も無い(=真下ダイブが空振りして着地)なら終了する。
+	// ダッシュ中(対象あり)や継続受付中(窓あり=キー入力待ち)は着地しても打ち切らない
+	if (m_isDiving && IsGrounded() && m_wpDiveTarget.expired() && m_comboWindowTimer <= 0.0f)
 	{
-		float chainRange = DebugParams::Instance().Float(U8("連続攻撃/範囲"), 8.0f, 1.0f, 30.0f);
-		std::shared_ptr<KdGameObject> spNext = FindNearestEnemy(GetPos(), chainRange);
-		if (spNext) { m_wpDiveTarget = spNext; }              // 続けて突撃(この敵へ飛ぶ)
-		else        { m_isDiving = false; m_wpDiveTarget.reset(); }
+		m_isDiving = false;
+		m_wpDiveTarget.reset();
 	}
 
 	// 接地して待機(突撃していない)状態ならチェインは途切れる(次は1から数え直す)

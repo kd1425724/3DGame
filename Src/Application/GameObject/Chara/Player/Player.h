@@ -95,8 +95,8 @@ private:
 	int m_diveChainCount = 0;
 	// 突撃入力の先行入力バッファ(連打でグラップルが繋がりやすいように少しの間押下を覚える)
 	float m_diveBufferTimer = 0.0f;
-	// 斬った後の追撃までの待ち時間(これが切れてから次の敵へ突撃する＝タン、タンの間)
-	float m_attackDelayTimer = 0.0f;
+	// 斬った後、次の突撃入力を受け付ける残り時間(この間にキーを押せば次の敵へ続けて突撃)
+	float m_comboWindowTimer = 0.0f;
 
 	// ロックオン中の対象(UpdateLockOnで設定。落下攻撃の突撃先に使う)
 	std::weak_ptr<KdGameObject> m_wpLockOnTarget;
