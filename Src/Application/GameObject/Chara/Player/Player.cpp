@@ -247,6 +247,48 @@ void Player::UpdateJump(float dt)
 
 void Player::UpdateDive(float dt)
 {
+	// === 連続攻撃(フルリー)中：止まった場所で周りの敵を自動ロックオンして連続で斬る ===
+	if (m_isFlurry)
+	{
+		float interval = DebugParams::Instance().Float(U8("連続攻撃/間隔"), 0.08f, 0.02f, 0.5f);
+		float range    = DebugParams::Instance().Float(U8("連続攻撃/範囲"), 5.0f, 1.0f, 20.0f);
+
+		// その場に留まる(勢いを止めて止まったまま連続攻撃)
+		SetPos(m_flurryPos);
+		m_velocity = Math::Vector3::Zero;
+
+		m_flurryTimer    -= dt;
+		m_flurryHitTimer -= dt;
+
+		if (m_flurryHitTimer <= 0.0f)
+		{
+			// 周りの敵を自動ロックオン(最も近い1体)して斬る
+			std::shared_ptr<KdGameObject> spNear;
+			float best = range;
+			for (auto& spEnemy : SceneManager::Instance().FindObjectsWithTag(ObjectTag::Enemy))
+			{
+				if (!spEnemy) { continue; }
+				float d = Math::Vector3::Distance(m_flurryPos, spEnemy->GetPos());
+				if (d < best) { best = d; spNear = spEnemy; }
+			}
+
+			if (spNear)
+			{
+				spNear->OnHit(this);   // 斬る(今の敵はOnHitで消滅)
+				m_diveChainCount++;
+				CameraShake::Instance().AddTrauma(std::clamp(0.15f + 0.03f * m_diveChainCount, 0.0f, 0.6f));
+				m_flurryHitTimer = interval;
+			}
+			else
+			{
+				m_flurryTimer = 0.0f;   // 周りに敵がいなくなったら連続攻撃終了
+			}
+		}
+
+		if (m_flurryTimer <= 0.0f) { m_isFlurry = false; }   // 終了→落下に戻る
+		return;
+	}
+
 	float radius = DebugParams::Instance().Float(U8("落下攻撃/斬撃範囲"), 3.0f, 0.5f, 15.0f);
 
 	// === 突撃中(対象へワイヤーで引き寄せ) ===
@@ -259,9 +301,10 @@ void Player::UpdateDive(float dt)
 			float pullMax   = DebugParams::Instance().Float(U8("落下攻撃/引き寄せ上限速度"), 45.0f, 5.0f, 150.0f);
 
 			// 対象(少し上=胴の高さ)へのベクトル。対象は動くので毎フレーム狙い直す(ホーミング)
-			Math::Vector3 to = (spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f)) - GetPos();
+			Math::Vector3 aim = spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f);
+			Math::Vector3 to  = aim - GetPos();
 			float dist = to.Length();
-			if (dist <= radius) { DiveImpact(); return; }   // 到達＝斬り抜け(対象を斬って通過)
+			if (dist <= radius) { StartFlurry(aim); return; }   // 到達＝敵の場所で止まって連続攻撃へ
 
 			to /= dist;
 			// リールで引かれるように、速さを加速でrampしつつ常に対象へまっすぐ向ける
@@ -271,7 +314,7 @@ void Player::UpdateDive(float dt)
 			m_velocity = to * sp;
 			return;
 		}
-		// 対象が消えた：そのまま落ちて着地時にDiveImpact(PostUpdate)
+		// 対象が消えた：そのまま落ちて着地時にフルリー(PostUpdateでStartFlurry)
 		return;
 	}
 
@@ -304,28 +347,19 @@ void Player::UpdateDive(float dt)
 	}
 }
 
-void Player::DiveImpact()
+void Player::StartFlurry(const Math::Vector3& atPos)
 {
-	// 斬り抜け：到達した対象とその周りの敵を斬る。スタンプのように止まらず、勢いのまま飛び抜ける
-	float radius = DebugParams::Instance().Float(U8("落下攻撃/斬撃範囲"), 3.0f, 0.5f, 15.0f);
+	// 敵の場所で一旦止まり、周りの敵への連続攻撃(フルリー)に移行する
+	m_flurryPos = atPos;
+	SetPos(atPos);                       // 止まる場所へスナップ
+	m_velocity = Math::Vector3::Zero;    // 斬り抜け/スタンプと違い、ここで勢いを止める
 
-	for (auto& spEnemy : SceneManager::Instance().FindObjectsWithTag(ObjectTag::Enemy))
-	{
-		if (!spEnemy) { continue; }
-		if (Math::Vector3::Distance(GetPos(), spEnemy->GetPos()) <= radius)
-		{
-			spEnemy->OnHit(this);   // 今の敵はOnHitで消滅(=斬る)
-		}
-	}
-
-	// チェイン数を増やす(接地でリセット)。連鎖が伸びるほど手応え(カメラ揺れ)を強くする
-	m_diveChainCount++;
-	CameraShake::Instance().AddTrauma(std::clamp(0.35f + 0.07f * m_diveChainCount, 0.0f, 1.0f));
-
-	// ※ velocityは残す＝スタンプで止まらず斬り抜ける。突撃状態だけ解除し、勢いのまま次へ繋ぐ。
-	//   飛び抜けた先で次の自動ターゲットへ突撃入力を出せば、着地せず連続で斬り抜けられる
 	m_isDiving = false;
 	m_wpDiveTarget.reset();
+
+	m_isFlurry = true;
+	m_flurryTimer    = DebugParams::Instance().Float(U8("連続攻撃/時間"), 0.6f, 0.1f, 3.0f);
+	m_flurryHitTimer = 0.0f;             // すぐ1発目(最初のロックオン対象=止まった敵)
 }
 
 void Player::UpdateLaser()
@@ -354,12 +388,13 @@ void Player::UpdateLaser()
 
 void Player::Respawn()
 {
-	// 開始位置へ戻し、勢い・接地・ワイヤー・突撃状態をすべてリセットする
+	// 開始位置へ戻し、勢い・接地・ワイヤー・突撃/連続攻撃状態をすべてリセットする
 	SetPos(m_spawnPos);
 	m_velocity = Math::Vector3::Zero;
 	m_isGrounded = false;
 	if (m_upWire) { m_upWire->Release(); }
 	m_isDiving = false;
+	m_isFlurry = false;
 	m_wpDiveTarget.reset();
 	m_diveChainCount = 0;
 	m_diveBufferTimer = 0.0f;
@@ -374,14 +409,14 @@ void Player::PostUpdate()
 		GroundCheck();
 	}
 
-	// 落下攻撃中に着地したら、その瞬間に範囲撃破する
+	// 突撃中に着地したら(未ロックの真下ダイブ等)、その場で連続攻撃(フルリー)へ移行する
 	if (m_isDiving && IsGrounded())
 	{
-		DiveImpact();
+		StartFlurry(GetPos());
 	}
 
-	// 接地したらチェイン突撃の連鎖は途切れる(次は1から数え直す)
-	if (IsGrounded()) { m_diveChainCount = 0; }
+	// 接地して待機(突撃/連続攻撃していない)状態ならチェインは途切れる(次は1から数え直す)
+	if (IsGrounded() && !m_isDiving && !m_isFlurry) { m_diveChainCount = 0; }
 
 	// === 着地・壁ヒットの手応え(カメラを揺らす) ===
 	// CharaBaseが記録した衝撃をConsumeし、一定以上ならtraumaを加える(小さすぎる衝撃は無視)。

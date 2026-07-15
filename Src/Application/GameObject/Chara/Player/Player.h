@@ -51,10 +51,11 @@ private:
 	void UpdateJump(float dt);
 	// Eキーで正面にレーザーを発射する
 	void UpdateLaser();
-	// 落下攻撃：空中で攻撃入力→急降下(ロックオン中は対象へ突撃するホーミング/未ロックは真下)
+	// 落下攻撃：空中で攻撃入力→対象へワイヤーで引き寄せ突撃(未ロックは真下ダイブ)。
+	// 到達/着地で連続攻撃(フルリー)へ移行する
 	void UpdateDive(float dt);
-	// 落下攻撃の着弾：周囲の敵を範囲撃破し、カメラを揺らす
-	void DiveImpact();
+	// 敵の場所で一旦止まり、周りの敵への連続攻撃(フルリー)を開始する
+	void StartFlurry(const Math::Vector3& atPos);
 	// 照準：カメラの向き(画面中心)に一番近い敵を毎フレーム自動ターゲットにする(カメラは回さない)。
 	// PostUpdateから呼ぶ。選ばれた敵はマーカー表示され、落下攻撃の突撃先になる
 	void UpdateTargeting();
@@ -83,11 +84,17 @@ private:
 	float m_coyoteTimer = 999.0f;     // 接地を離れてからの経過時間(小さいうちは空中でも跳べる)
 	float m_jumpBufferTimer = 0.0f;   // ジャンプ入力を先読みして保持する残り時間
 
-	// 落下攻撃中フラグ(急降下→着弾でDiveImpact)
+	// 落下攻撃(突撃)中フラグ(対象へ引き寄せ→到達でフルリーへ)
 	bool m_isDiving = false;
-	// チェイン突撃：着弾ごとに増える連鎖数(手応えを段階的に強く/将来のコンボUI用)。接地でリセット
+	// 連続攻撃(フルリー)中フラグ：到達点で止まり、周りの敵を自動ロックオンして連続で斬る
+	bool m_isFlurry = false;
+	// フルリーの残り時間／次の一撃までの間隔タイマー／止まって攻撃する位置
+	float m_flurryTimer = 0.0f;
+	float m_flurryHitTimer = 0.0f;
+	Math::Vector3 m_flurryPos = {};
+	// チェイン数：一撃ごとに増える(手応えを段階的に強く/将来のコンボUI用)。接地・待機でリセット
 	int m_diveChainCount = 0;
-	// 突撃入力の先行入力バッファ(連打でチェインが繋がりやすいように少しの間押下を覚える)
+	// 突撃入力の先行入力バッファ(連打でグラップルが繋がりやすいように少しの間押下を覚える)
 	float m_diveBufferTimer = 0.0f;
 
 	// ロックオン中の対象(UpdateLockOnで設定。落下攻撃の突撃先に使う)
