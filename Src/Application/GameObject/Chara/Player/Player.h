@@ -4,7 +4,7 @@
 
 class CameraBase;
 class WireAction;
-class KdSquarePolygon;
+class Targeting;
 
 //====================================================
 //
@@ -58,11 +58,6 @@ private:
 	void UpdateDive(float dt);
 	// 範囲内で最も近い生きている敵を返す(連続攻撃の次の突撃先選び)。いなければnull
 	std::shared_ptr<KdGameObject> FindNearestEnemy(const Math::Vector3& center, float range) const;
-	// 照準：カメラの向き(画面中心)に一番近い敵を毎フレーム自動ターゲットにする(カメラは回さない)。
-	// PostUpdateから呼ぶ。選ばれた敵はマーカー表示され、落下攻撃の突撃先になる
-	void UpdateTargeting();
-	// 自動ターゲット中の敵にマーカー(カメラを向く板ポリ)を描く
-	void DrawTargetMarker();
 
 	// 開始位置へ復帰する(速度リセット・接地解除・ワイヤー解除)。落下時とRキーで呼ぶ
 	void Respawn();
@@ -107,18 +102,14 @@ private:
 	// 斬った後、次の突撃入力を受け付ける残り時間(この間にキーを押せば次の敵へ続けて突撃)
 	float m_comboWindowTimer = 0.0f;
 
-	// ロックオン中の対象(UpdateLockOnで設定。落下攻撃の突撃先に使う)
-	std::weak_ptr<KdGameObject> m_wpLockOnTarget;
-	// 落下攻撃で突撃中の対象(ロックオンからコピー。ホーミングの狙い先)
+	// 落下攻撃で突撃中の対象(Targetingの選択からコピー。ホーミングの狙い先)
 	std::weak_ptr<KdGameObject> m_wpDiveTarget;
 
 	//ワイヤー(物理＋見た目を内包)
 	std::unique_ptr<WireAction> m_upWire;
 
-	// 自動ターゲットのマーカー(カメラを向く板ポリ)
-	std::unique_ptr<KdSquarePolygon> m_upMarkerPoly;
-	// マーカーの回転/脈動アニメ用の経過時間
-	float m_markerTime = 0.0f;
+	// 照準(画面中心の敵を自動ロックオン＋マーカー描画を内包する部品)
+	std::unique_ptr<Targeting> m_upTargeting;
 
 	// ※ 移動用の速度は基底CharaBaseの m_velocity(3D) を共通で使う
 };

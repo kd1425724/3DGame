@@ -291,6 +291,7 @@
     <ClInclude Include="Src\Application\GameObject\Chara\CharaBase.h" />
     <ClInclude Include="Src\Application\GameObject\Chara\Enemy\Enemy.h" />
     <ClInclude Include="Src\Application\GameObject\Chara\Player\Player.h" />
+    <ClInclude Include="Src\Application\GameObject\Chara\Player\Targeting.h" />
     <ClInclude Include="Src\Application\GameObject\Ground\Ground.h" />
     <ClInclude Include="Src\Application\GameObject\Wire\WireAction.h" />
     <ClInclude Include="Src\Application\Editor\LevelEditor\LevelEditorManager.h" />
@@ -372,6 +373,7 @@
     <ClCompile Include="Src\Application\GameObject\Chara\CharaBase.cpp" />
     <ClCompile Include="Src\Application\GameObject\Chara\Enemy\Enemy.cpp" />
     <ClCompile Include="Src\Application\GameObject\Chara\Player\Player.cpp" />
+    <ClCompile Include="Src\Application\GameObject\Chara\Player\Targeting.cpp" />
     <ClCompile Include="Src\Application\GameObject\Ground\Ground.cpp" />
     <ClCompile Include="Src\Application\GameObject\Wire\WireAction.cpp" />
     <ClCompile Include="Src\Application\Editor\LevelEditor\LevelEditorManager.cpp" />

@@ -375,6 +375,9 @@
     <ClInclude Include="Src\Application\GameObject\Chara\Player\Player.h">
       <Filter>Src\Application\GameObject\Chara\Player</Filter>
     </ClInclude>
+    <ClInclude Include="Src\Application\GameObject\Chara\Player\Targeting.h">
+      <Filter>Src\Application\GameObject\Chara\Player</Filter>
+    </ClInclude>
     <ClInclude Include="Src\Application\GameObject\Chara\Enemy\Enemy.h">
       <Filter>Src\Application\GameObject\Chara\Enemy</Filter>
     </ClInclude>
@@ -606,6 +609,9 @@
       <Filter>Src\Application\GameObject\Chara</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Chara\Player\Player.cpp">
+      <Filter>Src\Application\GameObject\Chara\Player</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\GameObject\Chara\Player\Targeting.cpp">
       <Filter>Src\Application\GameObject\Chara\Player</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Chara\Enemy\Enemy.cpp">

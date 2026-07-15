@@ -8,6 +8,7 @@
 #include "../../../Debug/DebugFlags/DebugFlags.h"
 #include "../../Camera/CameraShake.h"
 #include "../../../Effect/EffectManager.h"
+#include "Targeting.h"
 
 #include"../../Wire/WireAction.h"
 
@@ -32,11 +33,8 @@ void Player::Init()
 	//ワイヤー(物理＋見た目を内包。見た目の板ポリ生成はWireActionのctorが行う)
 	m_upWire = std::make_unique<WireAction>();
 
-	// 自動ターゲットのマーカー(照準テクスチャ・カメラを向く板ポリ)
-	m_upMarkerPoly = std::make_unique<KdSquarePolygon>("Asset/Textures/UI/Reticle.png");
-	m_upMarkerPoly->Set2DObject(false);
-	// 点ビルボード：常にカメラへ正対する。面内回転(spin)はworld側で与える
-	m_upMarkerPoly->SetBillboardMode(KdPolygon::BillboardMode::eScreen);
+	// 照準(画面中心の敵を自動ロックオン＋マーカー描画。マーカー板ポリ生成はTargetingのctorが行う)
+	m_upTargeting = std::make_unique<Targeting>();
 
 	m_pDebugWire = std::make_unique<KdDebugWireFrame>();
 }
@@ -379,7 +377,7 @@ void Player::UpdateDive(float dt)
 	m_comboWindowTimer = 0.0f;   // 初弾はすぐ突撃(前回の受付が残っていても消す)
 
 	// 自動ターゲットがいれば「対象へワイヤーで引き寄せ」、いなければ従来の真下ダイブ
-	std::shared_ptr<KdGameObject> spLock = m_wpLockOnTarget.lock();
+	std::shared_ptr<KdGameObject> spLock = m_upTargeting->GetTarget();
 	if (spLock)
 	{
 		// 以降UpdateDiveが対象へ引き寄せ、ワイヤーの線はDrawWireが手元→対象に描く
@@ -489,74 +487,8 @@ void Player::PostUpdate()
 	float wall = ConsumeWallImpact();
 	if (wall > 4.0f) { CameraShake::Instance().AddTrauma(std::clamp(wall / 25.0f, 0.0f, 0.7f)); }
 
-	// 照準：画面中心に一番近い敵を自動ターゲット(カメラは回さない)
-	UpdateTargeting();
-}
-
-void Player::UpdateTargeting()
-{
-	// マーカーのアニメ用に時間を進める
-	m_markerTime += Application::Instance().GetDeltaTime();
-
-	// カメラの向き(=画面中心の方向)に一番近い敵を選ぶ。カメラ自体は回さない。
-	std::shared_ptr<CameraBase> spCam = m_wpCamera.lock();
-	if (!spCam) { m_wpLockOnTarget.reset(); return; }
-
-	// カメラの発射方向(ピッチ込み)。ワイヤー発射と同じ「フルの向き」
-	Math::Vector3 camPos = spCam->GetPos();
-	Math::Vector3 camFwd = Math::Vector3::TransformNormal(Math::Vector3::Backward, spCam->GetRotationMatrix());
-	if (camFwd.LengthSquared() < 0.0001f) { return; }
-	camFwd.Normalize();
-
-	// 画面中心からの許容角度。これより外の敵は対象にしない
-	float limitDeg = DebugParams::Instance().Float(U8("照準/有効角度"), 40.0f, 5.0f, 90.0f);
-	float minDot = cosf(DirectX::XMConvertToRadians(limitDeg));
-
-	// カメラの前方向に一番よく揃っている(=中心に近い)敵を探す
-	std::shared_ptr<KdGameObject> best;
-	float bestDot = minDot;   // これ未満は中心から外れすぎなので対象外
-	for (auto& spEnemy : SceneManager::Instance().FindObjectsWithTag(ObjectTag::Enemy))
-	{
-		if (!spEnemy) { continue; }
-		Math::Vector3 to = spEnemy->GetPos() - camPos;
-		if (to.LengthSquared() < 0.0001f) { continue; }
-		to.Normalize();
-		float d = to.Dot(camFwd);   // （ベクトルA）toと（ベクトルB）camFwdの内積が1に近いほど画面中心 
-		if (d > bestDot) 
-		{
-			bestDot = d;
-			best = spEnemy;
-		}
-	}
-
-	m_wpLockOnTarget = best;   // 中心に一番近い敵(いなければ空)。落下攻撃の突撃先になる
-}
-
-void Player::DrawTargetMarker()
-{
-	if (!m_upMarkerPoly) { return; }
-
-	std::shared_ptr<KdGameObject> spTarget = m_wpLockOnTarget.lock();
-	if (!spTarget) { return; }
-
-	// マーカーサイズ＋脈動(sinで軽く拡縮=ロック中の呼吸感)
-	float baseSize  = DebugParams::Instance().Float(U8("照準/マーカーサイズ"), 0.7f, 0.1f, 3.0f);
-	float pulseAmp  = DebugParams::Instance().Float(U8("照準/脈動"),          0.15f, 0.0f, 1.0f);
-	float size = baseSize * (1.0f + pulseAmp * sinf(m_markerTime * 6.0f));
-	m_upMarkerPoly->SetScale(Math::Vector2(size, size));
-
-	// 回転角(照準がゆっくり回る)
-	float rotSpeed = DebugParams::Instance().Float(U8("照準/回転速度"), 60.0f, 0.0f, 360.0f);
-	float rotRad   = DirectX::XMConvertToRadians(m_markerTime * rotSpeed);
-
-	// 面内回転(local Z軸まわり)だけ作って敵の少し上へ配置。カメラへの正対はeScreenビルボードに任せる
-	Math::Matrix world = Math::Matrix::CreateRotationZ(rotRad);
-	world.Translation(spTarget->GetPos() + Math::Vector3(0.0f, 0.9f, 0.0f));
-
-	// 発光色つきで描く(DrawPolygonはCullNoneなので裏表は不問。テクスチャの透過で照準形に抜ける)
-	Math::Color   col(1.0f, 0.5f, 0.25f, 1.0f);
-	Math::Vector3 emissive(0.8f, 0.35f, 0.1f);
-	KdShaderManager::Instance().m_StandardShader.DrawPolygon(*m_upMarkerPoly, world, col, emissive);
+	// 照準：画面中心に一番近い敵を自動ターゲット(カメラは回さない)。選定とマーカーはTargetingが持つ
+	m_upTargeting->Update(m_wpCamera.lock(), Application::Instance().GetDeltaTime());
 }
 
 void Player::DrawUnLit()
@@ -564,7 +496,7 @@ void Player::DrawUnLit()
 	// キャラのモデルは CharaBase::DrawLit が描く。ここ(陰影なしパス)では
 	// ワイヤーの見た目・自動ターゲットのマーカーを描く(斬撃VFXはEffectManagerが描く)。
 	DrawWire();
-	DrawTargetMarker();
+	m_upTargeting->DrawMarker();
 }
 
 void Player::DrawWire()
