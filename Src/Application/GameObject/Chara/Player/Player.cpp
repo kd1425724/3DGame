@@ -275,10 +275,18 @@ void Player::UpdateDive(float dt)
 		return;
 	}
 
+	// === 突撃入力の先行入力バッファ ===
+	// 押した瞬間を少しの間覚えておく。突撃中に押しても覚えるので、着弾直後に消費されて
+	// 次のターゲットへ即チェインできる(連打でグラップルが繋がる)
+	float diveBuffer = DebugParams::Instance().Float(U8("落下攻撃/先行入力"), 0.15f, 0.0f, 0.5f);
+	if (KdInputManager::Instance().IsPress("DiveAttack")) { m_diveBufferTimer = diveBuffer; }
+	else { m_diveBufferTimer -= dt; if (m_diveBufferTimer < 0.0f) { m_diveBufferTimer = 0.0f; } }
+
 	// === 開始判定 ===
 	if (m_isGrounded) { return; }                                        // 空中専用
-	if (!KdInputManager::Instance().IsPress("DiveAttack")) { return; }
+	if (m_diveBufferTimer <= 0.0f) { return; }                           // 先行入力が生きている時だけ
 
+	m_diveBufferTimer = 0.0f;   // 入力を消費
 	m_isDiving = true;
 
 	// 自動ターゲットがいれば「対象へワイヤーで引き寄せ」、いなければ従来の真下ダイブ
@@ -310,8 +318,18 @@ void Player::DiveImpact()
 		}
 	}
 
-	// 着弾の手応え
-	CameraShake::Instance().AddTrauma(0.6f);
+	// チェイン数を増やす(接地でリセット)。連鎖が伸びるほど手応え(カメラ揺れ)を強くする
+	m_diveChainCount++;
+	CameraShake::Instance().AddTrauma(std::clamp(0.5f + 0.08f * m_diveChainCount, 0.0f, 1.0f));
+
+	// 次のチェインへ繋ぐための浮き：着弾の勢いを打ち消して少し上へ跳ね、空中時間を作る。
+	// この間に次の自動ターゲットへ突撃入力を出せば、着地せず連続でグラップルできる。
+	// ※ 空中でのグラップル着弾のときだけ。真下ダイブの地面着弾では跳ねさせない
+	if (!IsGrounded())
+	{
+		float pop = DebugParams::Instance().Float(U8("落下攻撃/チェイン浮き"), 6.0f, 0.0f, 20.0f);
+		m_velocity = Math::Vector3(0.0f, pop, 0.0f);
+	}
 
 	m_isDiving = false;
 	m_wpDiveTarget.reset();
@@ -343,11 +361,15 @@ void Player::UpdateLaser()
 
 void Player::Respawn()
 {
-	// 開始位置へ戻し、勢い・接地・ワイヤーをすべてリセットする
+	// 開始位置へ戻し、勢い・接地・ワイヤー・突撃状態をすべてリセットする
 	SetPos(m_spawnPos);
 	m_velocity = Math::Vector3::Zero;
 	m_isGrounded = false;
 	if (m_upWire) { m_upWire->Release(); }
+	m_isDiving = false;
+	m_wpDiveTarget.reset();
+	m_diveChainCount = 0;
+	m_diveBufferTimer = 0.0f;
 }
 
 void Player::PostUpdate()
@@ -364,6 +386,9 @@ void Player::PostUpdate()
 	{
 		DiveImpact();
 	}
+
+	// 接地したらチェイン突撃の連鎖は途切れる(次は1から数え直す)
+	if (IsGrounded()) { m_diveChainCount = 0; }
 
 	// === 着地・壁ヒットの手応え(カメラを揺らす) ===
 	// CharaBaseが記録した衝撃をConsumeし、一定以上ならtraumaを加える(小さすぎる衝撃は無視)。

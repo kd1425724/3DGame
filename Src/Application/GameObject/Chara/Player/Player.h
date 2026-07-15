@@ -85,6 +85,10 @@ private:
 
 	// 落下攻撃中フラグ(急降下→着弾でDiveImpact)
 	bool m_isDiving = false;
+	// チェイン突撃：着弾ごとに増える連鎖数(手応えを段階的に強く/将来のコンボUI用)。接地でリセット
+	int m_diveChainCount = 0;
+	// 突撃入力の先行入力バッファ(連打でチェインが繋がりやすいように少しの間押下を覚える)
+	float m_diveBufferTimer = 0.0f;
 
 	// ロックオン中の対象(UpdateLockOnで設定。落下攻撃の突撃先に使う)
 	std::weak_ptr<KdGameObject> m_wpLockOnTarget;
