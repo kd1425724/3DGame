@@ -4,7 +4,7 @@
 //
 // EffectManager ── EffectBase派生のVFXを一元管理するシングルトン
 //
-//  ・Add()で任意のEffectBaseを預かり、毎フレームUpdate→IsFinishedで除去する
+//  ・Add()で任意のEffectBase(KdGameObject派生)を預かり、毎フレームUpdate→IsExpiredで除去する
 //  ・SpawnSlash()等の便利関数で具体エフェクト(SlashEffect)を生成して追加する
 //  ・更新/描画はシーン(BaseScene)から毎フレーム呼ぶ。CameraShakeと同じ運用
 //
@@ -23,13 +23,14 @@ public:
 	}
 
 	// 任意のエフェクト(EffectBase派生)を預けて管理させる
-	void Add(std::unique_ptr<EffectBase> _effect);
+	void Add(const std::shared_ptr<EffectBase>& _effect);
 
 	// 便利関数：斬った位置に斬撃(SlashEffect)を1つ出す(面内回転は散らす)
 	void SpawnSlash(const Math::Vector3& _pos);
 
-	// 管理中のエフェクトの経過を進め、終わったものを外す。シーンから毎フレーム呼ぶ
-	void Update(float _dt);
+	// 管理中のエフェクトの経過を進め、終わったもの(IsExpired)を外す。シーンから毎フレーム呼ぶ
+	// (各エフェクトはKdGameObject同様、dtをApplicationから自分で取る)
+	void Update();
 
 	// 陰影なしパスで管理中のエフェクトを描画する。シーンのUnLitパスから呼ぶ
 	void DrawUnLit();
@@ -44,8 +45,8 @@ private:
 	EffectManager(const EffectManager&) = delete;
 	void operator=(const EffectManager&) = delete;
 
-	// 管理中のエフェクト
-	std::vector<std::unique_ptr<EffectBase>> m_effects;
+	// 管理中のエフェクト(KdGameObject派生なのでshared_ptrで保持)
+	std::vector<std::shared_ptr<EffectBase>> m_effects;
 
 	// SpawnSlashの面内回転を散らすための種(発生ごとに増やす)
 	unsigned int m_spawnCounter = 0;

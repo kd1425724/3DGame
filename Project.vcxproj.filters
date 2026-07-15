@@ -139,6 +139,9 @@
     <Filter Include="Src\Application\Effect">
       <UniqueIdentifier>{b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Application\Effect\SlashEffect">
+      <UniqueIdentifier>{c3d4e5f6-a7b8-4c9d-8e0f-2a3b4c5d6e7f}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\Application\Editor\LevelEditor">
       <UniqueIdentifier>{03cbb0c9-b05e-4c68-833c-94d73c0e29ca}</UniqueIdentifier>
     </Filter>
@@ -363,8 +366,8 @@
     <ClInclude Include="Src\Application\Effect\EffectBase.h">
       <Filter>Src\Application\Effect</Filter>
     </ClInclude>
-    <ClInclude Include="Src\Application\Effect\SlashEffect.h">
-      <Filter>Src\Application\Effect</Filter>
+    <ClInclude Include="Src\Application\Effect\SlashEffect\SlashEffect.h">
+      <Filter>Src\Application\Effect\SlashEffect</Filter>
     </ClInclude>
     <ClInclude Include="Src\Application\Editor\HudEditor\HudEditorManager.h">
       <Filter>Src\Application\Editor\HudEditor</Filter>
@@ -602,8 +605,8 @@
     <ClCompile Include="Src\Application\Effect\EffectManager.cpp">
       <Filter>Src\Application\Effect</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Application\Effect\SlashEffect.cpp">
-      <Filter>Src\Application\Effect</Filter>
+    <ClCompile Include="Src\Application\Effect\SlashEffect\SlashEffect.cpp">
+      <Filter>Src\Application\Effect\SlashEffect</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\Editor\HudEditor\HudEditorManager.cpp">
       <Filter>Src\Application\Editor\HudEditor</Filter>

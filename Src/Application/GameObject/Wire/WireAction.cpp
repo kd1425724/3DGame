@@ -9,8 +9,10 @@
 // ここ(完全な型が見える.cpp)で行うため、ctor/dtorを定義する
 WireAction::WireAction()
 {
-	// 白テクスチャを土台に、描画時に水色＋発光を乗せる。軸(ワイヤー方向)固定ビルボード
-	m_upPoly = std::make_unique<KdSquarePolygon>("Asset/Textures/System/WhiteNoise.png");
+	// 白テクスチャを土台に、描画時に水色＋発光を乗せる。軸(ワイヤー方向)固定ビルボード。
+	// テクスチャはKdAssetsのキャッシュから取り、板ポリに渡す
+	std::shared_ptr<KdTexture> spTex = KdAssets::Instance().m_textures.GetData("Asset/Textures/System/WhiteNoise.png");
+	m_upPoly = std::make_unique<KdSquarePolygon>(spTex);
 	m_upPoly->Set2DObject(false);
 	m_upPoly->SetBillboardMode(KdPolygon::BillboardMode::eAxis);
 }

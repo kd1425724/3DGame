@@ -1,16 +1,19 @@
 ﻿#include "SlashEffect.h"
 
-#include "../Debug/DebugParams/DebugParams.h"
+#include "../../main.h"   // Application::GetDeltaTime
+#include "../../Debug/DebugParams/DebugParams.h"
 
 // 共有の板ポリ実体。KdSquarePolygon(前方宣言)の破棄には完全な型が要るので.cpp側に置く
 std::unique_ptr<KdSquarePolygon> SlashEffect::s_upPoly;
 
 KdSquarePolygon* SlashEffect::GetSharedPoly()
 {
-	// 初回だけ生成。斬撃テクスチャの板ポリ(カメラを向く点ビルボード)
+	// 初回だけ生成。斬撃テクスチャの板ポリ(カメラを向く点ビルボード)。
+	// テクスチャはKdAssetsのキャッシュから取り、板ポリに渡す(存在しない_mtrf/_emi/_nmlを探しに行かない)
 	if (!s_upPoly)
 	{
-		s_upPoly = std::make_unique<KdSquarePolygon>("Asset/Textures/Effect/Slash.png");
+		std::shared_ptr<KdTexture> spTex = KdAssets::Instance().m_textures.GetData("Asset/Textures/Effect/Slash.png");
+		s_upPoly = std::make_unique<KdSquarePolygon>(spTex);
 		s_upPoly->Set2DObject(false);
 		s_upPoly->SetBillboardMode(KdPolygon::BillboardMode::eScreen);
 	}
@@ -25,9 +28,10 @@ SlashEffect::SlashEffect(const Math::Vector3& _pos, float _rot)
 
 SlashEffect::~SlashEffect() = default;
 
-void SlashEffect::Update(float _dt)
+void SlashEffect::Update()
 {
-	m_age += _dt;
+	m_age += Application::Instance().GetDeltaTime();
+	if (m_age >= m_life) { m_isExpired = true; }   // 寿命が尽きたらEffectManagerが外す
 }
 
 void SlashEffect::DrawUnLit()

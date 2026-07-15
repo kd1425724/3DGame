@@ -2,25 +2,24 @@
 
 //====================================================
 //
-// EffectBase ── 短命VFX1つぶんの基底クラス
+// EffectBase ── 短命VFXの基底(KdGameObject派生)
 //
-//  ・派生クラス(SlashEffect等)が見た目・寿命を実装する
-//  ・EffectManagerが unique_ptr<EffectBase> のリストで一元管理する
-//    (毎フレームUpdate→IsFinishedで除去、UnLitパスでDrawUnLit)
+//  ・エフェクトもゲームオブジェクトとして扱う。KdGameObjectの
+//    Update()/DrawUnLit()/IsExpired()/m_isExpired をそのまま使い、派生が実装する
+//  ・寿命が尽きたら m_isExpired = true にする(EffectManagerがリストから外す)
+//  ・EffectManagerが shared_ptr<EffectBase> のリストで一元管理する
+//  ・将来、位置や当たり判定を持つエフェクト(ダメージ衝撃波など)にも拡張できる
+//
+//  ※ KdGameObjectはPch強制インクルードで見えるので明示includeは不要
 //
 //====================================================
-class EffectBase
+class EffectBase : public KdGameObject
 {
 public:
 
-	virtual ~EffectBase() {}
+	// エフェクトはワールドに配置される当たり対象ではないのでタグは持たない
+	ObjectTag GetObjectTag() override { return ObjectTag::None; }
 
-	// 経過を進める(寿命やアニメを進行)
-	virtual void Update(float _dt) = 0;
-
-	// 陰影なしパスで描画する
-	virtual void DrawUnLit() = 0;
-
-	// 寿命が尽きたか(trueならEffectManagerがリストから外す)
-	virtual bool IsFinished() const = 0;
+	// Update()/DrawUnLit() は KdGameObject の仮想関数を派生でoverrideする
+	// (dtは他オブジェクト同様 Application::GetDeltaTime() から取る)
 };

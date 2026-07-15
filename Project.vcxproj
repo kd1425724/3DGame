@@ -284,7 +284,7 @@
     <ClInclude Include="Src\Application\GameObject\EnemySpawner\EnemySpawner.h" />
     <ClInclude Include="Src\Application\Effect\EffectManager.h" />
     <ClInclude Include="Src\Application\Effect\EffectBase.h" />
-    <ClInclude Include="Src\Application\Effect\SlashEffect.h" />
+    <ClInclude Include="Src\Application\Effect\SlashEffect\SlashEffect.h" />
     <ClInclude Include="Src\Application\GameObject\Camera\CameraBase.h" />
     <ClInclude Include="Src\Application\GameObject\Camera\CameraShake.h" />
     <ClInclude Include="Src\Application\GameObject\Camera\EditorCamera\EditorCamera.h" />
@@ -367,7 +367,7 @@
     <ClCompile Include="Src\Application\GameObject\Block\Block.cpp" />
     <ClCompile Include="Src\Application\GameObject\EnemySpawner\EnemySpawner.cpp" />
     <ClCompile Include="Src\Application\Effect\EffectManager.cpp" />
-    <ClCompile Include="Src\Application\Effect\SlashEffect.cpp" />
+    <ClCompile Include="Src\Application\Effect\SlashEffect\SlashEffect.cpp" />
     <ClCompile Include="Src\Application\GameObject\Camera\CameraBase.cpp" />
     <ClCompile Include="Src\Application\GameObject\Camera\CameraShake.cpp" />
     <ClCompile Include="Src\Application\GameObject\Camera\EditorCamera\EditorCamera.cpp" />

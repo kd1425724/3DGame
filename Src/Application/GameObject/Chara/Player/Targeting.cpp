@@ -8,8 +8,9 @@
 // ここ(完全な型が見える.cpp)で行うため、ctor/dtorを定義する
 Targeting::Targeting()
 {
-	// 照準テクスチャの板ポリ(カメラを向く点ビルボード)
-	m_upMarkerPoly = std::make_unique<KdSquarePolygon>("Asset/Textures/UI/Reticle.png");
+	// 照準テクスチャの板ポリ(カメラを向く点ビルボード)。テクスチャはKdAssetsキャッシュから取る
+	std::shared_ptr<KdTexture> spTex = KdAssets::Instance().m_textures.GetData("Asset/Textures/UI/Reticle.png");
+	m_upMarkerPoly = std::make_unique<KdSquarePolygon>(spTex);
 	m_upMarkerPoly->Set2DObject(false);
 	m_upMarkerPoly->SetBillboardMode(KdPolygon::BillboardMode::eScreen);
 }

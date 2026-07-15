@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-#include "EffectBase.h"
+#include "../EffectBase.h"
 
 //====================================================
 //
@@ -20,9 +20,8 @@ public:
 	SlashEffect(const Math::Vector3& _pos, float _rot);
 	~SlashEffect() override;
 
-	void Update(float _dt) override;
-	void DrawUnLit() override;
-	bool IsFinished() const override { return m_age >= m_life; }
+	void Update() override;      // 経過を進め、寿命で m_isExpired = true
+	void DrawUnLit() override;   // 拡大しながらフェードして描画
 
 private:
 

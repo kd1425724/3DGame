@@ -61,8 +61,8 @@ void BaseScene::PostUpdate()
 		obj->PostUpdate();
 	}
 
-	// エフェクト(斬撃VFX等)の経過を進める(寿命で自動消滅)
-	EffectManager::Instance().Update(Application::Instance().GetDeltaTime());
+	// エフェクト(斬撃VFX等)の経過を進める(寿命で自動消滅。dtは各エフェクトが自分で取る)
+	EffectManager::Instance().Update();
 }
 
 void BaseScene::PreDraw()
