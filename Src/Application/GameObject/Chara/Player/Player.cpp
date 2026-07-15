@@ -233,10 +233,10 @@ void Player::UpdateAirFocus()
 	// フォーカスゲージは"現実の時間"で増減させる(スローで薄まらないように実時間dtを使う)
 	float realDt = Application::Instance().GetRealDeltaTime();
 
-	// スロー可能：空中(ワイヤー未接続) && 左クリック長押し && 「突撃していない or 継続受付中」 && ゲージ残
-	//   ※ 突撃で実際にダッシュしている間(受付窓なし)はスローしない(突撃自体は等速)
+	// スロー可能：空中(ワイヤー未接続) && 左クリック長押し && 突撃していない && ゲージ残
+	//   ※ スローは初弾を"ためて狙う"時だけ。連続攻撃中(突撃/受付窓)はスローしない
 	bool airborne = !m_isGrounded && !m_upWire->IsAttached();
-	bool canAim   = airborne && (!m_isDiving || m_comboWindowTimer > 0.0f);
+	bool canAim   = airborne && !m_isDiving;
 	bool holding  = KdInputManager::Instance().IsHold("DiveAttack");
 	bool slowing  = canAim && holding && m_focusGauge > 0.0f;
 

@@ -18,7 +18,9 @@ void TPSCamera::Init()
 
 void TPSCamera::PostUpdate()
 {
-	const float dt = Application::Instance().GetDeltaTime();
+	// カメラは実時間で動かす(タイムスケール非適用)。空中スロー中でも視点操作・追従が
+	// 通常速度のままになり、遅い世界を普通に見渡して狙える
+	const float dt = Application::Instance().GetRealDeltaTime();
 
 	// カメラの手応え(着地・壁ヒットの揺れ)を減衰させる
 	CameraShake::Instance().Update(dt);
