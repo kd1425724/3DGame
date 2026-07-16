@@ -159,7 +159,7 @@ void Enemy::ResolveStrikeHit(const std::shared_ptr<KdGameObject>& _target)
 	{
 		// 無防備で被弾 → プレイヤーを外向きにノックバック(HPは無い=勢いを崩すだけ)
 		Math::Vector3 knockDir = _target->GetPos() - GetPos();
-		float power = DebugParams::Instance().Float(U8("敵/ノックバック力"), 12.0f, 0.0f, 40.0f);
+		float power = DebugParams::Instance().Float(U8("敵/ノックバック力"), 8.0f, 0.0f, 40.0f);
 		pPlayer->ApplyKnockback(knockDir, power);
 	}
 }

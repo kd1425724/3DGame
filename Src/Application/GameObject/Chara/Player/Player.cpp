@@ -63,8 +63,17 @@ void Player::Update()
 	//   無敵時間(0.2)>回避時間(0.18)だと端数が減らず"一度回避したらずっと無敵"になっていた
 	if (m_invincibleTimer > 0.0f) { m_invincibleTimer -= dt; }
 
-	// 被弾ノックバックの硬直を消化(この間は移動入力を無視して勢いを崩される)
-	if (m_staggerTimer > 0.0f) { m_staggerTimer -= dt; }
+	// 被弾ノックバックの硬直を消化(この間は移動入力を無視して勢いを崩される)。
+	// 硬直中は水平速度を摩擦で徐々に殺し、ノックバックで遠くまで(崖から)吹き飛ばされ続けないようにする
+	if (m_staggerTimer > 0.0f)
+	{
+		m_staggerTimer -= dt;
+		float fric = DebugParams::Instance().Float(U8("反撃/被弾の摩擦"), 6.0f, 0.0f, 30.0f);
+		float k = 1.0f - fric * dt;
+		if (k < 0.0f) { k = 0.0f; }
+		m_velocity.x *= k;
+		m_velocity.z *= k;
+	}
 
 	// ワイヤーの発射/解除(入力・狙いはPlayer側。スイング物理はWireActionに委譲)
 	UpdateWireInput();
@@ -533,11 +542,12 @@ void Player::ApplyKnockback(const Math::Vector3& _dir, float _power)
 	if (dir.LengthSquared() > 0.0001f) { dir.Normalize(); }
 	else { dir = Math::Vector3::Backward; }
 
-	// 水平に吐き飛ばし＋軽く浮かせて勢いを崩す。HPは無いのでダメージ自体は無い
+	// 水平に吐き飛ばして勢いを崩す。HPは無いのでダメージ自体は無い。
+	// 上向きには基本飛ばさない(浮かせると空中で慣性が保たれ、崖から遠くまで吹き飛ぶため既定0)
 	m_velocity.x = dir.x * _power;
 	m_velocity.z = dir.z * _power;
-	float pop = DebugParams::Instance().Float(U8("反撃/被弾の浮き"), 3.0f, 0.0f, 15.0f);
-	if (m_velocity.y < pop) { m_velocity.y = pop; }
+	float pop = DebugParams::Instance().Float(U8("反撃/被弾の浮き"), 0.0f, 0.0f, 15.0f);
+	if (pop > 0.0f && m_velocity.y < pop) { m_velocity.y = pop; }
 
 	// 短い硬直(この間は移動入力が効かない=勢いを崩される)
 	m_staggerTimer = DebugParams::Instance().Float(U8("反撃/被弾硬直"), 0.3f, 0.0f, 1.5f);
@@ -555,7 +565,7 @@ void Player::UpdateCounter()
 		m_counterSlowTimer -= Application::Instance().GetRealDeltaTime();
 		if (m_counterSlowTimer > 0.0f)
 		{
-			float slow = DebugParams::Instance().Float(U8("反撃/スロー倍率"), 0.3f, 0.05f, 1.0f);
+			float slow = DebugParams::Instance().Float(U8("反撃/スロー倍率"), 0.2f, 0.05f, 1.0f);
 			Application::Instance().SetTimeScale(slow);
 		}
 	}
@@ -564,7 +574,11 @@ void Player::UpdateCounter()
 	if (!m_counterPending) { return; }
 	m_counterPending = false;
 
-	// === 反撃発動：反撃地点の周囲の敵を一掃＋斬撃VFX＋強めシェイク＋一瞬スロー ===
+	// === 反撃発動：まず一瞬スローを効かせて"決まった"見せ場を作り、周囲を一掃＋VFX＋シェイク ===
+	// 発動フレームからスローを掛ける(次フレーム以降は上のブロックが維持)。AirFocusの後に呼ばれるので優先される
+	m_counterSlowTimer = DebugParams::Instance().Float(U8("反撃/スロー時間"), 0.35f, 0.0f, 1.5f);
+	Application::Instance().SetTimeScale(DebugParams::Instance().Float(U8("反撃/スロー倍率"), 0.2f, 0.05f, 1.0f));
+
 	float range = DebugParams::Instance().Float(U8("反撃/範囲"), 6.0f, 1.0f, 20.0f);
 
 	for (auto& spEnemy : SceneManager::Instance().FindObjectsWithTag(ObjectTag::Enemy))
@@ -586,7 +600,5 @@ void Player::UpdateCounter()
 	}
 
 	CameraShake::Instance().AddTrauma(0.8f);
-
-	// 一瞬スローで"決まった"感を出す(実時間で戻る。timeScaleの上書きは上のブロックで行う)
-	m_counterSlowTimer = DebugParams::Instance().Float(U8("反撃/スロー時間"), 0.25f, 0.0f, 1.0f);
+	// ※ スローの開始(m_counterSlowTimer/SetTimeScale)は発動の頭で行っている(この関数の上の方)
 }
