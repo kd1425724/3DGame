@@ -261,7 +261,10 @@ void Player::UpdateAirFocus()
 	bool airborne = !m_isGrounded && !m_upWire->IsAttached();
 	bool canAim   = airborne && !m_isDiving;
 	bool holding  = KdInputManager::Instance().IsHold("DiveAttack");
-	bool slowing  = canAim && holding && m_focusGauge > 0.0f;
+
+	// 「スローを掛けたい状況か(空中で長押し中)」と「実際に掛けられるか(ゲージ残あり)」を分ける
+	bool wantSlow = canAim && holding;
+	bool slowing  = wantSlow && m_focusGauge > 0.0f;
 
 	if (slowing)
 	{
@@ -272,7 +275,15 @@ void Player::UpdateAirFocus()
 	else
 	{
 		Application::Instance().SetTimeScale(1.0f);       // 等速に戻す
-		m_focusGauge += refill * realDt;                  // 未使用/地上で回復
+	}
+
+	// ゲージ回復は「スローを掛けようとしていない」間だけ行う(地上/未使用/離した時)。
+	// ※ 長押し中にゲージ切れした瞬間に回復させると、翌フレームまた少し溜まって再スロー…を毎フレーム
+	//   繰り返し、timeScaleが slowVal↔1.0 で振動 → 世界も暗幕も点滅してしまう。それを防ぐため
+	//   "長押し中(wantSlow)はゲージ0のまま据え置き"にする(離す/着地して初めて回復する)
+	if (!wantSlow)
+	{
+		m_focusGauge += refill * realDt;
 		if (m_focusGauge > maxGauge) { m_focusGauge = maxGauge; }
 	}
 }
