@@ -9,6 +9,7 @@
 #include "GameObject/Block/Block.h"
 #include "GameObject/Ground/Ground.h"
 #include "GameObject/Chara/Enemy/Enemy.h"
+#include "GameObject/StageProp/StageProp.h"
 
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
 // エントリーポイント
@@ -266,6 +267,10 @@ bool Application::Init(int w, int h)
 		obj->Init();
 		return obj;
 	});
+
+	// ステージ配置用モデル(家/建物/小物)を Asset/Models/Stage 配下から一括登録する。
+	// 種類名は「House/house01」等。追加したモデルはフォルダに置くだけで自動的に増える
+	StageProp::RegisterAllToEditor();
 
 	//===================================================================
 	// 入力(キーボード・マウス)の登録

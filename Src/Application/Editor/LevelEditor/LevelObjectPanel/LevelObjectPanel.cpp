@@ -26,10 +26,16 @@ void LevelObjectPanel::Draw()
 			m_selectTypeIndex = 0;
 		}
 
+		// 種類が多い(StagePropで140件超)ので、文字で絞り込めるようにする(例:"house01"/"church")
+		m_typeFilter.Draw(U8("検索"));
+
 		if (ImGui::BeginCombo(U8("種類"), names[m_selectTypeIndex].c_str()))
 		{
 			for (int i = 0; i < static_cast<int>(names.size()); i++)
 			{
+				// 検索フィルタに通らない種類はコンボに出さない
+				if (!m_typeFilter.PassFilter(names[i].c_str())) { continue; }
+
 				bool isSelected = (i == m_selectTypeIndex);
 				if (ImGui::Selectable(names[i].c_str(), isSelected))
 				{

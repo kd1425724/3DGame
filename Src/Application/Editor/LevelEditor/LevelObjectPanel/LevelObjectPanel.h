@@ -29,4 +29,7 @@ private:
 
 	// 配置する種類のコンボボックスで、現在選ばれているindex
 	int m_selectTypeIndex = 0;
+
+	// 種類の絞り込み検索(StageProp登録で140件超になるため)
+	ImGuiTextFilter m_typeFilter;
 };

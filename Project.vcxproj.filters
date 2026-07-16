@@ -88,6 +88,9 @@
     <Filter Include="Src\Application\GameObject\Block">
       <UniqueIdentifier>{a1e2c3d4-5f6a-4b7c-8d9e-0f1a2b3c4d5e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Application\GameObject\StageProp">
+      <UniqueIdentifier>{c7d8e9f0-1a2b-4c3d-8e4f-5a6b7c8d9e0f}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\Application\GameObject\EnemySpawner">
       <UniqueIdentifier>{f1270fd4-c2b5-482a-923d-e521237d2202}</UniqueIdentifier>
     </Filter>
@@ -465,6 +468,9 @@
     <ClInclude Include="Src\Application\GameObject\Block\Block.h">
       <Filter>Src\Application\GameObject\Block</Filter>
     </ClInclude>
+    <ClInclude Include="Src\Application\GameObject\StageProp\StageProp.h">
+      <Filter>Src\Application\GameObject\StageProp</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Pch.cpp">
@@ -709,6 +715,9 @@
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Block\Block.cpp">
       <Filter>Src\Application\GameObject\Block</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\GameObject\StageProp\StageProp.cpp">
+      <Filter>Src\Application\GameObject\StageProp</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
