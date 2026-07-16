@@ -524,12 +524,11 @@ void Player::DrawDebug()
 	KdGameObject::DrawDebug();
 }
 
-void Player::NotifyCounter(const Math::Vector3& _enemyPos)
+void Player::NotifyCounter()
 {
-	// 敵(Enemy::ResolveStrikeHit)から呼ばれる。実際の発動は次のUpdateCounterで行う
-	// (発動側をPlayerに集約して、演出やスローの管理を1箇所にまとめるため)
+	// 敵(Enemy::ResolveStrikeHit)がジャスト回避を受けた時に呼ぶ。実際の窓開けは次のUpdateCounterで行う
+	// (発動側をPlayerに集約して、スロー窓や突撃移行の管理を1箇所にまとめるため)
 	m_counterPending = true;
-	m_counterPos     = _enemyPos;
 }
 
 void Player::ApplyKnockback(const Math::Vector3& _dir, float _power)
@@ -557,48 +556,43 @@ void Player::ApplyKnockback(const Math::Vector3& _dir, float _power)
 
 void Player::UpdateCounter()
 {
-	// --- 反撃演出の一瞬スローを消化(実時間で減らす=スローで自分が薄まらない) ---
-	// AirFocusが先にtimeScaleを設定した後にこれを呼ぶので、スロー中はここで上書きして優先する。
-	// 終わった瞬間は何もしない(次フレームのUpdateAirFocusが通常のtimeScaleを再設定する)
-	if (m_counterSlowTimer > 0.0f)
+	float slow      = DebugParams::Instance().Float(U8("反撃/スロー倍率"), 0.2f, 0.05f, 1.0f);
+	float window    = DebugParams::Instance().Float(U8("反撃/受付時間"),   0.6f, 0.1f,  2.0f);
+	float findRange = DebugParams::Instance().Float(U8("連続攻撃/範囲"),   8.0f, 1.0f, 30.0f);
+
+	// --- ジャスト回避が成立した瞬間：スローの猶予窓を開く(成立の合図も出す) ---
+	if (m_counterPending)
 	{
-		m_counterSlowTimer -= Application::Instance().GetRealDeltaTime();
-		if (m_counterSlowTimer > 0.0f)
+		m_counterPending     = false;
+		m_counterWindowTimer = window;
+		EffectManager::Instance().SpawnSlash(GetPos() + Math::Vector3(0.0f, 0.8f, 0.0f));
+		CameraShake::Instance().AddTrauma(0.3f);
+	}
+
+	// --- スロー猶予窓：この間だけ時間をスローにし、攻撃(左クリック)で今の突撃(ダイブ)へ移行する ---
+	if (m_counterWindowTimer > 0.0f)
+	{
+		// AirFocusの後に呼ばれるのでSetTimeScaleが上書き優先される。窓の消化は実時間で行う
+		Application::Instance().SetTimeScale(slow);
+		m_counterWindowTimer -= Application::Instance().GetRealDeltaTime();
+
+		// 攻撃ボタン(左クリック)を押したら突撃へ移行する(狙いはauto-target、無ければ最寄りの敵)
+		if (KdInputManager::Instance().IsPress("DiveAttack"))
 		{
-			float slow = DebugParams::Instance().Float(U8("反撃/スロー倍率"), 0.2f, 0.05f, 1.0f);
-			Application::Instance().SetTimeScale(slow);
+			std::shared_ptr<KdGameObject> spTarget = m_upTargeting->GetTarget();
+			if (!spTarget) { spTarget = FindNearestEnemy(GetPos(), findRange); }
+
+			m_isDodging          = false;   // 回避から突撃へクリーンに移行する
+			m_counterWindowTimer = 0.0f;    // 窓を閉じる(スロー解除は次フレームのAirFocusが担当)
+
+			if (spTarget)
+			{
+				m_isDiving         = true;
+				m_comboWindowTimer = 0.0f;
+				m_wpDiveTarget     = spTarget;   // 以降UpdateDiveが対象へ引き寄せて突撃する
+			}
+			return;
 		}
+		// 押さずに窓が切れたら通常へ戻る(スローは次フレームのAirFocusが等速に戻す)
 	}
-
-	// --- 発動予約が無ければここまで ---
-	if (!m_counterPending) { return; }
-	m_counterPending = false;
-
-	// === 反撃発動：まず一瞬スローを効かせて"決まった"見せ場を作り、周囲を一掃＋VFX＋シェイク ===
-	// 発動フレームからスローを掛ける(次フレーム以降は上のブロックが維持)。AirFocusの後に呼ばれるので優先される
-	m_counterSlowTimer = DebugParams::Instance().Float(U8("反撃/スロー時間"), 0.35f, 0.0f, 1.5f);
-	Application::Instance().SetTimeScale(DebugParams::Instance().Float(U8("反撃/スロー倍率"), 0.2f, 0.05f, 1.0f));
-
-	float range = DebugParams::Instance().Float(U8("反撃/範囲"), 6.0f, 1.0f, 20.0f);
-
-	for (auto& spEnemy : SceneManager::Instance().FindObjectsWithTag(ObjectTag::Enemy))
-	{
-		if (!spEnemy || spEnemy->IsExpired()) { continue; }
-		if (Math::Vector3::Distance(m_counterPos, spEnemy->GetPos()) <= range)
-		{
-			spEnemy->OnHit(this);
-		}
-	}
-
-	// 見た目：反撃地点に斬撃を輪状に散らす
-	const int kNum = 6;
-	float visR = range * 0.5f;
-	for (int i = 0; i < kNum; ++i)
-	{
-		float a = (float)i / (float)kNum * DirectX::XM_2PI;
-		EffectManager::Instance().SpawnSlash(m_counterPos + Math::Vector3(cosf(a) * visR, 0.5f, sinf(a) * visR));
-	}
-
-	CameraShake::Instance().AddTrauma(0.8f);
-	// ※ スローの開始(m_counterSlowTimer/SetTimeScale)は発動の頭で行っている(この関数の上の方)
 }

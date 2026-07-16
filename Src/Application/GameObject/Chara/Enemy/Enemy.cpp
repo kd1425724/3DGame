@@ -151,9 +151,9 @@ void Enemy::ResolveStrikeHit(const std::shared_ptr<KdGameObject>& _target)
 
 	if (pPlayer->IsInvincible())
 	{
-		// ジャスト回避成立 → 反撃。攻撃してきた自分は消滅し、Player側に反撃発動を通知する
-		pPlayer->NotifyCounter(GetPos());
-		m_isExpired = true;
+		// ジャスト回避成立 → Player側に反撃(スロー窓)を通知する。
+		// 自分は消滅させず空振り扱い(呼び出し側でEnterRecoverする)。プレイヤーはこの後の突撃で狩れる
+		pPlayer->NotifyCounter();
 	}
 	else
 	{

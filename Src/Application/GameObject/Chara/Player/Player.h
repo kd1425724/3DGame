@@ -51,8 +51,8 @@ private:
 	void UpdateDodge(float dt);
 	// スキル「振り回し一掃」：Eで周囲の敵を一掃する(クールダウンあり)
 	void UpdateSweep(float dt);
-	// 反撃(ジャスト回避カウンター)：敵の突進を回避の無敵で受けた瞬間に発動を予約し、
-	// ここで周囲一掃＋一瞬スロー＋VFXを出す。回避の早期returnより前で毎フレーム呼ぶ
+	// 反撃(ジャスト回避カウンター)：敵の突進を回避の無敵で受けるとスロー猶予窓を開き、
+	// その窓の間に攻撃(左クリック)を押すと今の突撃(ダイブ)へ移行する。回避の早期returnより前で呼ぶ
 	void UpdateCounter();
 	// 空中スロー(エアフォーカス)：空中で左クリック長押し中は時間をスローにして狙う。
 	// フォーカスゲージで制限。離した瞬間に突撃(UpdateDiveがrelease発火)する
@@ -89,9 +89,8 @@ private:
 	float m_sweepCooldownTimer = 0.0f;
 
 	// 反撃(ジャスト回避カウンター)の状態
-	bool m_counterPending = false;      // 敵の突進を無敵で受けた=次のUpdateCounterで反撃発動
-	Math::Vector3 m_counterPos = {};    // 反撃の中心(受けた敵の位置)
-	float m_counterSlowTimer = 0.0f;    // 反撃演出の一瞬スロー残り(実時間で減らす)
+	bool m_counterPending = false;       // 敵の突進を無敵で受けた=次のUpdateCounterでスロー窓を開く
+	float m_counterWindowTimer = 0.0f;   // スロー猶予窓の残り(実時間で減らす)。この間に攻撃で突撃へ移行できる
 	// 被弾ノックバックの硬直(この間は移動入力を無視して勢いを崩される。HPは無い)
 	float m_staggerTimer = 0.0f;
 
@@ -99,8 +98,8 @@ public:
 	// 無敵中か(回避のiフレーム)。ダメージ処理を入れたらここを見て被弾を無視する
 	bool IsInvincible() const { return m_invincibleTimer > 0.0f; }
 
-	// 敵の突進を無敵(回避)で受けた時に敵から呼ばれ、反撃の発動を予約する(次のUpdateCounterで発動)
-	void NotifyCounter(const Math::Vector3& _enemyPos);
+	// 敵の突進を無敵(回避)で受けた時に敵から呼ばれ、反撃(スロー猶予窓)の開始を予約する
+	void NotifyCounter();
 	// 敵の突進を無防備で受けた時に敵から呼ばれ、外向きノックバック＋短い硬直を与える(HPは無い)
 	void ApplyKnockback(const Math::Vector3& _dir, float _power);
 private:
