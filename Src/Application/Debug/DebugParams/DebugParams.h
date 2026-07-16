@@ -71,8 +71,18 @@ private:
 		Bool,
 	};
 
-	struct FloatParam { float value = 0.0f; float min = 0.0f; float max = 0.0f; };
-	struct IntParam { int value = 0; int min = 0; int max = 0; };
+	struct FloatParam
+	{
+		float value = 0.0f;
+		float min = 0.0f;
+		float max = 0.0f;
+	};
+	struct IntParam
+	{
+		int value = 0;
+		int min = 0;
+		int max = 0;
+	};
 
 	// 登録済みパラメータ名 → 種類(まとめて描画する際に参照する)
 	std::map<std::string, ParamType> m_registry;
