@@ -54,6 +54,13 @@ void Player::Update()
 	// 空中スロー(左クリック長押しで時間をスロー＋狙う)。毎フレームtimeScaleを管理する
 	UpdateAirFocus();
 
+	// 反撃(ジャスト回避カウンター)の発動。回避中(無敵)に処理される必要があるので、
+	// 回避の早期return(下の m_isDodging)より前に置く。反撃スローはAirFocusの後に上書きする
+	UpdateCounter();
+
+	// 被弾ノックバックの硬直を消化(この間は移動入力を無視して勢いを崩される)
+	if (m_staggerTimer > 0.0f) { m_staggerTimer -= dt; }
+
 	// ワイヤーの発射/解除(入力・狙いはPlayer側。スイング物理はWireActionに委譲)
 	UpdateWireInput();
 
@@ -72,7 +79,8 @@ void Player::Update()
 	// 落下攻撃(突撃/連続攻撃)中は通常移動・ジャンプを止める。
 	// ※ UpdateMoveは接地中に水平速度を入力値(無入力なら0)へ上書きするため、
 	//   突撃中に走ると継続受付中の流しや突撃の勢いが地面で殺されてしまう
-	if (!m_isDiving)
+	// ※ 被弾硬直(m_staggerTimer)中も移動/ジャンプを止め、ノックバックの勢いを残す
+	if (!m_isDiving && m_staggerTimer <= 0.0f)
 	{
 		UpdateMove(dt);
 		UpdateJump(dt);
@@ -499,4 +507,80 @@ void Player::DrawDebug()
 		m_pDebugWire->Draw();
 	}
 	KdGameObject::DrawDebug();
+}
+
+void Player::NotifyCounter(const Math::Vector3& _enemyPos)
+{
+	// 敵(Enemy::ResolveStrikeHit)から呼ばれる。実際の発動は次のUpdateCounterで行う
+	// (発動側をPlayerに集約して、演出やスローの管理を1箇所にまとめるため)
+	m_counterPending = true;
+	m_counterPos     = _enemyPos;
+}
+
+void Player::ApplyKnockback(const Math::Vector3& _dir, float _power)
+{
+	// 回避中(無敵)は弾かれない。※呼び出し側(Enemy)も無敵時は反撃へ回すので通常来ないが保険
+	if (IsInvincible()) { return; }
+
+	Math::Vector3 dir = _dir;
+	dir.y = 0.0f;
+	if (dir.LengthSquared() > 0.0001f) { dir.Normalize(); }
+	else { dir = Math::Vector3::Backward; }
+
+	// 水平に吐き飛ばし＋軽く浮かせて勢いを崩す。HPは無いのでダメージ自体は無い
+	m_velocity.x = dir.x * _power;
+	m_velocity.z = dir.z * _power;
+	float pop = DebugParams::Instance().Float(U8("反撃/被弾の浮き"), 3.0f, 0.0f, 15.0f);
+	if (m_velocity.y < pop) { m_velocity.y = pop; }
+
+	// 短い硬直(この間は移動入力が効かない=勢いを崩される)
+	m_staggerTimer = DebugParams::Instance().Float(U8("反撃/被弾硬直"), 0.3f, 0.0f, 1.5f);
+
+	CameraShake::Instance().AddTrauma(0.4f);
+}
+
+void Player::UpdateCounter()
+{
+	// --- 反撃演出の一瞬スローを消化(実時間で減らす=スローで自分が薄まらない) ---
+	// AirFocusが先にtimeScaleを設定した後にこれを呼ぶので、スロー中はここで上書きして優先する。
+	// 終わった瞬間は何もしない(次フレームのUpdateAirFocusが通常のtimeScaleを再設定する)
+	if (m_counterSlowTimer > 0.0f)
+	{
+		m_counterSlowTimer -= Application::Instance().GetRealDeltaTime();
+		if (m_counterSlowTimer > 0.0f)
+		{
+			float slow = DebugParams::Instance().Float(U8("反撃/スロー倍率"), 0.3f, 0.05f, 1.0f);
+			Application::Instance().SetTimeScale(slow);
+		}
+	}
+
+	// --- 発動予約が無ければここまで ---
+	if (!m_counterPending) { return; }
+	m_counterPending = false;
+
+	// === 反撃発動：反撃地点の周囲の敵を一掃＋斬撃VFX＋強めシェイク＋一瞬スロー ===
+	float range = DebugParams::Instance().Float(U8("反撃/範囲"), 6.0f, 1.0f, 20.0f);
+
+	for (auto& spEnemy : SceneManager::Instance().FindObjectsWithTag(ObjectTag::Enemy))
+	{
+		if (!spEnemy || spEnemy->IsExpired()) { continue; }
+		if (Math::Vector3::Distance(m_counterPos, spEnemy->GetPos()) <= range)
+		{
+			spEnemy->OnHit(this);
+		}
+	}
+
+	// 見た目：反撃地点に斬撃を輪状に散らす
+	const int kNum = 6;
+	float visR = range * 0.5f;
+	for (int i = 0; i < kNum; ++i)
+	{
+		float a = (float)i / (float)kNum * DirectX::XM_2PI;
+		EffectManager::Instance().SpawnSlash(m_counterPos + Math::Vector3(cosf(a) * visR, 0.5f, sinf(a) * visR));
+	}
+
+	CameraShake::Instance().AddTrauma(0.8f);
+
+	// 一瞬スローで"決まった"感を出す(実時間で戻る。timeScaleの上書きは上のブロックで行う)
+	m_counterSlowTimer = DebugParams::Instance().Float(U8("反撃/スロー時間"), 0.25f, 0.0f, 1.0f);
 }
