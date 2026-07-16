@@ -13,6 +13,8 @@ public:
 
 	void DrawLit()			override;
 
+	void GenerateDepthMapFromLight() override;   // 影を落とす側：深度マップへモデルを描く
+
 	void DrawDebug()		override;   // 当たり判定(モデル立方体)を箱で可視化
 
 private:

@@ -23,6 +23,11 @@ public:
 
 	void DrawLit() override;
 
+	// 影生成：光から見た深度マップに自分のモデルを描く(影を落とす側)。
+	// BaseScene が BeginGenerateDepthMapFromLight〜End の間で呼ぶ。中身はDrawLitと同じモデル描画で、
+	// このときシェーダは深度書き込みモードになっている(BeginGenerateDepthMapFromLightが切替済み)
+	void GenerateDepthMapFromLight() override;
+
 	// 水平方向(xz)の速さを返す。HUDの速度メーターなど表示用
 	float GetHorizontalSpeed() const
 	{

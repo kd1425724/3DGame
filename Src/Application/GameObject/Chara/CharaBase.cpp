@@ -16,6 +16,15 @@ void CharaBase::DrawLit()
 	KdShaderManager::Instance().m_StandardShader.DrawModel(m_modelWork, m_mWorld, m_color);
 }
 
+void CharaBase::GenerateDepthMapFromLight()
+{
+	if (!m_modelWork.IsEnable()) { return; }
+
+	// 深度パス用シェーダはBaseScene側のBeginGenerateDepthMapFromLightで既にセット済み。
+	// ここは通常のモデル描画を呼ぶだけで、光から見た深度が深度マップに書き込まれる
+	KdShaderManager::Instance().m_StandardShader.DrawModel(m_modelWork, m_mWorld);
+}
+
 bool CharaBase::IsWallBetween(const Math::Vector3& from, const Math::Vector3& to, float margin)
 {
 	Math::Vector3 seg = to - from;

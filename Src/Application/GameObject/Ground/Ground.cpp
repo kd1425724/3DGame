@@ -33,6 +33,14 @@ void Ground::DrawLit()
 	KdShaderManager::Instance().m_StandardShader.DrawModel(*m_spModelWork, m_mWorld);
 }
 
+void Ground::GenerateDepthMapFromLight()
+{
+	if (!m_spModelWork || !m_spModelWork->IsEnable()) { return; }
+
+	// 深度パス用シェーダはBeginGenerateDepthMapFromLightでセット済み。モデルを描くだけで影の元になる
+	KdShaderManager::Instance().m_StandardShader.DrawModel(*m_spModelWork, m_mWorld);
+}
+
 void Ground::DrawDebug()
 {
 	// 当たり判定(モデル=1辺1の立方体をスケールした地面)を箱で可視化する
