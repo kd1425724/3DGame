@@ -1,7 +1,6 @@
 ﻿#include "DebugParams.h"
 
-#include <filesystem>
-
+#include "../../Utility/JsonManager.h"
 #include "../DebugUtility/DebugUtility.h"
 
 float& DebugParams::Float(const std::string& name, float defaultValue, float min, float max)
@@ -169,19 +168,6 @@ void DebugParams::Draw()
 
 bool DebugParams::Save(const std::string& filename)
 {
-	// 保存先のフォルダが無い場合は自動作成する
-	// (Asset/Data/Debug/DebugParams/ のように階層が深いフォルダは
-	//  存在しないと ofstream が開けず、何も言わずに保存が失敗してしまうため)
-	std::filesystem::path path(filename);
-	if (path.has_parent_path())
-	{
-		std::error_code ec;
-		std::filesystem::create_directories(path.parent_path(), ec);
-	}
-
-	std::ofstream ofs(filename);
-	if (!ofs) { return false; }
-
 	nlohmann::json json;
 
 	for (auto& [name, param] : m_floats)
@@ -201,26 +187,19 @@ bool DebugParams::Save(const std::string& filename)
 		json["bools"][name] = b;
 	}
 
-	ofs << json.dump(4);
-
-	return true;
+	return JsonManager::Instance().Write(filename, json);
 }
 
 bool DebugParams::Load(const std::string& filename)
 {
-	std::ifstream ifs(filename);
-	if (!ifs) { return false; }
-
 	nlohmann::json json;
+	if (!JsonManager::Instance().Read(filename, json)) { return false; }
 
-	// パース(ifs >> json)だけでなく、値の取り出し(get/at)も含めてまとめて保護する。
-	// 起動時に呼ばれるため、壊れた/古い形式のJSON(型不一致・要素数不足など)でも
-	// 例外で落とさず、既定値のまま起動できるようにする。
+	// 値の取り出し(get/at)を保護する。起動時に呼ばれるため、古い形式/型不一致の
+	// JSON(要素数不足など)でも例外で落とさず、既定値のまま起動できるようにする。
 	// nlohmann::json::exception は parse_error / type_error / out_of_range の基底クラス。
 	try
 	{
-		ifs >> json;
-
 		if (json.contains("floats"))
 		{
 			for (auto& [name, value] : json["floats"].items())

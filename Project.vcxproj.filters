@@ -124,6 +124,9 @@
     <Filter Include="Src\Application\Debug">
       <UniqueIdentifier>{81b7a301-0093-415a-895f-4f6d7d620939}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Application\Utility">
+      <UniqueIdentifier>{7c1e9a52-3b64-4d0f-9a2e-1f5c8b2d4e70}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\Application\Debug\DebugFlags">
       <UniqueIdentifier>{7830d08a-0bdb-4307-8973-c54254010788}</UniqueIdentifier>
     </Filter>
@@ -426,6 +429,9 @@
     <ClInclude Include="Src\Application\Debug\DebugParams\DebugParams.h">
       <Filter>Src\Application\Debug\DebugParams</Filter>
     </ClInclude>
+    <ClInclude Include="Src\Application\Utility\JsonManager.h">
+      <Filter>Src\Application\Utility</Filter>
+    </ClInclude>
     <ClInclude Include="Src\Application\Debug\DebugEffect\DebugEffect.h">
       <Filter>Src\Application\Debug\DebugEffect</Filter>
     </ClInclude>
@@ -667,6 +673,9 @@
     </ClCompile>
     <ClCompile Include="Src\Application\Debug\DebugParams\DebugParams.cpp">
       <Filter>Src\Application\Debug\DebugParams</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\Utility\JsonManager.cpp">
+      <Filter>Src\Application\Utility</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\Debug\DebugEffect\DebugEffect.cpp">
       <Filter>Src\Application\Debug\DebugEffect</Filter>

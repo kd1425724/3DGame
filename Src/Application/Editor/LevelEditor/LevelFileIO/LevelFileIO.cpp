@@ -2,6 +2,7 @@
 
 #include "../LevelEditorManager.h"
 #include "../../../Scene/SceneManager.h"
+#include "../../../Utility/JsonManager.h"
 
 void LevelFileIO::Draw()
 {
@@ -30,17 +31,6 @@ bool LevelFileIO::Save(const std::string& filename)
 {
 	LevelEditorManager& mgr = LevelEditorManager::Instance();
 
-	// 保存先のフォルダが無い場合は自動作成する
-	std::filesystem::path path(filename);
-	if (path.has_parent_path())
-	{
-		std::error_code ec;
-		std::filesystem::create_directories(path.parent_path(), ec);
-	}
-
-	std::ofstream ofs(filename);
-	if (!ofs) { return false; }
-
 	nlohmann::json json = nlohmann::json::array();
 
 	for (auto& obj : SceneManager::Instance().GetObjList())
@@ -65,27 +55,15 @@ bool LevelFileIO::Save(const std::string& filename)
 		json.push_back(std::move(object));
 	}
 
-	ofs << json.dump(4);
-
-	return true;
+	return JsonManager::Instance().Write(filename, json);
 }
 
 bool LevelFileIO::Load(const std::string& filename)
 {
 	LevelEditorManager& mgr = LevelEditorManager::Instance();
 
-	std::ifstream ifs(filename);
-	if (!ifs) { return false; }
-
 	nlohmann::json json;
-	try
-	{
-		ifs >> json;
-	}
-	catch (const nlohmann::json::parse_error&)
-	{
-		return false;
-	}
+	if (!JsonManager::Instance().Read(filename, json)) { return false; }
 
 	for (auto& object : json)
 	{

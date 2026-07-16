@@ -1,6 +1,7 @@
 ﻿#include "HudEditorManager.h"
 
 #include "../../GameObject/UI/HudSprite.h"
+#include "../../Utility/JsonManager.h"
 
 HudEditorManager::~HudEditorManager() = default;
 
@@ -75,41 +76,19 @@ void HudEditorManager::DrawSprites() const
 bool HudEditorManager::Save(const std::string& _filename)
 {
 	// 保存先フォルダが無ければ作成する
-	std::filesystem::path path(_filename);
-	if (path.has_parent_path())
-	{
-		std::error_code ec;
-		std::filesystem::create_directories(path.parent_path(), ec);
-	}
-
-	std::ofstream ofs(_filename);
-	if (!ofs) { return false; }
-
 	nlohmann::json json = nlohmann::json::array();
 	for (auto& sp : m_spSprites)
 	{
 		if (!sp) { continue; }
 		json.push_back(sp->ToJson());
 	}
-	ofs << json.dump(4);
-
-	return true;
+	return JsonManager::Instance().Write(_filename, json);
 }
 
 bool HudEditorManager::Load(const std::string& _filename)
 {
-	std::ifstream ifs(_filename);
-	if (!ifs) { return false; }
-
 	nlohmann::json json;
-	try
-	{
-		ifs >> json;
-	}
-	catch (const nlohmann::json::parse_error&)
-	{
-		return false;
-	}
+	if (!JsonManager::Instance().Read(_filename, json)) { return false; }
 
 	m_spSprites.clear();
 	m_selected = -1;

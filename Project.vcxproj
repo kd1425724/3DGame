@@ -277,6 +277,7 @@
     <ClInclude Include="Src\Application\Debug\DebugFlags\DebugFlags.h" />
     <ClInclude Include="Src\Application\Debug\DebugManager.h" />
     <ClInclude Include="Src\Application\Debug\DebugParams\DebugParams.h" />
+    <ClInclude Include="Src\Application\Utility\JsonManager.h" />
     <ClInclude Include="Src\Application\Debug\DebugEffect\DebugEffect.h" />
     <ClInclude Include="Src\Application\Debug\DebugUtility\DebugUtility.h" />
     <ClInclude Include="Src\Application\Debug\DebugWatch\DebugWatch.h" />
@@ -365,6 +366,7 @@
     <ClCompile Include="Src\Application\Debug\DebugFlags\DebugFlags.cpp" />
     <ClCompile Include="Src\Application\Debug\DebugManager.cpp" />
     <ClCompile Include="Src\Application\Debug\DebugParams\DebugParams.cpp" />
+    <ClCompile Include="Src\Application\Utility\JsonManager.cpp" />
     <ClCompile Include="Src\Application\Debug\DebugEffect\DebugEffect.cpp" />
     <ClCompile Include="Src\Application\Debug\DebugWatch\DebugWatch.cpp" />
     <ClCompile Include="Src\Application\GameObject\Block\Block.cpp" />
