@@ -565,7 +565,8 @@ void Player::UpdateCounter()
 	{
 		m_counterPending     = false;
 		m_counterWindowTimer = window;
-		EffectManager::Instance().SpawnSlash(GetPos() + Math::Vector3(0.0f, 0.8f, 0.0f));
+		//反撃直後に発生はいらないクリックしたら攻撃開始でいい
+		//EffectManager::Instance().SpawnSlash(GetPos() + Math::Vector3(0.0f, 0.8f, 0.0f));
 		CameraShake::Instance().AddTrauma(0.3f);
 	}
 
