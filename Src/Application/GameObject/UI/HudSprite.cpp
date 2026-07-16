@@ -46,13 +46,25 @@ void HudSprite::DrawImGuiEdit()
 	ImGui::Checkbox(U8("表示"), &m_visible);
 
 	int pos[2] = { m_posX, m_posY };
-	if (ImGui::DragInt2(U8("位置(px)"), pos)) { m_posX = pos[0]; m_posY = pos[1]; }
+	if (ImGui::DragInt2(U8("位置(px)"), pos))
+	{
+		m_posX = pos[0];
+		m_posY = pos[1];
+	}
 
 	int size[2] = { m_width, m_height };
-	if (ImGui::DragInt2(U8("サイズ(px)"), size)) { m_width = size[0]; m_height = size[1]; }
+	if (ImGui::DragInt2(U8("サイズ(px)"), size))
+	{
+		m_width = size[0];
+		m_height = size[1];
+	}
 
 	float pivot[2] = { m_pivot.x, m_pivot.y };
-	if (ImGui::DragFloat2(U8("基準点(0-1)"), pivot, 0.01f, 0.0f, 1.0f)) { m_pivot.x = pivot[0]; m_pivot.y = pivot[1]; }
+	if (ImGui::DragFloat2(U8("基準点(0-1)"), pivot, 0.01f, 0.0f, 1.0f))
+	{
+		m_pivot.x = pivot[0];
+		m_pivot.y = pivot[1];
+	}
 
 	float col[4] = { m_color.x, m_color.y, m_color.z, m_color.w };
 	if (ImGui::ColorEdit4(U8("色"), col)) { m_color = Math::Color(col[0], col[1], col[2], col[3]); }
@@ -74,8 +86,16 @@ nlohmann::json HudSprite::ToJson() const
 void HudSprite::FromJson(const nlohmann::json& _json)
 {
 	if (_json.contains("name"))    { m_name = _json["name"].get<std::string>(); }
-	if (_json.contains("pos"))     { m_posX = _json["pos"].at(0).get<int>(); m_posY = _json["pos"].at(1).get<int>(); }
-	if (_json.contains("size"))    { m_width = _json["size"].at(0).get<int>(); m_height = _json["size"].at(1).get<int>(); }
+	if (_json.contains("pos"))
+	{
+		m_posX = _json["pos"].at(0).get<int>();
+		m_posY = _json["pos"].at(1).get<int>();
+	}
+	if (_json.contains("size"))
+	{
+		m_width = _json["size"].at(0).get<int>();
+		m_height = _json["size"].at(1).get<int>();
+	}
 	if (_json.contains("pivot"))   { m_pivot = Math::Vector2(_json["pivot"].at(0).get<float>(), _json["pivot"].at(1).get<float>()); }
 	if (_json.contains("color"))   { m_color = Math::Color(_json["color"].at(0).get<float>(), _json["color"].at(1).get<float>(), _json["color"].at(2).get<float>(), _json["color"].at(3).get<float>()); }
 	if (_json.contains("visible")) { m_visible = _json["visible"].get<bool>(); }

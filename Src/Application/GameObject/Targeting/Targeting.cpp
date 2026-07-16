@@ -23,7 +23,11 @@ void Targeting::Update(const std::shared_ptr<CameraBase>& _spCamera, float _dt)
 	m_time += _dt;
 
 	// カメラの向き(=画面中心の方向)に一番近い敵を選ぶ。カメラ自体は回さない。
-	if (!_spCamera) { m_wpTarget.reset(); return; }
+	if (!_spCamera)
+	{
+		m_wpTarget.reset();
+		return;
+	}
 
 	// カメラの発射方向(ピッチ込み)。ワイヤー発射と同じ「フルの向き」
 	Math::Vector3 camPos = _spCamera->GetPos();

@@ -297,7 +297,11 @@ void Player::UpdateDive(float dt)
 	if (m_isDiving)
 	{
 		std::shared_ptr<KdGameObject> spTarget = m_wpDiveTarget.lock();
-		if (spTarget && spTarget->IsExpired()) { spTarget = nullptr; m_wpDiveTarget.reset(); }
+		if (spTarget && spTarget->IsExpired())
+		{
+			spTarget = nullptr;
+			m_wpDiveTarget.reset();
+		}
 
 		// --- 斬った後の継続受付：受付時間内に突撃キーを押したら周りの敵へ続けて突撃する ---
 		//     (自動では向かわない。押さなければ受付終了で落下に戻る)
@@ -312,7 +316,11 @@ void Player::UpdateDive(float dt)
 			if (KdInputManager::Instance().IsRelease("DiveAttack"))
 			{
 				spTarget = FindNearestEnemy(GetPos(), chainRange);   // 離した瞬間に次の敵へ
-				if (spTarget) { m_wpDiveTarget = spTarget; m_comboWindowTimer = 0.0f; }
+				if (spTarget)
+				{
+					m_wpDiveTarget = spTarget;
+					m_comboWindowTimer = 0.0f;
+				}
 			}
 
 			if (!spTarget)
@@ -401,7 +409,11 @@ std::shared_ptr<KdGameObject> Player::FindNearestEnemy(const Math::Vector3& cent
 	{
 		if (!spEnemy || spEnemy->IsExpired()) { continue; }
 		float d = Math::Vector3::Distance(center, spEnemy->GetPos());
-		if (d < bestDist) { bestDist = d; best = spEnemy; }
+		if (d < bestDist)
+		{
+			bestDist = d;
+			best = spEnemy;
+		}
 	}
 	return best;
 }

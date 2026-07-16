@@ -74,8 +74,18 @@ protected:
 	// 直近フレームの着地/壁ヒットの衝撃の大きさを取り出す(読むと0に戻すConsume方式)。
 	// カメラの手応え(CameraShake)の発火に使う。ResolveGround/ResolveBumpSweepが記録する。
 	// ※ 記録は全キャラ共通だが、実際にカメラを揺らすのはPlayerだけ(Enemyは呼ばない)
-	float ConsumeLandingImpact() { float v = m_landingImpact; m_landingImpact = 0.0f; return v; }
-	float ConsumeWallImpact()    { float v = m_wallImpact;    m_wallImpact = 0.0f;    return v; }
+	float ConsumeLandingImpact()
+	{
+		float v = m_landingImpact;
+		m_landingImpact = 0.0f;
+		return v;
+	}
+	float ConsumeWallImpact()
+	{
+		float v = m_wallImpact;
+		m_wallImpact = 0.0f;
+		return v;
+	}
 
 	// 表示用モデルワーク
 	KdModelWork m_modelWork;

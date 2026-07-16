@@ -251,7 +251,12 @@ void CharaBase::ResolveBumpSweep(const Math::Vector3& fromPos, Math::Vector3& po
 			hit = true;
 		}
 	}
-	if (!hit) { m_wasHittingWall = false; return; }   // 壁から離れたら接触フラグを解除
+	// 壁から離れたら接触フラグを解除
+	if (!hit)
+	{
+		m_wasHittingWall = false;
+		return;
+	}
 
 	// 壁の手前(半径ぶん外側)まで水平位置を戻す。縦(y)はいじらない
 	Math::Vector3 stop = hitPos - dir * radius;
