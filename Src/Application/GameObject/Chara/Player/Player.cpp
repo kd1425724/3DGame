@@ -58,6 +58,11 @@ void Player::Update()
 	// 回避の早期return(下の m_isDodging)より前に置く。反撃スローはAirFocusの後に上書きする
 	UpdateCounter();
 
+	// 回避の無敵時間を消化(回避が終わっても必ず毎フレーム減らす)。
+	// ※ 以前はUpdateDodgeの「回避実行中」ブロック内だけで減らしていたため、
+	//   無敵時間(0.2)>回避時間(0.18)だと端数が減らず"一度回避したらずっと無敵"になっていた
+	if (m_invincibleTimer > 0.0f) { m_invincibleTimer -= dt; }
+
 	// 被弾ノックバックの硬直を消化(この間は移動入力を無視して勢いを崩される)
 	if (m_staggerTimer > 0.0f) { m_staggerTimer -= dt; }
 
@@ -202,7 +207,8 @@ void Player::UpdateDodge(float dt)
 		m_velocity.y = 0.0f;
 
 		m_dodgeTimer -= dt;
-		if (m_invincibleTimer > 0.0f) { m_invincibleTimer -= dt; }
+		// ※ 無敵時間(m_invincibleTimer)の消化はUpdate()側で毎フレーム行う。
+		//   ここ(回避中のみ)で減らすと、無敵時間>回避時間のとき端数が残って永久無敵になる
 		if (m_dodgeTimer <= 0.0f) { m_isDodging = false; }
 		return;
 	}
