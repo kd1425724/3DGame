@@ -8,6 +8,7 @@
 #include "../../GameObject/Camera/TPSCamera/TPSCamera.h"
 #include "../../GameObject/Environment/StageEnvironment.h"
 #include "../../GameObject/Environment/FocusPostFx.h"
+#include "../../GameObject/UI/GameHud/GameHud.h"
 
 #include "../../Editor/LevelEditor/LevelFileIO/LevelFileIO.h"
 #include "../../Editor/LevelEditor/LevelEditorManager.h"
@@ -74,4 +75,9 @@ void GameScene::Init()
 
 	// 読み込み直後は最後の生成物が選択状態になるので、起動時のハイライトを消す
 	LevelEditorManager::Instance().ClearSelection();
+
+	// ゲーム本編の動的HUD(速度メーター等)。暗幕(FocusPostFx)より後に追加して最前面に描く
+	std::shared_ptr<GameHud> spHud = std::make_shared<GameHud>();
+	spHud->Init();
+	AddObject(spHud);
 }

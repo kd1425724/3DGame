@@ -304,6 +304,7 @@
     <ClInclude Include="Src\Application\Editor\LevelEditor\LevelInspector\LevelInspector.h" />
     <ClInclude Include="Src\Application\Editor\LevelEditor\LevelObjectPanel\LevelObjectPanel.h" />
     <ClInclude Include="Src\Application\Editor\LevelEditor\LevelPicker\LevelPicker.h" />
+    <ClInclude Include="Src\Application\GameObject\UI\DynamicHudBase.h" />
     <ClInclude Include="Src\Application\GameObject\UI\HudSprite.h" />
     <ClInclude Include="Src\Application\Editor\HudEditor\HudEditorManager.h" />
     <ClInclude Include="Src\Application\GameObject\UI\GameHud\GameHud.h" />

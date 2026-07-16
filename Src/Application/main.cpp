@@ -6,7 +6,6 @@
 #include "Debug/DebugFlags/DebugFlags.h"
 #include "Editor/LevelEditor/LevelEditorManager.h"
 #include "Editor/HudEditor/HudEditorManager.h"
-#include "GameObject/UI/GameHud/GameHud.h"
 #include "GameObject/Block/Block.h"
 #include "GameObject/Ground/Ground.h"
 #include "GameObject/Chara/Enemy/Enemy.h"
@@ -160,13 +159,12 @@ void Application::PostDraw()
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
 void Application::DrawSprite()
 {
+	// ゲーム本編の動的HUD(GameHud)はKdGameObjectとしてシーンに常駐し、
+	// SceneManager::DrawSprite内(2D描画パス)で描かれる
 	SceneManager::Instance().DrawSprite();
 
 	// HUD(画面2D)スプライトをシーンのスプライトの上に重ねて描画する
 	HudEditorManager::Instance().DrawSprites();
-
-	// ゲーム本編のHUD(速度メーターなどコード駆動)を描画する
-	GameHud::Instance().Draw();
 }
 
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////

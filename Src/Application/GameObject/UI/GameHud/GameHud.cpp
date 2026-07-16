@@ -5,12 +5,10 @@
 #include "../../../Debug/DebugParams/DebugParams.h"
 #include "../../../Debug/DebugFlags/DebugFlags.h"
 
-void GameHud::Draw()
+void GameHud::DrawHud()
 {
-	// 2D箱の描画はスプライトシェーダのBegin/Endで囲む
-	KdShaderManager::Instance().m_spriteShader.Begin();
+	// ※ スプライトのBegin/EndはBaseScene::DrawSpriteが囲むので、ここでは描くだけ
 	DrawSpeedMeter();
-	KdShaderManager::Instance().m_spriteShader.End();
 }
 
 void GameHud::DrawSpeedMeter()
