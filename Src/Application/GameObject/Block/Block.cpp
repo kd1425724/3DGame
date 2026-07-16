@@ -2,10 +2,7 @@
 
 void Block::Init()
 {
-	// 【一時プレビュー】house01の見た目/スケール/多メッシュ描画を確認するため、Blockのモデルを
-	// 家に差し替えている。確認後は下のBlock.gltfに戻すこと(またはStageProp化する)
-	//SetAsset("Asset/Models/Test/Block/Block.gltf");
-	SetAsset("Asset/Models/Stage/House/house01.gltf");
+	SetAsset("Asset/Models/Test/Block/Block.gltf");
 
 	// 当たり判定登録：モデルの形状そのものを登録する(Groundと同じ方式)
 	// ※ BoundingBoxのレイ判定はhitPosを埋めないため、ワイヤー等のレイが正しく当たらない。
