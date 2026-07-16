@@ -4,7 +4,9 @@
 //
 // Targeting ── 画面中心の敵を自動ロックオンし、マーカーを描く部品
 //
-//  ・KdGameObjectではなく、Playerが所有する「部品」
+//  ・KdGameObject派生。ただしシーンのオブジェクトリストには入れず、Playerが「部品」として
+//    所有し、親がUpdate/DrawMarkerを直接呼んで駆動する
+//    (KdGameObjectを継承するのは「オブジェクトは全てKdGameObject」方針に合わせるため)
 //  ・カメラのフルの向き(画面中心)に一番よく揃う敵を毎フレーム選ぶ(カメラは回さない)
 //  ・選んだ敵の少し上に、カメラを向くビルボードのマーカーを回転＋脈動で描く
 //  ・GetTarget()で現在の対象を返す(落下攻撃の突撃先に使う)
@@ -13,7 +15,8 @@
 class CameraBase;
 class KdSquarePolygon;
 
-class Targeting
+// ※ KdGameObjectはPch.hの強制インクルードで見えているため、継承でも明示includeは不要
+class Targeting : public KdGameObject
 {
 public:
 
