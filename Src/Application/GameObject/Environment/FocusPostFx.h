@@ -12,8 +12,10 @@
 //  ・遷移は実時間(GetRealDeltaTime)で滑らかにLerp。スロー中でも演出の切替は等速で進む
 //  ・KdPostProcessShader経由で DoF / Bright の定数バッファを毎フレーム設定する
 //    (PostEffectProcessはもとから毎フレーム走っているので負荷は変わらない)
+//  ・DrawSpriteで、スロー量(1-timeScale)に応じた半透明の黒幕を全画面に重ねて画面を暗くする
+//    (バレットタイム感。反撃/空中スローどちらのスローでも効く)
 //
-//  ※ 描画パスには出ないロジックのみのKdGameObject。GameScene::Initで常駐させる
+//  ※ 更新はロジックのみ。描画はDrawSprite(2D暗幕)だけのKdGameObject。GameScene::Initで常駐させる
 //
 //====================================================
 class FocusPostFx : public KdGameObject
@@ -21,6 +23,7 @@ class FocusPostFx : public KdGameObject
 public:
 
 	void Update() override;
+	void DrawSprite() override;   // スロー中に画面を少し暗くする半透明の黒幕
 
 private:
 

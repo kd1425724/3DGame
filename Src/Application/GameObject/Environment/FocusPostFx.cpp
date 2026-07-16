@@ -47,3 +47,30 @@ void FocusPostFx::Update()
 	float threshold = brightNormal + (brightSlow - brightNormal) * m_blend;
 	pp.SetBrightThreshold(threshold);
 }
+
+void FocusPostFx::DrawSprite()
+{
+	// スロー中(timeScale<1)だけ、遅さに応じて画面を少し暗くする(バレットタイム感)。
+	// ※ BaseScene::DrawSpriteのm_spriteShader.Begin〜End間で呼ばれる。この中で描画する
+	if (!DebugFlags::Instance().Get(U8("演出/スロー暗転"), true)) { return; }
+
+	float timeScale = Application::Instance().GetTimeScale();
+
+	// スロー量(0=等速〜1に近いほど遅い)に暗さ係数を掛けて不透明度を決める
+	float darkness = DebugParams::Instance().Float(U8("演出/スロー暗さ"), 0.4f, 0.0f, 1.0f);
+	float alpha = (1.0f - timeScale) * darkness;
+	if (alpha < 0.01f) { return; }                 // ほぼ等速なら暗幕は出さない
+	if (alpha > 0.85f) { alpha = 0.85f; }           // 暗くしすぎない上限
+
+	// 画面サイズいっぱいの黒い箱を中央(2D原点=画面中央)に描く
+	auto spBackBuffer = KdDirect3D::Instance().GetBackBuffer();
+	int w = spBackBuffer ? (int)spBackBuffer->GetWidth()  : 1280;
+	int h = spBackBuffer ? (int)spBackBuffer->GetHeight() : 720;
+
+	Math::Color col(0.0f, 0.0f, 0.0f, alpha);
+
+	// 半透明で重ねるためAlphaブレンドを張る(スプライトのBegin/Endはブレンドを設定しないため)
+	KdShaderManager::Instance().ChangeBlendState(KdBlendState::Alpha);
+	KdShaderManager::Instance().m_spriteShader.DrawBox(0, 0, w / 2 + 2, h / 2 + 2, &col, true);
+	KdShaderManager::Instance().UndoBlendState();
+}
