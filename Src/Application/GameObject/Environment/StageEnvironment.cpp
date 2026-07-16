@@ -38,10 +38,14 @@ void StageEnvironment::Apply()
 		amb.SetDistanceFog(fogCol, fogDensity);
 	}
 
-	// --- 影の生成エリア(カメラ位置を中心とした正方形の範囲。塔コースは広いので調整可能に) ---
-	// ※ 影はこの範囲の中だけに出る。範囲を広げると全体に影が出るが1024x1024の深度に広範囲を
-	//    詰めるほど1体あたりの影は粗くなる。範囲を狭めるほど密で綺麗だが端で影が切れる
-	float shadowArea   = DebugParams::Instance().Float(U8("環境/影エリア"),   40.0f, 5.0f, 200.0f);
-	float shadowHeight = DebugParams::Instance().Float(U8("環境/影の高さ"),   30.0f, 5.0f, 200.0f);
+	// --- 影の生成エリア(カメラ位置を中心とした箱。横=エリア / 奥行き=高さ×2) ---
+	// ※ 影はこの箱の中だけに出る。1024x1024の深度に広範囲を詰めるほど1体あたりの影は粗くなる。
+	// ※ 高さ(=深度の奥行き)はエリアに自動連動させる。エリア(横)だけ広げると箱の隅が深度範囲から
+	//    はみ出して地面に境目の線が出るため、高さをエリアに比例させて確保する。
+	//    → 基本は「環境/影エリア」1つだけ調整すればよい(境目が出にくい)
+	float shadowArea  = DebugParams::Instance().Float(U8("環境/影エリア"),     40.0f, 5.0f, 200.0f);
+	float heightRatio = DebugParams::Instance().Float(U8("環境/影の高さ比率"), 0.75f, 0.3f,   2.0f);
+	float shadowHeight = shadowArea * heightRatio;
+	if (shadowHeight < 25.0f) { shadowHeight = 25.0f; }   // 小さいエリアでも塔より高い所から照らすための下限
 	amb.SetDirLightShadowArea(Math::Vector2(shadowArea, shadowArea), shadowHeight);
 }
