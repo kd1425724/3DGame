@@ -6,6 +6,8 @@
 #include "../../GameObject/Chara/Enemy/Enemy.h"
 #include "../../GameObject/EnemySpawner/EnemySpawner.h"
 #include "../../GameObject/Camera/TPSCamera/TPSCamera.h"
+#include "../../GameObject/Environment/StageEnvironment.h"
+#include "../../GameObject/Environment/FocusPostFx.h"
 
 #include "../../Editor/LevelEditor/LevelFileIO/LevelFileIO.h"
 #include "../../Editor/LevelEditor/LevelEditorManager.h"
@@ -23,6 +25,17 @@ void GameScene::Event()
 
 void GameScene::Init()
 {
+	// ステージの空気感(平行光/環境光/距離フォグ/影エリア)を毎フレーム適用する環境オブジェクト。
+	// 見た目のみでロジックを持たない。値はDebugParams「環境/…」で実行中に調整する
+	std::shared_ptr<StageEnvironment> spEnv = std::make_shared<StageEnvironment>();
+	spEnv->Init();
+	AddObject(spEnv);
+
+	// 空中スロー中の画面演出(被写界深度+Bloom強調)。Application::GetTimeScaleを見て自律反応する
+	std::shared_ptr<FocusPostFx> spFocusFx = std::make_shared<FocusPostFx>();
+	spFocusFx->Init();
+	AddObject(spFocusFx);
+
 	// 地面
 	std::shared_ptr<Ground> spGround = std::make_shared<Ground>();
 	spGround->Init();

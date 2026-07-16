@@ -282,6 +282,8 @@
     <ClInclude Include="Src\Application\Debug\DebugWatch\DebugWatch.h" />
     <ClInclude Include="Src\Application\GameObject\Block\Block.h" />
     <ClInclude Include="Src\Application\GameObject\EnemySpawner\EnemySpawner.h" />
+    <ClInclude Include="Src\Application\GameObject\Environment\StageEnvironment.h" />
+    <ClInclude Include="Src\Application\GameObject\Environment\FocusPostFx.h" />
     <ClInclude Include="Src\Application\Effect\EffectManager.h" />
     <ClInclude Include="Src\Application\Effect\EffectBase.h" />
     <ClInclude Include="Src\Application\Effect\SlashEffect\SlashEffect.h" />
@@ -366,6 +368,8 @@
     <ClCompile Include="Src\Application\Debug\DebugWatch\DebugWatch.cpp" />
     <ClCompile Include="Src\Application\GameObject\Block\Block.cpp" />
     <ClCompile Include="Src\Application\GameObject\EnemySpawner\EnemySpawner.cpp" />
+    <ClCompile Include="Src\Application\GameObject\Environment\StageEnvironment.cpp" />
+    <ClCompile Include="Src\Application\GameObject\Environment\FocusPostFx.cpp" />
     <ClCompile Include="Src\Application\Effect\EffectManager.cpp" />
     <ClCompile Include="Src\Application\Effect\SlashEffect\SlashEffect.cpp" />
     <ClCompile Include="Src\Application\GameObject\Camera\CameraBase.cpp" />

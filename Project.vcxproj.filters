@@ -91,6 +91,9 @@
     <Filter Include="Src\Application\GameObject\EnemySpawner">
       <UniqueIdentifier>{f1270fd4-c2b5-482a-923d-e521237d2202}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Application\GameObject\Environment">
+      <UniqueIdentifier>{b2c3d4e5-6f7a-4b8c-9d0e-1f2a3b4c5d6e}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\Application\GameObject\Camera">
       <UniqueIdentifier>{cedad702-e70f-4d1b-9fdc-88426f7f436b}</UniqueIdentifier>
     </Filter>
@@ -363,6 +366,12 @@
     <ClInclude Include="Src\Application\GameObject\EnemySpawner\EnemySpawner.h">
       <Filter>Src\Application\GameObject\EnemySpawner</Filter>
     </ClInclude>
+    <ClInclude Include="Src\Application\GameObject\Environment\StageEnvironment.h">
+      <Filter>Src\Application\GameObject\Environment</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\Application\GameObject\Environment\FocusPostFx.h">
+      <Filter>Src\Application\GameObject\Environment</Filter>
+    </ClInclude>
     <ClInclude Include="Src\Application\Effect\EffectManager.h">
       <Filter>Src\Application\Effect</Filter>
     </ClInclude>
@@ -604,6 +613,12 @@
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\EnemySpawner\EnemySpawner.cpp">
       <Filter>Src\Application\GameObject\EnemySpawner</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\GameObject\Environment\StageEnvironment.cpp">
+      <Filter>Src\Application\GameObject\Environment</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\GameObject\Environment\FocusPostFx.cpp">
+      <Filter>Src\Application\GameObject\Environment</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\Effect\EffectManager.cpp">
       <Filter>Src\Application\Effect</Filter>
