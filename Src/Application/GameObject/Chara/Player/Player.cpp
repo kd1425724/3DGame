@@ -6,6 +6,7 @@
 #include "../../../Scene/SceneManager.h"
 #include "../../../Debug/DebugParams/DebugParams.h"
 #include "../../../Debug/DebugFlags/DebugFlags.h"
+#include "../../../Debug/DebugWatch/DebugWatch.h"
 #include "../../Camera/CameraShake.h"
 #include "../../../Effect/EffectManager.h"
 #include "../../Targeting/Targeting.h"
@@ -502,6 +503,9 @@ void Player::PostUpdate()
 
 	// 照準：画面中心に一番近い敵を自動ターゲット(カメラは回さない)。選定とマーカーはTargetingが持つ
 	m_upTargeting->Update(m_wpCamera.lock(), Application::Instance().GetDeltaTime());
+
+	// デバッグ用：状態値をDebugWatchへ(このフレームの最終状態を出す。PostUpdateは毎フレーム必ず走る)
+	WatchDebug();
 }
 
 void Player::DrawUnLit()
@@ -538,13 +542,71 @@ void Player::DrawWire()
 
 void Player::DrawDebug()
 {
-	if (m_upWire && m_upWire->IsAttached())        // 繋がっている間だけ
+	// 当たり判定表示(DebugFlags「当たり判定/AABB表示」)ON時、索敵範囲・攻撃範囲などを可視化する
+	if (s_showColliderDebug)
 	{
 		if (!m_pDebugWire) { m_pDebugWire = std::make_unique<KdDebugWireFrame>(); }
-		//m_pDebugWire->AddDebugLine(m_pos, m_upWire->GetAnchor(),kBlueColor);
-		m_pDebugWire->Draw();
+		DrawDebugRanges();
 	}
+	// KdGameObject::DrawDebugが m_pCollider のAABBを積み、m_pDebugWire をまとめて描画する
 	KdGameObject::DrawDebug();
+}
+
+void Player::WatchDebug() const
+{
+	DebugWatch& w = DebugWatch::Instance();
+
+	// 速度・接地まわり
+	w.Watch(U8("Player/水平速度"),   GetHorizontalSpeed());
+	w.Watch(U8("Player/垂直速度"),   m_velocity.y);
+	w.Watch(U8("Player/接地"),       IsGrounded());
+	w.Watch(U8("Player/ワイヤー接続"), m_upWire && m_upWire->IsAttached());
+
+	// 攻撃・突撃まわり
+	w.Watch(U8("Player/突撃中"),          m_isDiving);
+	w.Watch(U8("Player/チェイン数"),      m_diveChainCount);
+	w.Watch(U8("Player/連続攻撃の受付窓"), m_comboWindowTimer);
+	w.Watch(U8("Player/フォーカスゲージ"), m_focusGauge);
+
+	// クールタイム・猶予窓まわり
+	w.Watch(U8("Player/回避クールタイム"),     m_dodgeCooldownTimer);
+	w.Watch(U8("Player/振り回しクールタイム"), m_sweepCooldownTimer);
+	w.Watch(U8("Player/反撃スロー窓"),         m_counterWindowTimer);
+	w.Watch(U8("Player/被弾硬直"),             m_staggerTimer);
+	w.Watch(U8("Player/無敵"),                 IsInvincible());
+	w.Watch(U8("Player/コヨーテ時間"),         m_coyoteTimer);
+	w.Watch(U8("Player/ジャンプ先行入力"),     m_jumpBufferTimer);
+}
+
+void Player::DrawDebugRanges()
+{
+	// ※ 呼び出し元(DrawDebug)で s_showColliderDebug と m_pDebugWire を確認済み
+	const Math::Vector3 pos = GetPos();
+
+	// 攻撃判定：落下攻撃の斬撃範囲(赤)。UpdateDiveと同じDebugParamsキーを読む
+	float slashR = DebugParams::Instance().Float(U8("落下攻撃/斬撃範囲"), 1.5f, 0.5f, 15.0f);
+	m_pDebugWire->AddDebugSphere(pos, slashR, Math::Color(1.0f, 0.2f, 0.2f, 1.0f));
+
+	// 攻撃判定：振り回し一掃の範囲(黄)
+	float sweepR = DebugParams::Instance().Float(U8("振り回し/範囲"), 5.0f, 1.0f, 20.0f);
+	m_pDebugWire->AddDebugSphere(pos, sweepR, Math::Color(1.0f, 0.9f, 0.2f, 1.0f));
+
+	// 索敵範囲：連続攻撃で次の敵を探す範囲(緑)
+	float findR = DebugParams::Instance().Float(U8("連続攻撃/範囲"), 8.0f, 1.0f, 30.0f);
+	m_pDebugWire->AddDebugSphere(pos, findR, Math::Color(0.2f, 1.0f, 0.4f, 1.0f));
+
+	// 現在の自動ターゲットへの線(水色)
+	if (m_upTargeting)
+	{
+		std::shared_ptr<KdGameObject> spTarget = m_upTargeting->GetTarget();
+		if (spTarget) { m_pDebugWire->AddDebugLine(pos, spTarget->GetPos(), Math::Color(0.2f, 0.9f, 1.0f, 1.0f)); }
+	}
+
+	// ワイヤー接続中：手元→アンカーの線(青)
+	if (m_upWire && m_upWire->IsAttached())
+	{
+		m_pDebugWire->AddDebugLine(pos, m_upWire->GetAnchor(), Math::Color(0.4f, 0.6f, 1.0f, 1.0f));
+	}
 }
 
 void Player::NotifyCounter()

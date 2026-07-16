@@ -70,6 +70,14 @@ private:
 	// スイング中はアンカーへ、突撃(グラップル)中は対象へ、手元から線を引く
 	void DrawWire();
 
+	// DebugWatchにプレイヤーの状態(速度/接地/各クールタイム/ゲージ/窓など)を毎フレーム出す。
+	// DebugWatchウィンドウ(DebugManagerのメニューで表示ON)に一覧表示される
+	void WatchDebug() const;
+
+	// 当たり判定表示(DebugFlags「当たり判定/AABB表示」)がONのとき、索敵範囲・攻撃範囲・
+	// 現在のターゲット線などを m_pDebugWire に積んで可視化する(DrawDebugから呼ぶ)
+	void DrawDebugRanges();
+
 	// ※ 移動速度はDebugParams("プレイヤー/移動速度")で調整する
 
 	// 移動方向の基準にするカメラ
