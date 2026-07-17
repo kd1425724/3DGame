@@ -19,8 +19,14 @@ void GameHud::DrawReticle()
 
 	// 種類を切り替えて見比べられるようにする(0=環A / 1=菱形B / 2=コンパスC)
 	int type = DebugParams::Instance().Int(U8("HUD/レティクル種類(0環1菱2羅)"), 0, 0, 2);
-	if (type < 0) { type = 0; }
-	if (type > 2) { type = 2; }
+	if (type < 0)
+	{
+		type = 0;
+	}
+	if (type > 2)
+	{
+		type = 2;
+	}
 
 	static const char* kPaths[3] =
 	{

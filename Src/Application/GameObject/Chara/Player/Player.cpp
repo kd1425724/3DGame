@@ -131,20 +131,32 @@ void Player::UpdateWireInput()
 			std::list<KdCollider::CollisionResult> aimHits;
 			for (auto& obj : SceneManager::Instance().GetObjList())
 			{
-				if (obj) { obj->Intersects(aimRay, &aimHits); }
+				if (!obj) { continue; }
+
+				obj->Intersects(aimRay, &aimHits);
 			}
 			float best = aimRange;
 			for (auto& h : aimHits)
 			{
 				float d = Math::Vector3::Distance(camPos, h.m_hitPos);
-				if (d < best) { best = d; aimPoint = h.m_hitPos; }
+				if (d < best)
+				{
+					best = d;
+					aimPoint = h.m_hitPos;
+				}
 			}
 
 			// ② 手元→照準点 の向き(これをワイヤーの発射方向にする)
 			dir = aimPoint - from;
 		}
-		if (dir.LengthSquared() > 0.0001f) { dir.Normalize(); }
-		else                               { dir = Math::Vector3::Backward; }
+		if (dir.LengthSquared() > 0.0001f)
+		{
+			dir.Normalize();
+		}
+		else
+		{
+			dir = Math::Vector3::Backward;
+		}
 
 		// 撃った瞬間、今の速度(m_velocity)はそのまま引き継ぐ
 		// (走りながら撃てば横の勢いが乗る。速度は基底CharaBaseの共通m_velocity)

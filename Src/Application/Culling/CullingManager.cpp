@@ -63,11 +63,21 @@ DirectX::BoundingSphere CullingManager::CalcLocalBoundingSphere(const KdModelWor
 		DirectX::BoundingBox bb = node.m_spMesh->GetBoundingBox();	// メッシュローカル
 		bb.Transform(bb, node.m_worldTransform);					// モデルローカルへ配置
 
-		if (!has) { total = bb; has = true; }
-		else      { DirectX::BoundingBox::CreateMerged(total, total, bb); }
+		if (!has)
+		{
+			total = bb;
+			has = true;
+		}
+		else
+		{
+			DirectX::BoundingBox::CreateMerged(total, total, bb);
+		}
 	}
 
-	if (has) { DirectX::BoundingSphere::CreateFromBoundingBox(bs, total); }
+	if (has)
+	{
+		DirectX::BoundingSphere::CreateFromBoundingBox(bs, total);
+	}
 
 	return bs;
 }
