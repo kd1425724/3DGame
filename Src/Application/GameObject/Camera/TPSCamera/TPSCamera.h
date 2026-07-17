@@ -52,4 +52,9 @@ private:
 	float         m_smoothPullback  = 0.0f;
 	// F: 速度に応じて広げるFOV(度。平滑化後)
 	float         m_smoothFov       = 60.0f;
+
+	// カメラのローカル位置の基準オフセット(Initで設定し、PostUpdateで使う)。
+	// x=横ずらし(プレイヤーを画面端に寄せる肩越し量。+でカメラを右へ→プレイヤーは画面左寄りになる)、
+	// y=注視の高さ、z=引き距離。PostUpdateはこのzへ速度ぶんの引き(m_smoothPullback)を足す。
+	Math::Vector3 m_localBaseOffset = { 0.0f, 0.75f, -4.0f };
 };

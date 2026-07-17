@@ -10,8 +10,9 @@ void TPSCamera::Init()
 	// 親クラスの初期化呼び出し
 	CameraBase::Init();
 
-	// 注視点(ターゲットが縮小されたのに合わせてカメラも近づける)
-	m_mLocalPos = Math::Matrix::CreateTranslation(0, 0.75f, -4.0f);
+	// カメラのローカル位置の基準。x=1.0でカメラを右へずらし、プレイヤーを画面左寄りにして画面中央を見せる
+	m_localBaseOffset = { 1.0f, 0.75f, -4.0f };
+	m_mLocalPos = Math::Matrix::CreateTranslation(m_localBaseOffset);
 
 	SetCursorPos(m_FixMousePos.x, m_FixMousePos.y);
 }
@@ -107,8 +108,9 @@ void TPSCamera::PostUpdate()
 	if (m_spCamera) { m_spCamera->SetProjectionMatrix(m_smoothFov); }
 
 	// === カメラ行列の構築 ===
-	// ローカル位置(基準 z=-4.0)に、速度ぶんの引きを足して後ろへ下げる
-	m_mLocalPos = Math::Matrix::CreateTranslation(0.0f, 0.75f, -4.0f - m_smoothPullback);
+	// ローカル位置の基準(Initで設定したm_localBaseOffset)に、速度ぶんの引きをzへ足して後ろへ下げる
+	m_mLocalPos = Math::Matrix::CreateTranslation(
+		m_localBaseOffset.x, m_localBaseOffset.y, m_localBaseOffset.z - m_smoothPullback);
 	// 平滑化した角度で回転行列を作る(CameraBase::GetRotationMatrixは生のm_DegAngを使うのでここでは使わない)
 	m_mRotation = Math::Matrix::CreateFromYawPitchRoll(
 		DirectX::XMConvertToRadians(m_smoothDegAng.y),
