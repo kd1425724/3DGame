@@ -3,6 +3,7 @@
 #include "../../main.h"
 #include "../../Scene/SceneManager.h"
 #include "../../Debug/DebugParams/DebugParams.h"
+#include "../StageProp/StageProp.h"   // IsFarForCollision(遠い建物の当たり判定スキップ)
 
 void CharaBase::SetAsset(const std::string& assetName)
 {
@@ -38,12 +39,15 @@ bool CharaBase::IsWallBetween(const Math::Vector3& from, const Math::Vector3& to
 	KdCollider::RayInfo ray(KdCollider::TypeBump, start, dir, len - margin * 2.0f);
 
 	std::list<KdCollider::CollisionResult> results;
+	// レイ区間の中点から「区間の半分+余裕」より遠い建物は当たりようがないのでスキップ
+	const Math::Vector3 segMid = (from + to) * 0.5f;
+	const float segReach = len * 0.5f + 1.0f;
 	for (auto& obj : SceneManager::Instance().GetObjList())
 	{
-		if (obj)
-		{
-			obj->Intersects(ray, &results);
-		}
+		if (!obj) { continue; }
+		if (StageProp::IsFarForCollision(obj.get(), segMid, segReach)) { continue; }
+
+		obj->Intersects(ray, &results);
 	}
 	return !results.empty();   // 途中(両端margin除く)に壁があれば遮蔽されている
 }
@@ -104,10 +108,11 @@ void CharaBase::ResolveGround(Math::Vector3& pos)
 	// レイに当たったオブジェクトを格納するリストを作成
 	std::list<KdCollider::CollisionResult> retRayList;
 
-	// 全オブジェクトと当たり判定を行う
+	// 全オブジェクトと当たり判定を行う(遠い建物はスキップ=大量配置時のCPU削減)
 	for (auto& obj : SceneManager::Instance().GetObjList())
 	{
 		if (!obj) { continue; }
+		if (StageProp::IsFarForCollision(obj.get(), pos, rayRange + 2.0f)) { continue; }
 
 		obj->Intersects(ray, &retRayList);
 	}
@@ -179,9 +184,13 @@ void CharaBase::ResolveBump(Math::Vector3& pos)
 		KdCollider::SphereInfo sphere(KdCollider::TypeBump, Math::Vector3(pos.x, centerY, pos.z), radius);
 
 		std::list<KdCollider::CollisionResult> results;
+		const Math::Vector3 sphereCenter(pos.x, centerY, pos.z);
 		for (auto& obj : SceneManager::Instance().GetObjList())
 		{
 			if (!obj) { continue; }
+			// 遠い建物は判定ごとスキップ(大量配置時のCPU削減)
+			if (StageProp::IsFarForCollision(obj.get(), sphereCenter, radius + 1.0f)) { continue; }
+
 			obj->Intersects(sphere, &results);
 		}
 
@@ -262,6 +271,9 @@ void CharaBase::ResolveBumpSweep(const Math::Vector3& fromPos, Math::Vector3& po
 	for (auto& obj : SceneManager::Instance().GetObjList())
 	{
 		if (!obj) { continue; }
+		// 遠い建物は判定ごとスキップ(大量配置時のCPU削減)
+		if (StageProp::IsFarForCollision(obj.get(), origin, dist + radius + 1.0f)) { continue; }
+
 		obj->Intersects(ray, &results);
 	}
 

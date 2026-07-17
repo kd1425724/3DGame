@@ -39,6 +39,12 @@ public:
 	// カリング用のワールド境界球を返す(初回に一度モデルからローカル球を計算してキャッシュ)
 	DirectX::BoundingSphere WorldBoundingSphere();
 
+	// _pObj がStageProp(建物)で、_queryPos から _range より遠ければ true(=当たり判定を省略してよい)。
+	// 建物を大量配置すると、キャラ毎フレームの接地レイ/壁球判定が全建物のCOLチャンクを
+	// 舐めてCPUを食うため、判定前の粗い距離ふるい(broadphase代わり)として使う。
+	// StageProp以外(地面/敵など)は常にfalse=従来どおり判定される
+	static bool IsFarForCollision(KdGameObject* _pObj, const Math::Vector3& _queryPos, float _range);
+
 private:
 
 	// 表示モデルのパス(例 "Asset/Models/Stage/House/house01/house01.gltf")
