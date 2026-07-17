@@ -109,16 +109,42 @@ void Player::UpdateWireInput()
 	// === ワイヤーの発射 / 解除 ===
 	if (KdInputManager::Instance().IsPress("WireShoot"))
 	{
-		// カメラのフルの向き(ピッチ込み=上も狙える)を撃つ方向にする
+		Math::Vector3 from = GetPos() + Math::Vector3(0, 1.0f, 0);   // ワイヤーの手元
+		float maxLen = DebugParams::Instance().Float(U8("ワイヤー/最大長"), 30.0f, 1.0f, 100.0f);
+
+		// 撃つ方向は「レティクル(画面中央)が指す点」へ向ける。
+		// カメラは後方＋肩ぶん横にズレているので、カメラの向きを手元から飛ばすと視差でズレる。
+		//   ① カメラからレティクル方向(=カメラ前方)へレイを飛ばし、最初に当たった点を照準点にする
+		//   ② 手元からその照準点へ向けて撃つ(これで画面中央が指す場所へ正確に飛ぶ)
 		Math::Vector3 dir = Math::Vector3::Backward;
 		if (std::shared_ptr<CameraBase> spCamera = m_wpCamera.lock())
 		{
-			dir = Math::Vector3::TransformNormal(dir, spCamera->GetRotationMatrix());
-		}
-		dir.Normalize();
+			Math::Vector3 camPos     = spCamera->GetPos();
+			Math::Vector3 camForward = Math::Vector3::TransformNormal(Math::Vector3::Backward, spCamera->GetRotationMatrix());
+			camForward.Normalize();
 
-		Math::Vector3 from = GetPos() + Math::Vector3(0, 1.0f, 0);
-		float maxLen = DebugParams::Instance().Float(U8("ワイヤー/最大長"), 30.0f, 1.0f, 100.0f);
+			// ① 照準点を求める。何にも当たらなければカメラ前方の遠方点を狙う
+			float aimRange = DebugParams::Instance().Float(U8("ワイヤー/照準レイ長"), 200.0f, 10.0f, 1000.0f);
+			Math::Vector3 aimPoint = camPos + camForward * aimRange;
+
+			KdCollider::RayInfo aimRay(KdCollider::TypeGround | KdCollider::TypeBump, camPos, camForward, aimRange);
+			std::list<KdCollider::CollisionResult> aimHits;
+			for (auto& obj : SceneManager::Instance().GetObjList())
+			{
+				if (obj) { obj->Intersects(aimRay, &aimHits); }
+			}
+			float best = aimRange;
+			for (auto& h : aimHits)
+			{
+				float d = Math::Vector3::Distance(camPos, h.m_hitPos);
+				if (d < best) { best = d; aimPoint = h.m_hitPos; }
+			}
+
+			// ② 手元→照準点 の向き(これをワイヤーの発射方向にする)
+			dir = aimPoint - from;
+		}
+		if (dir.LengthSquared() > 0.0001f) { dir.Normalize(); }
+		else                               { dir = Math::Vector3::Backward; }
 
 		// 撃った瞬間、今の速度(m_velocity)はそのまま引き継ぐ
 		// (走りながら撃てば横の勢いが乗る。速度は基底CharaBaseの共通m_velocity)
