@@ -173,11 +173,20 @@ void CharaBase::ResolveBump(Math::Vector3& pos)
 			obj->Intersects(sphere, &results);
 		}
 
-		// 一番深くめり込んでいる相手から押し出す
+		// 一番深くめり込んでいる相手から押し出す。
+		// ただし押し出し方向(≒面の法線)が上向きの接触は「床/歩ける斜面」なので水平押し出しの対象外にする。
+		// (StagePropの凸包などの斜め面を壁扱いして水平に押すと、斜面を下へ滑ってしまうため。
+		//  斜面での上下位置合わせは縦の接地ResolveGroundが担当する)。
+		// しきい値: 法線Yがこれを超えたら床扱い。0=全部壁, 1=真上の面だけ床。0.5≒水平から約60°より緩い面。
+		float walkableNormalY = DebugParams::Instance().Float(U8("キャラ/歩ける斜面のしきい値(法線Y)"), 0.5f, 0.0f, 1.0f);
+
 		Math::Vector3 push = Math::Vector3::Zero;
 		float maxOverlap = 0.0f;
 		for (auto& ret : results)
 		{
+			// 床/歩ける斜面(法線が上向き)は縦の接地ResolveGroundに任せ、ここでは水平に押さない(斜面滑り防止)
+			if (ret.m_hitDir.y > walkableNormalY) { continue; }
+
 			if (ret.m_overlapDistance > maxOverlap)
 			{
 				maxOverlap = ret.m_overlapDistance;
