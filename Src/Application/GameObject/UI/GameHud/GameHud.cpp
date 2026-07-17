@@ -9,6 +9,36 @@ void GameHud::DrawHud()
 {
 	// ※ スプライトのBegin/EndはBaseScene::DrawSpriteが囲むので、ここでは描くだけ
 	DrawSpeedMeter();
+	DrawReticle();
+}
+
+void GameHud::DrawReticle()
+{
+	// 表示ON/OFF(DebugFlags「HUD/レティクル表示」)
+	if (!DebugFlags::Instance().Get(U8("HUD/レティクル表示"), true)) { return; }
+
+	// 種類を切り替えて見比べられるようにする(0=環A / 1=菱形B / 2=コンパスC)
+	int type = DebugParams::Instance().Int(U8("HUD/レティクル種類(0環1菱2羅)"), 0, 0, 2);
+	if (type < 0) { type = 0; }
+	if (type > 2) { type = 2; }
+
+	static const char* kPaths[3] =
+	{
+		"Asset/Textures/UI/ReticleRing.png",		// A 照準環
+		"Asset/Textures/UI/ReticleDiamond.png",	// B 菱形
+		"Asset/Textures/UI/ReticleCompass.png",	// C コンパス
+	};
+
+	// テクスチャはKdAssetsキャッシュから取得(Targetingのマーカーと同じ方式)
+	std::shared_ptr<KdTexture> spTex = KdAssets::Instance().m_textures.GetData(kPaths[type]);
+	if (!spTex) { return; }
+
+	// 表示サイズ(px)と不透明度をDebugParamsで調整。座標は画面中央が原点(0,0)、ピボット中心で中央に出る
+	int   size  = static_cast<int>(DebugParams::Instance().Float(U8("HUD/レティクルサイズ"), 56.0f, 8.0f, 256.0f));
+	float alpha = DebugParams::Instance().Float(U8("HUD/レティクル不透明度"), 0.9f, 0.0f, 1.0f);
+
+	Math::Color col(1.0f, 1.0f, 1.0f, alpha);
+	KdShaderManager::Instance().m_spriteShader.DrawTex(spTex.get(), 0, 0, size, size, nullptr, &col);
 }
 
 void GameHud::DrawSpeedMeter()

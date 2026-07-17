@@ -25,4 +25,7 @@ private:
 
 	// プレイヤーの速度メーター(横バー)を描く
 	void DrawSpeedMeter();
+
+	// 画面中央のレティクル(照準)を描く。種類A/B/CはDebugParamsで切り替えられる
+	void DrawReticle();
 };
