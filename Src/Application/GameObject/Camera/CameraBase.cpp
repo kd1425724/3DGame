@@ -1,5 +1,7 @@
 ﻿#include "CameraBase.h"
 
+#include "../../Culling/CullingManager.h"
+
 void CameraBase::Init()
 {
 	if (!m_spCamera)
@@ -17,6 +19,9 @@ void CameraBase::PreDraw()
 
 	m_spCamera->SetCameraMatrix(m_mWorld);
 	m_spCamera->SetToShader();
+
+	// このフレームの描画に使うカメラで視錐台カリングを更新する(描画パスの前に確定させる)
+	CullingManager::Instance().Update(*m_spCamera);
 
 	// このフレームの描画に実際使われるカメラをEffekseerにも反映する
 	// (TPSCamera/EditorCameraはシーンのオブジェクト列に排他で1つだけ存在するため、これで常に現在の描画カメラと一致する)

@@ -1,5 +1,20 @@
 ﻿#include "Block.h"
 
+#include "../../Culling/CullingManager.h"
+
+DirectX::BoundingSphere Block::WorldBoundingSphere()
+{
+	// 初回だけモデル全体のローカル境界球を計算してキャッシュする
+	if (m_localBS.Radius <= 0.0f && m_spModelWork)
+	{
+		m_localBS = CullingManager::CalcLocalBoundingSphere(*m_spModelWork);
+	}
+
+	DirectX::BoundingSphere wbs;
+	m_localBS.Transform(wbs, m_mWorld);
+	return wbs;
+}
+
 void Block::Init()
 {
 	SetAsset("Asset/Models/Test/Block/Block.gltf");
@@ -21,12 +36,18 @@ void Block::DrawLit()
 {
 	if (!m_spModelWork || !m_spModelWork->IsEnable()) { return; }
 
+	// 視錐台＋距離カリング：画面外/遠すぎるものは描かない
+	if (!CullingManager::Instance().IsVisible(WorldBoundingSphere())) { return; }
+
 	KdShaderManager::Instance().m_StandardShader.DrawModel(*m_spModelWork, m_mWorld);
 }
 
 void Block::GenerateDepthMapFromLight()
 {
 	if (!m_spModelWork || !m_spModelWork->IsEnable()) { return; }
+
+	// 影は距離のみでカリング(画面外の物でも影は画面内に落ちうるので視錐台では切らない)
+	if (!CullingManager::Instance().IsInRange(WorldBoundingSphere())) { return; }
 
 	// 深度パス用シェーダはBeginGenerateDepthMapFromLightでセット済み。モデルを描くだけで影の元になる
 	KdShaderManager::Instance().m_StandardShader.DrawModel(*m_spModelWork, m_mWorld);

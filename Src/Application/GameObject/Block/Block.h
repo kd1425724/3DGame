@@ -19,7 +19,13 @@ public:
 
 private:
 
+	// カリング用のワールド境界球を返す(初回に一度モデルからローカル球を計算してキャッシュ)
+	DirectX::BoundingSphere WorldBoundingSphere();
+
 	// 表示・当たり判定の両方で共有するモデルワーク
 	// (当たり判定側にshared_ptrとして渡して共有するためshared_ptrで保持。Groundと同じ形)
 	std::shared_ptr<KdModelWork> m_spModelWork;
+
+	// カリング用のモデル全体のローカル境界球(半径0=未計算。WorldBoundingSphereで遅延計算)
+	DirectX::BoundingSphere m_localBS = { { 0.0f, 0.0f, 0.0f }, 0.0f };
 };

@@ -88,6 +88,9 @@
     <Filter Include="Src\Application\GameObject\Block">
       <UniqueIdentifier>{a1e2c3d4-5f6a-4b7c-8d9e-0f1a2b3c4d5e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Application\Culling">
+      <UniqueIdentifier>{b3f4d5e6-7a8b-4c9d-8e0f-1a2b3c4d5e6f}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\Application\GameObject\StageProp">
       <UniqueIdentifier>{c7d8e9f0-1a2b-4c3d-8e4f-5a6b7c8d9e0f}</UniqueIdentifier>
     </Filter>
@@ -465,6 +468,9 @@
     <ClInclude Include="Src\Application\GameObject\Camera\EditorCamera\EditorCamera.h">
       <Filter>Src\Application\GameObject\Camera\EditorCamera</Filter>
     </ClInclude>
+    <ClInclude Include="Src\Application\Culling\CullingManager.h">
+      <Filter>Src\Application\Culling</Filter>
+    </ClInclude>
     <ClInclude Include="Src\Application\GameObject\Block\Block.h">
       <Filter>Src\Application\GameObject\Block</Filter>
     </ClInclude>
@@ -712,6 +718,9 @@
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Camera\EditorCamera\EditorCamera.cpp">
       <Filter>Src\Application\GameObject\Camera\EditorCamera</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\Culling\CullingManager.cpp">
+      <Filter>Src\Application\Culling</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Block\Block.cpp">
       <Filter>Src\Application\GameObject\Block</Filter>
