@@ -34,8 +34,14 @@ public:
 	// エディタで配置可能なオブジェクトの種類を登録する
 	void RegisterCreatable(const std::string_view name, const std::function<std::shared_ptr<KdGameObject>(void)>& func)
 	{
-		m_factory.RegisterCreateFunction(name, func);
-		m_creatableNames.push_back(std::string(name));
+		// KdGameObjectFactoryはキーを非所有のstd::string_viewで保持する(KdGameObjectFactory.h)。
+		// そのため一時std::string等を渡すとキーがダングリングし、生成時にfindが一致せずassertになる。
+		// (文字列リテラルは静的記憶域なので偶然無事だが、動的生成した種類名は破壊される)。
+		// プログラム全体で生存する安定アドレスのstd::string実体に紐付けてから登録する。
+		// std::listは要素追加で既存要素のアドレスを無効化しないためキーが壊れない。
+		const std::string& stableName = m_typeNameKeys.emplace_back(name);
+		m_factory.RegisterCreateFunction(stableName, func);
+		m_creatableNames.push_back(stableName);
 	}
 
 	// 登録済みの種類名一覧(一覧表示用。登録順を保持する)
@@ -158,6 +164,10 @@ private:
 
 	// オブジェクト生成用ファクトリー(このレベルエディタ専用)
 	KdGameObjectFactory m_factory;
+
+	// KdGameObjectFactoryのキー(非所有のstring_view)が指す実体を安定して保持する領域。
+	// std::listは要素追加で既存要素のアドレスが変わらないため、動的登録した種類名のキーが壊れない。
+	std::list<std::string> m_typeNameKeys;
 
 	// 登録済みの種類名(表示順を保持するため別途保持)
 	std::vector<std::string> m_creatableNames;
