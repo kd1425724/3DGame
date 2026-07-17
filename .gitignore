@@ -10,6 +10,11 @@ x64/
 #開発者ローカルのDebugParams調整値(実行時保存。最終値はコードのFloat()既定値に焼き込む方針)
 /Asset/Data/Debug/
 
+#ステージ配置用モデル(中世136件・約386MB)。Desktop/BlenderDataマスター + _tools/batch_all.py で
+#いつでも再生成できるため追跡しない(COL当たりメッシュ込みで出力される)。
+#※配置結果のLevel*.json(Asset/Data/LevelEditor/)は小さいゲーム内容なので追跡する
+/Asset/Models/Stage/
+
 #共通無視拡張子
 *.tlog
 *.obj
