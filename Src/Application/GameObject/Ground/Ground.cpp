@@ -1,5 +1,7 @@
 ﻿#include "Ground.h"
 
+#include "../../Culling/CullingManager.h"   // CalcLocalBoundingSphere(モデル全体の境界球)
+
 void Ground::Init()
 {
 	SetAsset("Asset/Models/Test/Block/Block.gltf");
@@ -28,6 +30,18 @@ void Ground::SetAsset(const std::string& assetName)
 {
 	m_spModelWork = std::make_shared<KdModelWork>();
 	m_spModelWork->SetModelData(KdAssets::Instance().m_modeldatas.GetData(assetName));
+}
+
+DirectX::BoundingSphere Ground::GetColliderBounds() const
+{
+	// モデル全体のローカル境界球をワールド変換して返す。地面は巨大なので、CollisionGrid側では
+	// 「多数のセルにまたがる=常時候補」として毎クエリ必ず候補に含まれる(=常に接地判定される)
+	DirectX::BoundingSphere bs(DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f), 0.0f);
+	if (!m_spModelWork) { return bs; }
+
+	const DirectX::BoundingSphere local = CullingManager::CalcLocalBoundingSphere(*m_spModelWork);
+	local.Transform(bs, m_mWorld);
+	return bs;
 }
 
 void Ground::DrawLit()

@@ -10,6 +10,7 @@
 #include "LevelFileIO/LevelFileIO.h"
 #include "LevelPicker/LevelPicker.h"
 #include "LevelEditorHistory/LevelEditorHistory.h"
+#include "../../Collision/CollisionGrid.h"
 
 std::shared_ptr<KdGameObject> LevelEditorManager::CreateObject(const std::string_view objTypeName)
 {
@@ -170,6 +171,13 @@ void LevelEditorManager::SetEnabled(bool enabled)
 
 void LevelEditorManager::Update()
 {
+	// 編集中は建物を置く/動かす/消すので、当たり判定のbroadphaseを毎フレーム作り直させる
+	// (次のクエリで再構築される)。編集OFF=ゲーム中は建物が静止するので作り直さない=O(1)クエリ。
+	if (m_enabled)
+	{
+		CollisionGrid::Instance().MarkDirty();
+	}
+
 	// F1でエディタモードのON/OFFを切り替える(OFF中でもこのキーだけは常に効く)
 	if (!ImGui::GetIO().WantCaptureKeyboard && KdInputManager::Instance().IsPress("ToggleEditor"))
 	{

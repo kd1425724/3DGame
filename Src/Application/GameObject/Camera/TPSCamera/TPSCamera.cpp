@@ -2,6 +2,7 @@
 
 #include "../../../main.h"
 #include "../../../Scene/SceneManager.h"
+#include "../../../Collision/CollisionGrid.h"
 #include "../../../Debug/DebugParams/DebugParams.h"
 #include "../CameraShake.h"
 
@@ -158,14 +159,14 @@ void TPSCamera::PostUpdate()
 	// 地面(TypeGround)だけでなく塔などのBlock(TypeBump)にもカメラを遮らせる
 	rayInfo.m_type = KdCollider::TypeGround | KdCollider::TypeBump;
 
-	// ②シーン内の全オブジェクトに総当たり
-	// ※ 以前はカメラ専用の登録リスト(RegistHitObject)だけを見ていたため、
-	//   レベルエディタのLevel.jsonから後で足された塔(Block)が対象外ですり抜けていた。
-	//   Player側の当たり判定(CharaBase)と同じくSceneManagerの全オブジェクトを走査する。
+	// ②カメラ〜プレイヤーのレイ近傍の静的コリジョンだけをbroadphase(CollisionGrid)から取り出して判定する。
+	// ※ 以前は全オブジェクト総当たりだったが、建物を大量に置くと重くなるためグリッド経由に変更。
+	//   グリッドには地面/建物(IStaticCollider)が載っており、CharaBase側の当たりと同じ対象を見る。
 	std::list<KdCollider::CollisionResult> retRayList;
-	for (auto& spGameObj : SceneManager::Instance().GetObjList())
+	std::vector<KdGameObject*> camCandidates;
+	CollisionGrid::Instance().QueryRay(rayInfo.m_pos, rayInfo.m_dir, rayInfo.m_range, camCandidates);
+	for (KdGameObject* spGameObj : camCandidates)
 	{
-		if (!spGameObj) { continue; }
 		spGameObj->Intersects(rayInfo, &retRayList);
 	}
 

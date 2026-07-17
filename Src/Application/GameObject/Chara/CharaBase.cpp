@@ -3,7 +3,7 @@
 #include "../../main.h"
 #include "../../Scene/SceneManager.h"
 #include "../../Debug/DebugParams/DebugParams.h"
-#include "../StageProp/StageProp.h"   // IsFarForCollision(遠い建物の当たり判定スキップ)
+#include "../../Collision/CollisionGrid.h"   // 静的コリジョンのbroadphase(近傍の建物だけ問い合わせる)
 
 void CharaBase::SetAsset(const std::string& assetName)
 {
@@ -39,14 +39,11 @@ bool CharaBase::IsWallBetween(const Math::Vector3& from, const Math::Vector3& to
 	KdCollider::RayInfo ray(KdCollider::TypeBump, start, dir, len - margin * 2.0f);
 
 	std::list<KdCollider::CollisionResult> results;
-	// レイ区間の中点から「区間の半分+余裕」より遠い建物は当たりようがないのでスキップ
-	const Math::Vector3 segMid = (from + to) * 0.5f;
-	const float segReach = len * 0.5f + 1.0f;
-	for (auto& obj : SceneManager::Instance().GetObjList())
+	// レイ近傍の静的コリジョン(建物/地面)だけをグリッドから取り出して判定する
+	std::vector<KdGameObject*> candidates;
+	CollisionGrid::Instance().QueryRay(start, dir, len - margin * 2.0f, candidates);
+	for (KdGameObject* obj : candidates)
 	{
-		if (!obj) { continue; }
-		if (StageProp::IsFarForCollision(obj.get(), segMid, segReach)) { continue; }
-
 		obj->Intersects(ray, &results);
 	}
 	return !results.empty();   // 途中(両端margin除く)に壁があれば遮蔽されている
@@ -108,12 +105,11 @@ void CharaBase::ResolveGround(Math::Vector3& pos)
 	// レイに当たったオブジェクトを格納するリストを作成
 	std::list<KdCollider::CollisionResult> retRayList;
 
-	// 全オブジェクトと当たり判定を行う(遠い建物はスキップ=大量配置時のCPU削減)
-	for (auto& obj : SceneManager::Instance().GetObjList())
+	// 近傍の静的コリジョンだけをグリッドから取り出して判定する(大量配置時のCPU削減)
+	std::vector<KdGameObject*> candidates;
+	CollisionGrid::Instance().QueryRay(pos + Math::Vector3(0, rayStartUp, 0), Math::Vector3::Down, rayRange, candidates);
+	for (KdGameObject* obj : candidates)
 	{
-		if (!obj) { continue; }
-		if (StageProp::IsFarForCollision(obj.get(), pos, rayRange + 2.0f)) { continue; }
-
 		obj->Intersects(ray, &retRayList);
 	}
 
@@ -181,16 +177,15 @@ void CharaBase::ResolveBump(Math::Vector3& pos)
 	// 複数の壁に挟まれても安定するよう数回反復する
 	for (int iter = 0; iter < 3; ++iter)
 	{
-		KdCollider::SphereInfo sphere(KdCollider::TypeBump, Math::Vector3(pos.x, centerY, pos.z), radius);
+		const Math::Vector3 sphereCenter(pos.x, centerY, pos.z);
+		KdCollider::SphereInfo sphere(KdCollider::TypeBump, sphereCenter, radius);
 
 		std::list<KdCollider::CollisionResult> results;
-		const Math::Vector3 sphereCenter(pos.x, centerY, pos.z);
-		for (auto& obj : SceneManager::Instance().GetObjList())
+		// 近傍の静的コリジョンだけをグリッドから取り出して判定する(大量配置時のCPU削減)
+		std::vector<KdGameObject*> candidates;
+		CollisionGrid::Instance().QuerySphere(sphereCenter, radius, candidates);
+		for (KdGameObject* obj : candidates)
 		{
-			if (!obj) { continue; }
-			// 遠い建物は判定ごとスキップ(大量配置時のCPU削減)
-			if (StageProp::IsFarForCollision(obj.get(), sphereCenter, radius + 1.0f)) { continue; }
-
 			obj->Intersects(sphere, &results);
 		}
 
@@ -268,12 +263,11 @@ void CharaBase::ResolveBumpSweep(const Math::Vector3& fromPos, Math::Vector3& po
 	}
 
 	std::list<KdCollider::CollisionResult> results;
-	for (auto& obj : SceneManager::Instance().GetObjList())
+	// 近傍の静的コリジョンだけをグリッドから取り出して判定する(大量配置時のCPU削減)
+	std::vector<KdGameObject*> candidates;
+	CollisionGrid::Instance().QueryRay(origin, dir, dist + radius, candidates);
+	for (KdGameObject* obj : candidates)
 	{
-		if (!obj) { continue; }
-		// 遠い建物は判定ごとスキップ(大量配置時のCPU削減)
-		if (StageProp::IsFarForCollision(obj.get(), origin, dist + radius + 1.0f)) { continue; }
-
 		obj->Intersects(ray, &results);
 	}
 

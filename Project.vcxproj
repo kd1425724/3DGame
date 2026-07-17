@@ -281,6 +281,8 @@
     <ClInclude Include="Src\Application\Debug\DebugEffect\DebugEffect.h" />
     <ClInclude Include="Src\Application\Debug\DebugUtility\DebugUtility.h" />
     <ClInclude Include="Src\Application\Debug\DebugWatch\DebugWatch.h" />
+    <ClInclude Include="Src\Application\Collision\IStaticCollider.h" />
+    <ClInclude Include="Src\Application\Collision\CollisionGrid.h" />
     <ClInclude Include="Src\Application\Culling\CullingManager.h" />
     <ClInclude Include="Src\Application\GameObject\Block\Block.h" />
     <ClInclude Include="Src\Application\GameObject\StageProp\InstancedPropRenderer.h" />
@@ -372,6 +374,7 @@
     <ClCompile Include="Src\Application\Utility\JsonManager.cpp" />
     <ClCompile Include="Src\Application\Debug\DebugEffect\DebugEffect.cpp" />
     <ClCompile Include="Src\Application\Debug\DebugWatch\DebugWatch.cpp" />
+    <ClCompile Include="Src\Application\Collision\CollisionGrid.cpp" />
     <ClCompile Include="Src\Application\Culling\CullingManager.cpp" />
     <ClCompile Include="Src\Application\GameObject\Block\Block.cpp" />
     <ClCompile Include="Src\Application\GameObject\StageProp\InstancedPropRenderer.cpp" />

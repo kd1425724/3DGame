@@ -10,6 +10,7 @@
 #include "../../GameObject/Environment/FocusPostFx.h"
 #include "../../GameObject/UI/GameHud/GameHud.h"
 #include "../../GameObject/StageProp/InstancedPropRenderer.h"
+#include "../../Collision/CollisionGrid.h"
 
 #include "../../Editor/LevelEditor/LevelFileIO/LevelFileIO.h"
 #include "../../Editor/LevelEditor/LevelEditorManager.h"
@@ -87,4 +88,8 @@ void GameScene::Init()
 	std::shared_ptr<InstancedPropRenderer> spPropRenderer = std::make_shared<InstancedPropRenderer>();
 	spPropRenderer->Init();
 	AddObject(spPropRenderer);
+
+	// 当たり判定のbroadphaseを、このシーンの静的コリジョン(地面/建物)で作り直させる。
+	// (シーンを切り替えても前シーンの内容が残らないよう、シーン構築のたびにdirtyにする)
+	CollisionGrid::Instance().MarkDirty();
 }

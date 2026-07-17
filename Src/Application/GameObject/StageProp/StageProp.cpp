@@ -5,19 +5,6 @@
 #include "../../Editor/LevelEditor/LevelEditorManager.h"
 #include "../../Culling/CullingManager.h"
 
-bool StageProp::IsFarForCollision(KdGameObject* _pObj, const Math::Vector3& _queryPos, float _range)
-{
-	StageProp* pProp = dynamic_cast<StageProp*>(_pObj);
-	if (pProp == nullptr) { return false; }
-
-	// 境界球の中心から「半径+判定側の届く範囲」より遠ければ、当たりようがないので省略できる
-	const DirectX::BoundingSphere bs = pProp->WorldBoundingSphere();
-	const float reach = bs.Radius + _range;
-	const Math::Vector3 center(bs.Center.x, bs.Center.y, bs.Center.z);
-
-	return Math::Vector3::DistanceSquared(center, _queryPos) > reach * reach;
-}
-
 DirectX::BoundingSphere StageProp::WorldBoundingSphere()
 {
 	// 初回だけモデル全体のローカル境界球を計算してキャッシュする
