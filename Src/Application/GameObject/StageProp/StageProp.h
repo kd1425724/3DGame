@@ -31,10 +31,15 @@ public:
 	// 「<カテゴリ>/<名前>」の種類名でLevelEditorに一括登録する(起動時に1回呼ぶ)
 	static void RegisterAllToEditor();
 
-private:
+	// ===== GPUインスタンシング用 =====
+	// StagePropの描画は InstancedPropRenderer が「同じモデルごとにまとめて」行う。
+	// そのために必要な情報を公開する(自分ではDrawLit等で描かない。下のDrawLit参照)
+	const std::shared_ptr<KdModelWork>& GetModelWork() const { return m_spModelWork; }
 
 	// カリング用のワールド境界球を返す(初回に一度モデルからローカル球を計算してキャッシュ)
 	DirectX::BoundingSphere WorldBoundingSphere();
+
+private:
 
 	// 表示モデルのパス(例 "Asset/Models/Stage/House/house01/house01.gltf")
 	std::string m_modelPath;

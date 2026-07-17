@@ -63,6 +63,10 @@ public:
 	// メッシュデータをデバイスへセットする
 	void SetToDevice() const;
 
+	// ===== 追加(GPUインスタンシング) =====
+	// 同じメッシュを instanceCount 個まとめて1回のドローで描く。既存のDrawSubsetは変更せず残してある
+	void DrawSubsetInstanced(int subsetNo, UINT instanceCount) const;
+
 	// スキンメッシュ？
 	bool IsSkinMesh() const { return m_isSkinMesh; }
 

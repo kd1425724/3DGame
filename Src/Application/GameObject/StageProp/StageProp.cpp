@@ -33,25 +33,24 @@ void StageProp::Init()
 	m_pCollider->RegisterCollisionShape("StagePropCol", m_spModelWork, KdCollider::TypeBump);
 }
 
+// ※ StagePropは自分では描画しない。InstancedPropRenderer が「同じモデルごとにまとめて」
+//    GPUインスタンシングで描く(大量配置してもドローコールが増えないようにするため)。
+//    ここで個別に描くと二重描画になるので、DrawLit / GenerateDepthMapFromLight は空にしてある。
+//    カリング判定(IsVisible / IsInRange)も InstancedPropRenderer 側で同じように行っている。
+//
+//    参考：インスタンシング導入前は、ここで以下のように1軒ずつ描いていた
+//      void StageProp::DrawLit()
+//      {
+//          if (!m_spModelWork || !m_spModelWork->IsEnable()) { return; }
+//          if (!CullingManager::Instance().IsVisible(WorldBoundingSphere())) { return; }
+//          KdShaderManager::Instance().m_StandardShader.DrawModel(*m_spModelWork, m_mWorld);
+//      }
 void StageProp::DrawLit()
 {
-	if (!m_spModelWork || !m_spModelWork->IsEnable()) { return; }
-
-	// 視錐台＋距離カリング：画面外/遠すぎるものは描かない
-	if (!CullingManager::Instance().IsVisible(WorldBoundingSphere())) { return; }
-
-	KdShaderManager::Instance().m_StandardShader.DrawModel(*m_spModelWork, m_mWorld);
 }
 
 void StageProp::GenerateDepthMapFromLight()
 {
-	if (!m_spModelWork || !m_spModelWork->IsEnable()) { return; }
-
-	// 影は距離のみでカリング(画面外の物でも影は画面内に落ちうるので視錐台では切らない)
-	if (!CullingManager::Instance().IsInRange(WorldBoundingSphere())) { return; }
-
-	// 深度パス用シェーダはBeginGenerateDepthMapFromLightでセット済み。モデルを描くだけで影の元になる
-	KdShaderManager::Instance().m_StandardShader.DrawModel(*m_spModelWork, m_mWorld);
 }
 
 void StageProp::DrawDebug()

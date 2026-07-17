@@ -170,6 +170,15 @@ public:
 	void DrawModel(KdModelWork& rModel, const Math::Matrix& mWorld = Math::Matrix::Identity,
 		const Math::Color& colRate = kWhiteColor, const Math::Vector3& emissive = Math::Vector3::Zero);
 
+	// ===== 追加(GPUインスタンシング) =====
+	// 同じモデルを worldList の数だけ、まとめて1回のドローで描く(静的プロップの大量配置用)。
+	// 通常のDrawModelは1オブジェクト1ドローだが、こちらはワールド行列をインスタンスバッファ
+	// (頂点slot1)で渡すため、100個置いても「マテリアル数ぶん」のドローで済む。
+	// ※ BeginLit / BeginGenerateDepthMapFromLight の間で呼ぶこと(パスに応じて専用VSへ自動で切替、描画後に元へ戻す)
+	// ※ スキンメッシュ・UnLitパスは非対応(その場合は何もしないので、呼び出し側で通常のDrawModelを使うこと)
+	void DrawModelInstanced(KdModelWork& rModel, const std::vector<Math::Matrix>& worldList,
+		const Math::Color& colRate = kWhiteColor, const Math::Vector3& emissive = Math::Vector3::Zero);
+
 	// 任意の頂点群からなるポリゴン描画
 	void DrawPolygon(const KdPolygon& poly, const Math::Matrix& mWorld = Math::Matrix::Identity,
 		const Math::Color& colRate = kWhiteColor, const Math::Vector3& emissive = Math::Vector3::Zero);
@@ -198,6 +207,13 @@ private:
 
 	// マテリアルのセット
 	void WriteMaterial(const KdMaterial& material, const Math::Vector4& colRate, const Math::Vector3& emiRate);
+
+	// ===== 追加(GPUインスタンシング) =====
+	// インスタンス行列をGPUの動的頂点バッファへ書き込む(足りなければ作り直して拡張する)
+	bool WriteInstanceBuffer(const std::vector<Math::Matrix>& mats);
+	// DrawMeshのインスタンシング版(頂点slot0＋インスタンスslot1をバインドしてDrawIndexedInstanced)
+	void DrawMeshInstanced(const KdMesh* mesh, const std::vector<KdMaterial>& materials,
+		const Math::Vector4& col, const Math::Vector3& emissive, UINT instanceCount);
 
 	// ポリゴンの法線情報を2Dように書き換える
 	void ConvertNormalsFor2D(std::vector<KdPolygon::Vertex>& target, const Math::Matrix& mWorld);
@@ -233,6 +249,25 @@ private:
 
 	// 頂点入力レイアウト
 	ID3D11InputLayout* m_inputLayout = nullptr;
+
+	// ===== 追加(GPUインスタンシング) =====
+	// 通常版との違いは「ワールド行列を定数バッファではなく頂点slot1のインスタンスデータで受ける」点。
+	// そのため専用のVSと、per-instance要素を含む入力レイアウトが要る。既存の物は消していない。
+	ID3D11VertexShader* m_VS_Lit_Inst = nullptr;				// 陰影あり(インスタンシング版)
+	ID3D11VertexShader* m_VS_GenDepthFromLight_Inst = nullptr;	// 光からの深度(インスタンシング版)
+	ID3D11InputLayout*	m_inputLayout_Inst = nullptr;			// 頂点(slot0)＋インスタンス行列(slot1)
+	ID3D11Buffer*		m_instanceBuf = nullptr;				// インスタンス行列を入れる動的頂点バッファ
+	UINT				m_instanceCapacity = 0;					// 上のバッファが確保済みのインスタンス数
+
+	// 現在の描画パス。インスタンス描画時にどの専用VSを使うか判断するために Begin* で記録する
+	enum class Pass
+	{
+		None,
+		Lit,
+		UnLit,
+		GenDepth,
+	};
+	Pass m_curPass = Pass::None;
 	
 	// ピクセルシェーダー
 	ID3D11PixelShader* m_PS_Lit = nullptr;					// 陰影あり

@@ -283,6 +283,7 @@
     <ClInclude Include="Src\Application\Debug\DebugWatch\DebugWatch.h" />
     <ClInclude Include="Src\Application\Culling\CullingManager.h" />
     <ClInclude Include="Src\Application\GameObject\Block\Block.h" />
+    <ClInclude Include="Src\Application\GameObject\StageProp\InstancedPropRenderer.h" />
     <ClInclude Include="Src\Application\GameObject\StageProp\StageProp.h" />
     <ClInclude Include="Src\Application\GameObject\EnemySpawner\EnemySpawner.h" />
     <ClInclude Include="Src\Application\GameObject\Environment\StageEnvironment.h" />
@@ -373,6 +374,7 @@
     <ClCompile Include="Src\Application\Debug\DebugWatch\DebugWatch.cpp" />
     <ClCompile Include="Src\Application\Culling\CullingManager.cpp" />
     <ClCompile Include="Src\Application\GameObject\Block\Block.cpp" />
+    <ClCompile Include="Src\Application\GameObject\StageProp\InstancedPropRenderer.cpp" />
     <ClCompile Include="Src\Application\GameObject\StageProp\StageProp.cpp" />
     <ClCompile Include="Src\Application\GameObject\EnemySpawner\EnemySpawner.cpp" />
     <ClCompile Include="Src\Application\GameObject\Environment\StageEnvironment.cpp" />
@@ -516,6 +518,18 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
     </FxCompile>
     <FxCompile Include="Src\Framework\Shader\StandardShader\KdStandardShader_VS_Lit.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Src\Framework\Shader\StandardShader\KdStandardShader_VS_Lit_Inst.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Vertex</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Src\Framework\Shader\StandardShader\KdStandardShader_VS_GenDepthMapFromLight_Inst.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Vertex</ShaderType>

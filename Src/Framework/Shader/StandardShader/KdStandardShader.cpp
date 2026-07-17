@@ -15,6 +15,9 @@
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
 void KdStandardShader::BeginLit()
 {
+	// 追加(GPUインスタンシング)：現在のパスを記録する。DrawModelInstancedがどの専用VSを使うか判断に使う
+	m_curPass = Pass::Lit;
+
 	// 頂点シェーダーのパイプライン変更
 	if (KdShaderManager::Instance().SetVertexShader(m_VS_Lit))
 	{
@@ -63,6 +66,9 @@ void KdStandardShader::EndLit()
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
 void KdStandardShader::BeginUnLit()
 {
+	// 追加(GPUインスタンシング)：現在のパスを記録する(UnLitはインスタンシング非対応)
+	m_curPass = Pass::UnLit;
+
 	if (KdShaderManager::Instance().SetVertexShader(m_VS_UnLit))
 	{
 		KdShaderManager::Instance().SetInputLayout(m_inputLayout);
@@ -94,6 +100,9 @@ void KdStandardShader::EndUnLit()
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
 void KdStandardShader::BeginGenerateDepthMapFromLight()
 {
+	// 追加(GPUインスタンシング)：現在のパスを記録する。DrawModelInstancedがどの専用VSを使うか判断に使う
+	m_curPass = Pass::GenDepth;
+
 	if (KdShaderManager::Instance().SetVertexShader(m_VS_GenDepthFromLight))
 	{
 		KdShaderManager::Instance().SetInputLayout(m_inputLayout);
@@ -253,6 +262,171 @@ void KdStandardShader::DrawModel(KdModelWork& rModel, const Math::Matrix& mWorld
 	}
 
 	// 定数に変更があった場合は自動的に初期状態に戻す
+	if (m_dirtyCBObj)
+	{
+		ResetCBObject();
+	}
+}
+
+// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
+// 追加(GPUインスタンシング)
+// ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
+// 通常のDrawModel/DrawMeshは「1オブジェクト＝1ドロー(＋ワールド行列の定数バッファ更新)」。
+// 静的プロップを大量配置するとこのドローコール数がCPUのボトルネックになるため、
+// ワールド行列をインスタンスバッファ(頂点slot1)へまとめて入れ、DrawIndexedInstancedで
+// 同じモデルを一括描画できるようにした。
+// ※ 既存のDrawModel/DrawMeshは一切変更していない(キャラ等は従来経路のまま使う)
+// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
+
+// インスタンス行列をGPUの動的頂点バッファへ書き込む。容量が足りなければ作り直して拡張する
+bool KdStandardShader::WriteInstanceBuffer(const std::vector<Math::Matrix>& mats)
+{
+	if (mats.empty()) { return false; }
+
+	const UINT need = static_cast<UINT>(mats.size());
+
+	// 容量不足のときだけ作り直す(毎フレーム作らないようにするため、縮小はしない)
+	if (m_instanceBuf == nullptr || m_instanceCapacity < need)
+	{
+		KdSafeRelease(m_instanceBuf);
+		m_instanceCapacity = 0;
+
+		D3D11_BUFFER_DESC desc = {};
+		desc.ByteWidth = sizeof(Math::Matrix) * need;
+		desc.Usage = D3D11_USAGE_DYNAMIC;			// 毎フレームCPUから書き換える
+		desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;	// 頂点ストリーム(slot1)として使う
+		desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+		if (FAILED(KdDirect3D::Instance().WorkDev()->CreateBuffer(&desc, nullptr, &m_instanceBuf)))
+		{
+			assert(0 && "インスタンスバッファ作成失敗");
+			return false;
+		}
+
+		m_instanceCapacity = need;
+	}
+
+	// 行列をそのまま流し込む。Math::Matrixはrow-majorのXMFLOAT4X4なので、シェーダ側の
+	// float4x4(mtx0..mtx3) が「各float4=1行」として通常版のg_mWorldと同じ向きに組み上がる
+	D3D11_MAPPED_SUBRESOURCE mapped = {};
+	if (FAILED(KdDirect3D::Instance().WorkDevContext()->Map(m_instanceBuf, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped)))
+	{
+		return false;
+	}
+
+	memcpy(mapped.pData, mats.data(), sizeof(Math::Matrix) * need);
+	KdDirect3D::Instance().WorkDevContext()->Unmap(m_instanceBuf, 0);
+
+	return true;
+}
+
+// DrawMeshのインスタンシング版。頂点(slot0)とインスタンス行列(slot1)をバインドして一括描画する
+void KdStandardShader::DrawMeshInstanced(const KdMesh* mesh, const std::vector<KdMaterial>& materials,
+	const Math::Vector4& col, const Math::Vector3& emissive, UINT instanceCount)
+{
+	if (mesh == nullptr || instanceCount == 0) { return; }
+
+	// 頂点バッファ(slot0)・インデックスバッファ・トポロジをセット
+	mesh->SetToDevice();
+
+	// インスタンス行列バッファ(slot1)をセット
+	UINT stride = sizeof(Math::Matrix);
+	UINT offset = 0;
+	KdDirect3D::Instance().WorkDevContext()->IASetVertexBuffers(1, 1, &m_instanceBuf, &stride, &offset);
+
+	// サブセット(=マテリアル)ごとに描画。1サブセットにつき1ドローで全インスタンスを描く
+	for (UINT subi = 0; subi < mesh->GetSubsets().size(); subi++)
+	{
+		// 面が無いサブセットはスキップ
+		if (mesh->GetSubsets()[subi].FaceCount == 0) { continue; }
+
+		// マテリアルセット(通常版DrawMeshと同じ扱いにする)
+		WriteMaterial(materials[mesh->GetSubsets()[subi].MaterialNo], col, emissive);
+
+		mesh->DrawSubsetInstanced(subi, instanceCount);
+	}
+
+	// 後続の通常描画がslot1のインスタンスストリームを引きずらないよう外しておく
+	ID3D11Buffer* pNullBuf = nullptr;
+	UINT zero = 0;
+	KdDirect3D::Instance().WorkDevContext()->IASetVertexBuffers(1, 1, &pNullBuf, &zero, &zero);
+}
+
+// 同じモデルを worldList の数だけ、まとめて1回のドローで描く
+void KdStandardShader::DrawModelInstanced(KdModelWork& rModel, const std::vector<Math::Matrix>& worldList,
+	const Math::Color& colRate, const Math::Vector3& emissive)
+{
+	if (!rModel.IsEnable() || worldList.empty()) { return; }
+
+	const std::shared_ptr<KdModelData>& data = rModel.GetData();
+	if (data == nullptr) { return; }
+
+	// スキンメッシュはインスタンシング非対応(静的プロップ用)。呼び出し側で通常のDrawModelを使うこと
+	if (data->IsSkinMesh()) { return; }
+
+	// 今のパスに応じて専用VSを選ぶ。対応外(UnLit等)なら何もしない
+	ID3D11VertexShader* pInstVS = nullptr;
+	ID3D11VertexShader* pNormalVS = nullptr;
+	if (m_curPass == Pass::Lit)
+	{
+		pInstVS = m_VS_Lit_Inst;
+		pNormalVS = m_VS_Lit;
+	}
+	else if (m_curPass == Pass::GenDepth)
+	{
+		pInstVS = m_VS_GenDepthFromLight_Inst;
+		pNormalVS = m_VS_GenDepthFromLight;
+	}
+	if (pInstVS == nullptr || m_inputLayout_Inst == nullptr) { return; }
+
+	if (rModel.NeedCalcNodeMatrices())
+	{
+		rModel.CalcNodeMatrices();
+	}
+
+	// オブジェクト単位の定数(UV/フォグ等)は通常描画と同じものを使う
+	SetIsSkinMeshObj(false);
+	if (m_dirtyCBObj)
+	{
+		m_cb0_Obj.Write();
+	}
+
+	// インスタンシング用のVS・入力レイアウトへ切り替える
+	KdShaderManager::Instance().SetVertexShader(pInstVS);
+	KdShaderManager::Instance().SetInputLayout(m_inputLayout_Inst);
+
+	const std::vector<KdModelData::Node>& dataNodes = data->GetOriginalNodes();
+	const std::vector<KdModelWork::Node>& workNodes = rModel.GetNodes();
+
+	std::vector<Math::Matrix> mats;
+	mats.reserve(worldList.size());
+
+	for (auto& nodeIdx : data->GetDrawMeshNodeIndices())
+	{
+		if (nodeIdx < 0 || nodeIdx >= (int)dataNodes.size()) { continue; }
+
+		const KdMesh* pMesh = dataNodes[nodeIdx].m_spMesh.get();
+		if (pMesh == nullptr) { continue; }
+
+		// ノードのモデル内行列を各インスタンスのワールド行列に掛けてから渡す
+		// (通常版DrawModelの workNodes[nodeIdx].m_worldTransform * mWorld と同じ計算)
+		const Math::Matrix& nodeMat = workNodes[nodeIdx].m_worldTransform;
+		mats.clear();
+		for (const Math::Matrix& w : worldList)
+		{
+			mats.push_back(nodeMat * w);
+		}
+
+		if (!WriteInstanceBuffer(mats)) { continue; }
+
+		DrawMeshInstanced(pMesh, data->GetMaterials(), colRate, emissive, static_cast<UINT>(mats.size()));
+	}
+
+	// 通常描画に戻す(この後にキャラ等の非インスタンス描画が来ても壊れないように)
+	KdShaderManager::Instance().SetVertexShader(pNormalVS);
+	KdShaderManager::Instance().SetInputLayout(m_inputLayout);
+
+	// 定数に変更があった場合は自動的に初期状態に戻す(通常版DrawModelと同じ)
 	if (m_dirtyCBObj)
 	{
 		ResetCBObject();
@@ -489,6 +663,59 @@ bool KdStandardShader::Init()
 		}
 	}
 
+	// ===== 追加(GPUインスタンシング)：Lit用インスタンシングVS＋専用入力レイアウト =====
+	// 通常版と違い、ワールド行列を定数バッファではなく頂点slot1のインスタンスデータで受け取る。
+	// そのため per-instance 要素を含む専用の入力レイアウトが必要になる。
+	{
+#include "KdStandardShader_VS_Lit_Inst.shaderInc"
+
+		if (FAILED(KdDirect3D::Instance().WorkDev()->CreateVertexShader(compiledBuffer, sizeof(compiledBuffer), nullptr, &m_VS_Lit_Inst))) {
+			assert(0 && "頂点シェーダー作成失敗(Lit_Inst)");
+			Release();
+			return false;
+		}
+
+		// slot0=頂点ごとのデータ(通常版と同じ) / slot1=インスタンスごとのワールド行列(float4×4=64byte)
+		// slot1は D3D11_INPUT_PER_INSTANCE_DATA なので、1インスタンス進むごとに次の行列が読まれる
+		std::vector<D3D11_INPUT_ELEMENT_DESC> layout = {
+			{ "POSITION",	0, DXGI_FORMAT_R32G32B32_FLOAT,		0,  0, D3D11_INPUT_PER_VERTEX_DATA,   0 },
+			{ "TEXCOORD",	0, DXGI_FORMAT_R32G32_FLOAT,		0, 12, D3D11_INPUT_PER_VERTEX_DATA,   0 },
+			{ "COLOR",		0, DXGI_FORMAT_R8G8B8A8_UNORM,		0, 20, D3D11_INPUT_PER_VERTEX_DATA,   0 },
+			{ "NORMAL",		0, DXGI_FORMAT_R32G32B32_FLOAT,		0, 24, D3D11_INPUT_PER_VERTEX_DATA,   0 },
+			{ "TANGENT",	0, DXGI_FORMAT_R32G32B32_FLOAT,		0, 36, D3D11_INPUT_PER_VERTEX_DATA,   0 },
+			{ "SKININDEX",	0, DXGI_FORMAT_R16G16B16A16_UINT,	0, 48, D3D11_INPUT_PER_VERTEX_DATA,   0 },
+			{ "SKINWEIGHT",	0, DXGI_FORMAT_R32G32B32A32_FLOAT,	0, 56, D3D11_INPUT_PER_VERTEX_DATA,   0 },
+			{ "INSTMAT",	0, DXGI_FORMAT_R32G32B32A32_FLOAT,	1,  0, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "INSTMAT",	1, DXGI_FORMAT_R32G32B32A32_FLOAT,	1, 16, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "INSTMAT",	2, DXGI_FORMAT_R32G32B32A32_FLOAT,	1, 32, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+			{ "INSTMAT",	3, DXGI_FORMAT_R32G32B32A32_FLOAT,	1, 48, D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+		};
+
+		if (FAILED(KdDirect3D::Instance().WorkDev()->CreateInputLayout(
+			&layout[0],
+			(UINT)layout.size(),
+			&compiledBuffer[0],
+			sizeof(compiledBuffer),
+			&m_inputLayout_Inst))
+			) {
+			assert(0 && "CreateInputLayout失敗(インスタンシング用)");
+			Release();
+			return false;
+		}
+	}
+
+	// ===== 追加(GPUインスタンシング)：影深度用インスタンシングVS =====
+	// 入力レイアウトは上の m_inputLayout_Inst を共用する(頂点要素の並びが同じため)
+	{
+#include "KdStandardShader_VS_GenDepthMapFromLight_Inst.shaderInc"
+
+		if (FAILED(KdDirect3D::Instance().WorkDev()->CreateVertexShader(compiledBuffer, sizeof(compiledBuffer), nullptr, &m_VS_GenDepthFromLight_Inst))) {
+			assert(0 && "頂点シェーダー作成失敗(GenDepth_Inst)");
+			Release();
+			return false;
+		}
+	}
+
 	{
 #include "KdStandardShader_VS_GenDepthMapFromLight.shaderInc"
 
@@ -579,7 +806,14 @@ void KdStandardShader::Release()
 	KdSafeRelease(m_VS_UnLit);
 
 	KdSafeRelease(m_inputLayout);
-	
+
+	// 追加(GPUインスタンシング)：専用VS・入力レイアウト・インスタンスバッファの解放
+	KdSafeRelease(m_VS_Lit_Inst);
+	KdSafeRelease(m_VS_GenDepthFromLight_Inst);
+	KdSafeRelease(m_inputLayout_Inst);
+	KdSafeRelease(m_instanceBuf);
+	m_instanceCapacity = 0;
+
 	KdSafeRelease(m_PS_Lit);
 	KdSafeRelease(m_PS_GenDepthFromLight);
 	KdSafeRelease(m_PS_UnLit);

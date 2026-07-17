@@ -9,6 +9,7 @@
 #include "../../GameObject/Environment/StageEnvironment.h"
 #include "../../GameObject/Environment/FocusPostFx.h"
 #include "../../GameObject/UI/GameHud/GameHud.h"
+#include "../../GameObject/StageProp/InstancedPropRenderer.h"
 
 #include "../../Editor/LevelEditor/LevelFileIO/LevelFileIO.h"
 #include "../../Editor/LevelEditor/LevelEditorManager.h"
@@ -80,4 +81,10 @@ void GameScene::Init()
 	std::shared_ptr<GameHud> spHud = std::make_shared<GameHud>();
 	spHud->Init();
 	AddObject(spHud);
+
+	// StagePropをGPUインスタンシングでまとめて描くレンダラ(StageProp自身は描画しないので必須)。
+	// シーンに1つ常駐させ、各描画パスから DrawLit / GenerateDepthMapFromLight が呼ばれる
+	std::shared_ptr<InstancedPropRenderer> spPropRenderer = std::make_shared<InstancedPropRenderer>();
+	spPropRenderer->Init();
+	AddObject(spPropRenderer);
 }

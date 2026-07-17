@@ -107,3 +107,24 @@ void KdMesh::DrawSubset(int subsetNo) const
 	// 描画
 	KdDirect3D::Instance().WorkDevContext()->DrawIndexed(m_subsets[subsetNo].FaceCount * 3, m_subsets[subsetNo].FaceStart * 3, 0);
 }
+
+// ===== 追加(GPUインスタンシング) =====
+// DrawSubsetのインスタンシング版。同じメッシュを instanceCount 個まとめて1回のドローで描く。
+// ※ 既存のDrawSubsetはそのまま(キャラ等の通常描画で使い続けるため)。
+// ※ 呼ぶ前に SetToDevice() で頂点(slot0)/インデックスを、slot1にインスタンス行列バッファを
+//    バインドしておくこと(KdStandardShader::DrawMeshInstancedが行う)。
+void KdMesh::DrawSubsetInstanced(int subsetNo, UINT instanceCount) const
+{
+	// 範囲外のサブセットはスキップ
+	if (subsetNo >= (int)m_subsets.size()) { return; }
+	// 面数が0、またはインスタンスが0なら描画スキップ
+	if (m_subsets[subsetNo].FaceCount == 0 || instanceCount == 0) { return; }
+
+	// 描画(1回でinstanceCount個ぶん)
+	KdDirect3D::Instance().WorkDevContext()->DrawIndexedInstanced(
+		m_subsets[subsetNo].FaceCount * 3,		// 1インスタンスあたりのインデックス数
+		instanceCount,							// インスタンス数
+		m_subsets[subsetNo].FaceStart * 3,		// 開始インデックス
+		0,										// ベース頂点
+		0);										// 開始インスタンス
+}
