@@ -31,7 +31,10 @@ SlashEffect::~SlashEffect() = default;
 void SlashEffect::Update()
 {
 	m_age += Application::Instance().GetDeltaTime();
-	if (m_age >= m_life) { m_isExpired = true; }   // 寿命が尽きたらEffectManagerが外す
+	if (m_age >= m_life)
+	{
+		m_isExpired = true;
+	}   // 寿命が尽きたらEffectManagerが外す
 }
 
 void SlashEffect::DrawUnLit()

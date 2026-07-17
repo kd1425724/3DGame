@@ -5,8 +5,14 @@
 void CameraShake::AddTrauma(float _amount)
 {
 	m_trauma += _amount;
-	if (m_trauma > 1.0f) { m_trauma = 1.0f; }
-	if (m_trauma < 0.0f) { m_trauma = 0.0f; }
+	if (m_trauma > 1.0f)
+	{
+		m_trauma = 1.0f;
+	}
+	if (m_trauma < 0.0f)
+	{
+		m_trauma = 0.0f;
+	}
 }
 
 void CameraShake::Update(float _dt)
@@ -15,7 +21,10 @@ void CameraShake::Update(float _dt)
 
 	float decay = DebugParams::Instance().Float(U8("カメラ/シェイク減衰"), 3.0f, 0.1f, 20.0f);
 	m_trauma -= decay * _dt;
-	if (m_trauma < 0.0f) { m_trauma = 0.0f; }
+	if (m_trauma < 0.0f)
+	{
+		m_trauma = 0.0f;
+	}
 }
 
 Math::Vector3 CameraShake::GetOffset() const

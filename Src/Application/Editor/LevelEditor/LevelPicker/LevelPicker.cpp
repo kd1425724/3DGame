@@ -17,7 +17,10 @@ namespace
 		Math::Vector3 toPoint = point - rayPos;
 
 		float t = toPoint.Dot(rayDir);
-		if (t < 0.0f) { t = 0.0f; }
+		if (t < 0.0f)
+		{
+			t = 0.0f;
+		}
 
 		Math::Vector3 closestPointOnRay = rayPos + rayDir * t;
 
@@ -237,7 +240,10 @@ void LevelPicker::Update()
 			for (auto& [wpObj, startPos] : m_dragGroupStartPos)
 			{
 				std::shared_ptr<KdGameObject> obj = wpObj.lock();
-				if (obj) { obj->SetPos(startPos + appliedDelta); }
+				if (obj)
+				{
+					obj->SetPos(startPos + appliedDelta);
+				}
 			}
 		}
 	}
@@ -258,7 +264,10 @@ void LevelPicker::Update()
 				for (auto& [wpObj, startPos] : m_dragGroupStartPos)
 				{
 					std::shared_ptr<KdGameObject> obj = wpObj.lock();
-					if (obj) { obj->SetPos(startPos + appliedDelta); }
+					if (obj)
+					{
+						obj->SetPos(startPos + appliedDelta);
+					}
 				}
 			}
 		}

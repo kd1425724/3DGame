@@ -19,7 +19,10 @@ void FocusPostFx::Update()
 	float dt     = Application::Instance().GetRealDeltaTime();
 	float follow = DebugParams::Instance().Float(U8("スロー演出/追従速度"), 8.0f, 0.5f, 30.0f);
 	float t = follow * dt;
-	if (t > 1.0f) { t = 1.0f; }
+	if (t > 1.0f)
+	{
+		t = 1.0f;
+	}
 	m_blend += (target - m_blend) * t;
 
 	// ===== 被写界深度(DoF) =====
@@ -60,7 +63,10 @@ void FocusPostFx::DrawSprite()
 	float darkness = DebugParams::Instance().Float(U8("演出/スロー暗さ"), 0.4f, 0.0f, 1.0f);
 	float alpha = (1.0f - timeScale) * darkness;
 	if (alpha < 0.01f) { return; }                 // ほぼ等速なら暗幕は出さない
-	if (alpha > 0.85f) { alpha = 0.85f; }           // 暗くしすぎない上限
+	if (alpha > 0.85f)
+	{
+		alpha = 0.85f;
+	}   // 暗くしすぎない上限
 
 	// 画面サイズいっぱいの黒い箱を中央(2D原点=画面中央)に描く
 	auto spBackBuffer = KdDirect3D::Instance().GetBackBuffer();

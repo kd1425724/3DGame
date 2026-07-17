@@ -66,8 +66,14 @@ void GameHud::DrawSpeedMeter()
 	float maxSpeed =                  DebugParams::Instance().Float(U8("HUD/速度メーター最大速度"),   25.0f,    1.0f, 100.0f);
 
 	float ratio = speed / maxSpeed;
-	if (ratio < 0.0f) { ratio = 0.0f; }
-	if (ratio > 1.0f) { ratio = 1.0f; }
+	if (ratio < 0.0f)
+	{
+		ratio = 0.0f;
+	}
+	if (ratio > 1.0f)
+	{
+		ratio = 1.0f;
+	}
 
 	auto& sprite = KdShaderManager::Instance().m_spriteShader;
 

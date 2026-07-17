@@ -41,7 +41,10 @@ void HudEditorManager::Draw()
 		if (!m_spSprites[i]) { continue; }
 
 		std::string label = std::to_string(i) + ": " + m_spSprites[i]->GetName();
-		if (ImGui::Selectable(label.c_str(), m_selected == i)) { m_selected = i; }
+		if (ImGui::Selectable(label.c_str(), m_selected == i))
+		{
+			m_selected = i;
+		}
 	}
 
 	ImGui::Separator();
@@ -68,7 +71,10 @@ void HudEditorManager::DrawSprites() const
 	KdShaderManager::Instance().m_spriteShader.Begin();
 	for (auto& sp : m_spSprites)
 	{
-		if (sp) { sp->Draw(); }
+		if (sp)
+		{
+			sp->Draw();
+		}
 	}
 	KdShaderManager::Instance().m_spriteShader.End();
 }

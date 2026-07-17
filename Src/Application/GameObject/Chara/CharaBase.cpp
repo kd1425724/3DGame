@@ -40,7 +40,10 @@ bool CharaBase::IsWallBetween(const Math::Vector3& from, const Math::Vector3& to
 	std::list<KdCollider::CollisionResult> results;
 	for (auto& obj : SceneManager::Instance().GetObjList())
 	{
-		if (obj) { obj->Intersects(ray, &results); }
+		if (obj)
+		{
+			obj->Intersects(ray, &results);
+		}
 	}
 	return !results.empty();   // 途中(両端margin除く)に壁があれば遮蔽されている
 }
@@ -91,7 +94,10 @@ void CharaBase::ResolveGround(Math::Vector3& pos)
 	// デバッグ表示：地面判定に使用したレイを可視化
 	if (KdGameObject::s_showColliderDebug)
 	{
-		if (!m_pDebugWire) { m_pDebugWire = std::make_unique<KdDebugWireFrame>(); }
+		if (!m_pDebugWire)
+		{
+			m_pDebugWire = std::make_unique<KdDebugWireFrame>();
+		}
 		m_pDebugWire->AddDebugLine(ray.m_pos, ray.m_dir, ray.m_range, Math::Color(1.0f, 1.0f, 0.0f, 1.0f));
 	}
 
@@ -130,7 +136,10 @@ void CharaBase::ResolveGround(Math::Vector3& pos)
 		if (pos.y <= standY)
 		{
 			// 空中から着地した"瞬間"だけ、落下の速さを手応え(カメラ揺れ)用に記録する
-			if (!wasGrounded) { m_landingImpact = -m_velocity.y; }
+			if (!wasGrounded)
+			{
+				m_landingImpact = -m_velocity.y;
+			}
 
 			pos.y = standY;
 			m_velocity.y = 0.0f;   // 縦の勢いだけ止める(横の勢いはそのまま=着地滑りは各キャラのUpdate側で制御)
@@ -157,7 +166,10 @@ void CharaBase::ResolveBump(Math::Vector3& pos)
 	// デバッグ表示：壁当たり用の球を可視化(DebugFlags「当たり判定/AABB表示」でON/OFF)
 	if (KdGameObject::s_showColliderDebug)
 	{
-		if (!m_pDebugWire) { m_pDebugWire = std::make_unique<KdDebugWireFrame>(); }
+		if (!m_pDebugWire)
+		{
+			m_pDebugWire = std::make_unique<KdDebugWireFrame>();
+		}
 		m_pDebugWire->AddDebugSphere(Math::Vector3(pos.x, centerY, pos.z), radius, Math::Color(0.3f, 0.6f, 1.0f, 1.0f));
 	}
 
@@ -207,7 +219,10 @@ void CharaBase::ResolveBump(Math::Vector3& pos)
 			Math::Vector3 n = push;
 			n.Normalize();
 			float into = m_velocity.Dot(n);
-			if (into < 0.0f) { m_velocity -= n * into; }
+			if (into < 0.0f)
+			{
+				m_velocity -= n * into;
+			}
 		}
 	}
 }
@@ -236,7 +251,10 @@ void CharaBase::ResolveBumpSweep(const Math::Vector3& fromPos, Math::Vector3& po
 	// デバッグ表示：スイープに使ったレイを可視化
 	if (KdGameObject::s_showColliderDebug)
 	{
-		if (!m_pDebugWire) { m_pDebugWire = std::make_unique<KdDebugWireFrame>(); }
+		if (!m_pDebugWire)
+		{
+			m_pDebugWire = std::make_unique<KdDebugWireFrame>();
+		}
 		m_pDebugWire->AddDebugLine(ray.m_pos, ray.m_dir, ray.m_range, Math::Color(1.0f, 0.4f, 0.0f, 1.0f));
 	}
 
@@ -278,7 +296,10 @@ void CharaBase::ResolveBumpSweep(const Math::Vector3& fromPos, Math::Vector3& po
 	{
 		// 手応え(カメラ揺れ)は"壁に当たった瞬間"だけ記録する。押し付け続けても毎フレーム
 		// 揺らさない(連続攻撃で壁の向こうの敵へ突っ込み続けるとシェイクが終わらない不具合の対策)
-		if (!m_wasHittingWall) { m_wallImpact = into; }
+		if (!m_wasHittingWall)
+		{
+			m_wallImpact = into;
+		}
 		m_wasHittingWall = true;
 		m_velocity -= dir * into;
 	}

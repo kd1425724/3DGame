@@ -206,8 +206,14 @@ bool DebugParams::Load(const std::string& filename)
 			{
 				float v = value.get<float>();
 				auto itr = m_floats.find(name);
-				if (itr != m_floats.end()) { itr->second.value = v; }
-				else { m_pendingFloats[name] = v; }
+				if (itr != m_floats.end())
+				{
+					itr->second.value = v;
+				}
+				else
+				{
+					m_pendingFloats[name] = v;
+				}
 			}
 		}
 
@@ -217,8 +223,14 @@ bool DebugParams::Load(const std::string& filename)
 			{
 				int v = value.get<int>();
 				auto itr = m_ints.find(name);
-				if (itr != m_ints.end()) { itr->second.value = v; }
-				else { m_pendingInts[name] = v; }
+				if (itr != m_ints.end())
+				{
+					itr->second.value = v;
+				}
+				else
+				{
+					m_pendingInts[name] = v;
+				}
 			}
 		}
 
@@ -228,8 +240,14 @@ bool DebugParams::Load(const std::string& filename)
 			{
 				Math::Vector3 v(value.at(0).get<float>(), value.at(1).get<float>(), value.at(2).get<float>());
 				auto itr = m_vectors.find(name);
-				if (itr != m_vectors.end()) { itr->second = v; }
-				else { m_pendingVectors[name] = v; }
+				if (itr != m_vectors.end())
+				{
+					itr->second = v;
+				}
+				else
+				{
+					m_pendingVectors[name] = v;
+				}
 			}
 		}
 
@@ -239,8 +257,14 @@ bool DebugParams::Load(const std::string& filename)
 			{
 				bool v = value.get<bool>();
 				auto itr = m_bools.find(name);
-				if (itr != m_bools.end()) { itr->second = v; }
-				else { m_pendingBools[name] = v; }
+				if (itr != m_bools.end())
+				{
+					itr->second = v;
+				}
+				else
+				{
+					m_pendingBools[name] = v;
+				}
 			}
 		}
 	}

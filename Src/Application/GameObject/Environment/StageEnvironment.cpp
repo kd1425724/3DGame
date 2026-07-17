@@ -46,6 +46,9 @@ void StageEnvironment::Apply()
 	float shadowArea  = DebugParams::Instance().Float(U8("環境/影エリア"),     40.0f, 5.0f, 200.0f);
 	float heightRatio = DebugParams::Instance().Float(U8("環境/影の高さ比率"), 0.75f, 0.3f,   2.0f);
 	float shadowHeight = shadowArea * heightRatio;
-	if (shadowHeight < 25.0f) { shadowHeight = 25.0f; }   // 小さいエリアでも塔より高い所から照らすための下限
+	if (shadowHeight < 25.0f)
+	{
+		shadowHeight = 25.0f;
+	}   // 小さいエリアでも塔より高い所から照らすための下限
 	amb.SetDirLightShadowArea(Math::Vector2(shadowArea, shadowArea), shadowHeight);
 }

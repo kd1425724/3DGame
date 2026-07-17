@@ -26,11 +26,26 @@ void DebugManager::Draw()
 	// 上部メニューバー(各ウィンドウの個別ON/OFF)
 	DrawMenuBar();
 
-	if (m_showFlags)	{ DebugFlags::Instance().Draw(); }
-	if (m_showWatch)	{ DebugWatch::Instance().Draw(); }
-	if (m_showParams)	{ DebugParams::Instance().Draw(); }
-	if (m_showEffect)	{ DebugEffect::Instance().Draw(); }
-	if (m_showHud)		{ HudEditorManager::Instance().Draw(); }
+	if (m_showFlags)
+	{
+		DebugFlags::Instance().Draw();
+	}
+	if (m_showWatch)
+	{
+		DebugWatch::Instance().Draw();
+	}
+	if (m_showParams)
+	{
+		DebugParams::Instance().Draw();
+	}
+	if (m_showEffect)
+	{
+		DebugEffect::Instance().Draw();
+	}
+	if (m_showHud)
+	{
+		HudEditorManager::Instance().Draw();
+	}
 
 	// レベルエディタ(配置ツール)のパネルもF3の一括トグルで隠す
 	// (エディタモード自体のON/OFF・カメラ・3Dギズモは従来どおりF1で制御。ここは表示だけ)

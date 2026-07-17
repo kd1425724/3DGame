@@ -11,7 +11,10 @@ void DebugEffect::Draw()
 	}
 
 	// 初回だけ実フォルダを自動走査する(以降は「再読み込み」ボタンで更新)
-	if (!m_fileListScanned) { RefreshFileList(); }
+	if (!m_fileListScanned)
+	{
+		RefreshFileList();
+	}
 
 	ImGui::TextDisabled(U8("Asset/Data/Effect/ 内の .efk をプルダウンから選択(手入力も可)"));
 
@@ -22,13 +25,22 @@ void DebugEffect::Draw()
 		for (const std::string& file : m_efkFiles)
 		{
 			bool selected = (file == m_fileName);
-			if (ImGui::Selectable(file.c_str(), selected)) { m_fileName = file; }
-			if (selected) { ImGui::SetItemDefaultFocus(); }
+			if (ImGui::Selectable(file.c_str(), selected))
+			{
+				m_fileName = file;
+			}
+			if (selected)
+			{
+				ImGui::SetItemDefaultFocus();
+			}
 		}
 		ImGui::EndCombo();
 	}
 	ImGui::SameLine();
-	if (ImGui::Button(U8("再読み込み"))) { RefreshFileList(); }
+	if (ImGui::Button(U8("再読み込み")))
+	{
+		RefreshFileList();
+	}
 
 	if (m_efkFiles.empty())
 	{
@@ -95,7 +107,10 @@ void DebugEffect::RefreshFileList()
 
 		// 基準からの相対パス。generic_stringで区切りを'/'に統一(Playが期待する形)
 		const std::string rel = fs::relative(p, base, ec).generic_string();
-		if (!ec && !rel.empty()) { m_efkFiles.push_back(rel); }
+		if (!ec && !rel.empty())
+		{
+			m_efkFiles.push_back(rel);
+		}
 	}
 
 	// 名前順に並べて選びやすくする

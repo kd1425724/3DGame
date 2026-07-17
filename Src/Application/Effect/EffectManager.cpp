@@ -9,7 +9,10 @@ EffectManager::~EffectManager() = default;
 
 void EffectManager::Add(const std::shared_ptr<EffectBase>& _effect)
 {
-	if (_effect) { m_effects.push_back(_effect); }
+	if (_effect)
+	{
+		m_effects.push_back(_effect);
+	}
 }
 
 void EffectManager::SpawnSlash(const Math::Vector3& _pos)
@@ -33,7 +36,10 @@ void EffectManager::Update()
 			m_effects[i] = std::move(m_effects.back());
 			m_effects.pop_back();
 		}
-		else { ++i; }
+		else
+		{
+			++i;
+		}
 	}
 }
 

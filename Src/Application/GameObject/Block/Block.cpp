@@ -60,7 +60,10 @@ void Block::DrawDebug()
 	//    m_mWorldに回転・スケールが入っているのでoriented=trueで実形状に一致させる
 	if (KdGameObject::s_showColliderDebug)
 	{
-		if (!m_pDebugWire) { m_pDebugWire = std::make_unique<KdDebugWireFrame>(); }
+		if (!m_pDebugWire)
+		{
+			m_pDebugWire = std::make_unique<KdDebugWireFrame>();
+		}
 		m_pDebugWire->AddDebugBox(m_mWorld, Math::Vector3(0.5f, 0.5f, 0.5f), Math::Vector3::Zero, true, kGreenColor);
 	}
 

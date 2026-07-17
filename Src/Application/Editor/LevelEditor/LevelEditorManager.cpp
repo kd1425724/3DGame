@@ -43,8 +43,14 @@ void LevelEditorManager::RemoveObject(const std::shared_ptr<KdGameObject>& obj)
 	// ここでまとめて掃除しておく(生ポインタキーが残り続けるのを防ぐ)
 	for (auto it = m_objectTypeNames.begin(); it != m_objectTypeNames.end(); )
 	{
-		if (it->second.wp.expired()) { it = m_objectTypeNames.erase(it); }
-		else { ++it; }
+		if (it->second.wp.expired())
+		{
+			it = m_objectTypeNames.erase(it);
+		}
+		else
+		{
+			++it;
+		}
 	}
 
 	// 選択中リストからも取り除く(破棄済みのものも一緒に掃除しておく)
@@ -58,7 +64,10 @@ void LevelEditorManager::SetSelected(const std::shared_ptr<KdGameObject>& obj)
 {
 	m_wpSelectedList.clear();
 
-	if (obj) { m_wpSelectedList.push_back(obj); }
+	if (obj)
+	{
+		m_wpSelectedList.push_back(obj);
+	}
 }
 
 std::shared_ptr<KdGameObject> LevelEditorManager::GetSelected() const
@@ -98,7 +107,10 @@ std::vector<std::shared_ptr<KdGameObject>> LevelEditorManager::GetSelectedList()
 	for (auto& wp : m_wpSelectedList)
 	{
 		std::shared_ptr<KdGameObject> sp = wp.lock();
-		if (sp) { result.push_back(sp); }
+		if (sp)
+		{
+			result.push_back(sp);
+		}
 	}
 
 	return result;
@@ -172,11 +184,26 @@ void LevelEditorManager::Update()
 
 		if (ctrl)
 		{
-			if (KdInputManager::Instance().IsPress("Copy"))		{ CopySelected(); }
-			if (KdInputManager::Instance().IsPress("Paste"))		{ Paste(); }
-			if (KdInputManager::Instance().IsPress("Duplicate"))	{ DuplicateSelected(); }
-			if (KdInputManager::Instance().IsPress("Undo"))		{ LevelEditorHistory::Instance().Undo(); }
-			if (KdInputManager::Instance().IsPress("Redo"))		{ LevelEditorHistory::Instance().Redo(); }
+			if (KdInputManager::Instance().IsPress("Copy"))
+			{
+				CopySelected();
+			}
+			if (KdInputManager::Instance().IsPress("Paste"))
+			{
+				Paste();
+			}
+			if (KdInputManager::Instance().IsPress("Duplicate"))
+			{
+				DuplicateSelected();
+			}
+			if (KdInputManager::Instance().IsPress("Undo"))
+			{
+				LevelEditorHistory::Instance().Undo();
+			}
+			if (KdInputManager::Instance().IsPress("Redo"))
+			{
+				LevelEditorHistory::Instance().Redo();
+			}
 		}
 
 		// Deleteキーで選択中のオブジェクトを一括削除

@@ -33,7 +33,10 @@ namespace MathAPI
 		if (angle >= 0.1f)
 		{
 			// 1回の回転量に上限を設ける
-			if (angle > maxAngleSpeedDeg) { angle = maxAngleSpeedDeg; }
+			if (angle > maxAngleSpeedDeg)
+			{
+				angle = maxAngleSpeedDeg;
+			}
 
 			// 外積：2つのベクトルに対し垂直なベクトルを算出。Y成分の符号で回転方向を判定する
 			Math::Vector3 cross = nowDir.Cross(toDir);
@@ -42,13 +45,19 @@ namespace MathAPI
 			{
 				// 外積が上を向いている
 				newAngleDeg += angle;
-				if (newAngleDeg > 360.0f) { newAngleDeg -= 360.0f; }
+				if (newAngleDeg > 360.0f)
+				{
+					newAngleDeg -= 360.0f;
+				}
 			}
 			else
 			{
 				// 外積が下を向いている
 				newAngleDeg -= angle;
-				if (newAngleDeg < 0.0f) { newAngleDeg += 360.0f; }
+				if (newAngleDeg < 0.0f)
+				{
+					newAngleDeg += 360.0f;
+				}
 			}
 		}
 

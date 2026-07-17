@@ -62,7 +62,10 @@ void Player::Update()
 	// 回避の無敵時間を消化(回避が終わっても必ず毎フレーム減らす)。
 	// ※ 以前はUpdateDodgeの「回避実行中」ブロック内だけで減らしていたため、
 	//   無敵時間(0.2)>回避時間(0.18)だと端数が減らず"一度回避したらずっと無敵"になっていた
-	if (m_invincibleTimer > 0.0f) { m_invincibleTimer -= dt; }
+	if (m_invincibleTimer > 0.0f)
+	{
+		m_invincibleTimer -= dt;
+	}
 
 	// 被弾ノックバックの硬直を消化(この間は移動入力を無視して勢いを崩される)。
 	// 硬直中は水平速度を摩擦で徐々に殺し、ノックバックで遠くまで(崖から)吹き飛ばされ続けないようにする
@@ -71,7 +74,10 @@ void Player::Update()
 		m_staggerTimer -= dt;
 		float fric = DebugParams::Instance().Float(U8("反撃/被弾の摩擦"), 6.0f, 0.0f, 30.0f);
 		float k = 1.0f - fric * dt;
-		if (k < 0.0f) { k = 0.0f; }
+		if (k < 0.0f)
+		{
+			k = 0.0f;
+		}
 		m_velocity.x *= k;
 		m_velocity.z *= k;
 	}
@@ -208,7 +214,10 @@ void Player::UpdateMove(float dt)
 		if (addSpeed > 0.0f)
 		{
 			float accel = airAccel * moveSpeed * dt;
-			if (accel > addSpeed) { accel = addSpeed; }  // 入力方向がmoveSpeedを超えないよう頭打ち
+			if (accel > addSpeed)
+			{
+				accel = addSpeed;
+			}   // 入力方向がmoveSpeedを超えないよう頭打ち
 			m_velocity.x += wishDir.x * accel;
 			m_velocity.z += wishDir.z * accel;
 		}
@@ -225,11 +234,28 @@ void Player::UpdateJump(float dt)
 	float bufferTime = DebugParams::Instance().Float(U8("プレイヤー/ジャンプ先行入力"), 0.12f, 0.0f, 0.5f);
 
 	// タイマー更新：接地中はコヨーテを0に、空中では増やす
-	if (m_isGrounded) { m_coyoteTimer = 0.0f; } else { m_coyoteTimer += dt; }
+	if (m_isGrounded)
+	{
+		m_coyoteTimer = 0.0f;
+	}
+	else
+	{
+		m_coyoteTimer += dt;
+	}
 
 	// 入力があればバッファを満タンに、なければ減らす
-	if (KdInputManager::Instance().IsPress("Jump")) { m_jumpBufferTimer = bufferTime; }
-	else { m_jumpBufferTimer -= dt; if (m_jumpBufferTimer < 0.0f) { m_jumpBufferTimer = 0.0f; } }
+	if (KdInputManager::Instance().IsPress("Jump"))
+	{
+		m_jumpBufferTimer = bufferTime;
+	}
+	else
+	{
+		m_jumpBufferTimer -= dt;
+		if (m_jumpBufferTimer < 0.0f)
+		{
+			m_jumpBufferTimer = 0.0f;
+		}
+	}
 
 	// 「先行入力が生きている」かつ「接地中 or コヨーテ猶予内」なら跳ぶ
 	bool canJump = (m_jumpBufferTimer > 0.0f) && (m_isGrounded || m_coyoteTimer <= coyoteTime);
@@ -244,7 +270,10 @@ void Player::UpdateJump(float dt)
 void Player::UpdateDodge(float dt)
 {
 	// クールダウンを消化
-	if (m_dodgeCooldownTimer > 0.0f) { m_dodgeCooldownTimer -= dt; }
+	if (m_dodgeCooldownTimer > 0.0f)
+	{
+		m_dodgeCooldownTimer -= dt;
+	}
 
 	// === 回避ダッシュ実行中：水平にフラットに素早く移動(縦は止めて空中でもキレよく) ===
 	if (m_isDodging)
@@ -257,7 +286,10 @@ void Player::UpdateDodge(float dt)
 		m_dodgeTimer -= dt;
 		// ※ 無敵時間(m_invincibleTimer)の消化はUpdate()側で毎フレーム行う。
 		//   ここ(回避中のみ)で減らすと、無敵時間>回避時間のとき端数が残って永久無敵になる
-		if (m_dodgeTimer <= 0.0f) { m_isDodging = false; }
+		if (m_dodgeTimer <= 0.0f)
+		{
+			m_isDodging = false;
+		}
 		return;
 	}
 
@@ -269,13 +301,19 @@ void Player::UpdateDodge(float dt)
 	// 方向：移動入力があればその向き(カメラ基準)、無ければカメラ前方(水平)
 	Math::Vector2 moveAxis = KdInputManager::Instance().GetAxisState("Move");
 	Math::Vector3 dir = Math::Vector3::Backward * moveAxis.y + Math::Vector3::Right * moveAxis.x;
-	if (dir.LengthSquared() < 0.0001f) { dir = Math::Vector3::Backward; }   // 入力なし→前方へ
+	if (dir.LengthSquared() < 0.0001f)
+	{
+		dir = Math::Vector3::Backward;
+	}   // 入力なし→前方へ
 	if (std::shared_ptr<CameraBase> spCam = m_wpCamera.lock())
 	{
 		dir = Math::Vector3::TransformNormal(dir, spCam->GetRotationYMatrix());
 	}
 	dir.y = 0.0f;
-	if (dir.LengthSquared() < 0.0001f) { dir = Math::Vector3::Backward; }
+	if (dir.LengthSquared() < 0.0001f)
+	{
+		dir = Math::Vector3::Backward;
+	}
 	dir.Normalize();
 	m_dodgeDir = dir;
 
@@ -309,7 +347,10 @@ void Player::UpdateAirFocus()
 	{
 		Application::Instance().SetTimeScale(slowVal);   // 世界をスローに
 		m_focusGauge -= realDt;
-		if (m_focusGauge < 0.0f) { m_focusGauge = 0.0f; }
+		if (m_focusGauge < 0.0f)
+		{
+			m_focusGauge = 0.0f;
+		}
 	}
 	else
 	{
@@ -323,7 +364,10 @@ void Player::UpdateAirFocus()
 	if (!wantSlow)
 	{
 		m_focusGauge += refill * realDt;
-		if (m_focusGauge > maxGauge) { m_focusGauge = maxGauge; }
+		if (m_focusGauge > maxGauge)
+		{
+			m_focusGauge = maxGauge;
+		}
 	}
 }
 
@@ -364,7 +408,10 @@ void Player::UpdateDive(float dt)
 
 			if (!spTarget)
 			{
-				if (m_comboWindowTimer <= 0.0f) { m_isDiving = false; }   // 受付終了→落下へ
+				if (m_comboWindowTimer <= 0.0f)
+				{
+					m_isDiving = false;
+				}   // 受付終了→落下へ
 				return;
 			}
 			// 次の対象が決まった → 下のダッシュへ流れる
@@ -412,7 +459,10 @@ void Player::UpdateDive(float dt)
 		to /= dist;
 		// リールで引かれるように、速さを加速でrampしつつ常に対象へまっすぐ向ける
 		float sp = m_velocity.Length() + pullAccel * dt;
-		if (sp > pullMax) { sp = pullMax; }
+		if (sp > pullMax)
+		{
+			sp = pullMax;
+		}
 		m_velocity = to * sp;
 		return;
 	}
@@ -460,7 +510,10 @@ std::shared_ptr<KdGameObject> Player::FindNearestEnemy(const Math::Vector3& cent
 void Player::UpdateSweep(float dt)
 {
 	// クールダウンを消化
-	if (m_sweepCooldownTimer > 0.0f) { m_sweepCooldownTimer -= dt; }
+	if (m_sweepCooldownTimer > 0.0f)
+	{
+		m_sweepCooldownTimer -= dt;
+	}
 
 	// === 発動判定 ===
 	if (m_isDiving) { return; }                                    // 突撃中は使わない
@@ -498,7 +551,10 @@ void Player::Respawn()
 	SetPos(m_spawnPos);
 	m_velocity = Math::Vector3::Zero;
 	m_isGrounded = false;
-	if (m_upWire) { m_upWire->Release(); }
+	if (m_upWire)
+	{
+		m_upWire->Release();
+	}
 	m_isDiving = false;
 	m_wpDiveTarget.reset();
 	m_diveChainCount = 0;
@@ -528,16 +584,25 @@ void Player::PostUpdate()
 	}
 
 	// 接地して待機(突撃していない)状態ならチェインは途切れる(次は1から数え直す)
-	if (IsGrounded() && !m_isDiving) { m_diveChainCount = 0; }
+	if (IsGrounded() && !m_isDiving)
+	{
+		m_diveChainCount = 0;
+	}
 
 	// === 着地・壁ヒットの手応え(カメラを揺らす) ===
 	// CharaBaseが記録した衝撃をConsumeし、一定以上ならtraumaを加える(小さすぎる衝撃は無視)。
 	// ※ Playerだけが発火する。Enemyも同じ記録はするが読まないのでカメラは揺れない
 	float landing = ConsumeLandingImpact();
-	if (landing > 3.0f) { CameraShake::Instance().AddTrauma(std::clamp(landing / 20.0f, 0.0f, 0.6f)); }
+	if (landing > 3.0f)
+	{
+		CameraShake::Instance().AddTrauma(std::clamp(landing / 20.0f, 0.0f, 0.6f));
+	}
 
 	float wall = ConsumeWallImpact();
-	if (wall > 4.0f) { CameraShake::Instance().AddTrauma(std::clamp(wall / 25.0f, 0.0f, 0.7f)); }
+	if (wall > 4.0f)
+	{
+		CameraShake::Instance().AddTrauma(std::clamp(wall / 25.0f, 0.0f, 0.7f));
+	}
 
 	// 照準：画面中心に一番近い敵を自動ターゲット(カメラは回さない)。選定とマーカーはTargetingが持つ
 	m_upTargeting->Update(m_wpCamera.lock(), Application::Instance().GetDeltaTime());
@@ -583,7 +648,10 @@ void Player::DrawDebug()
 	// 当たり判定表示(DebugFlags「当たり判定/AABB表示」)ON時、索敵範囲・攻撃範囲などを可視化する
 	if (s_showColliderDebug)
 	{
-		if (!m_pDebugWire) { m_pDebugWire = std::make_unique<KdDebugWireFrame>(); }
+		if (!m_pDebugWire)
+		{
+			m_pDebugWire = std::make_unique<KdDebugWireFrame>();
+		}
 		DrawDebugRanges();
 	}
 	// KdGameObject::DrawDebugが m_pCollider のAABBを積み、m_pDebugWire をまとめて描画する
@@ -637,7 +705,10 @@ void Player::DrawDebugRanges()
 	if (m_upTargeting)
 	{
 		std::shared_ptr<KdGameObject> spTarget = m_upTargeting->GetTarget();
-		if (spTarget) { m_pDebugWire->AddDebugLine(pos, spTarget->GetPos(), Math::Color(0.2f, 0.9f, 1.0f, 1.0f)); }
+		if (spTarget)
+		{
+			m_pDebugWire->AddDebugLine(pos, spTarget->GetPos(), Math::Color(0.2f, 0.9f, 1.0f, 1.0f));
+		}
 	}
 
 	// ワイヤー接続中：手元→アンカーの線(青)
@@ -661,15 +732,24 @@ void Player::ApplyKnockback(const Math::Vector3& _dir, float _power)
 
 	Math::Vector3 dir = _dir;
 	dir.y = 0.0f;
-	if (dir.LengthSquared() > 0.0001f) { dir.Normalize(); }
-	else { dir = Math::Vector3::Backward; }
+	if (dir.LengthSquared() > 0.0001f)
+	{
+		dir.Normalize();
+	}
+	else
+	{
+		dir = Math::Vector3::Backward;
+	}
 
 	// 水平に吐き飛ばして勢いを崩す。HPは無いのでダメージ自体は無い。
 	// 上向きには基本飛ばさない(浮かせると空中で慣性が保たれ、崖から遠くまで吹き飛ぶため既定0)
 	m_velocity.x = dir.x * _power;
 	m_velocity.z = dir.z * _power;
 	float pop = DebugParams::Instance().Float(U8("反撃/被弾の浮き"), 0.0f, 0.0f, 15.0f);
-	if (pop > 0.0f && m_velocity.y < pop) { m_velocity.y = pop; }
+	if (pop > 0.0f && m_velocity.y < pop)
+	{
+		m_velocity.y = pop;
+	}
 
 	// 短い硬直(この間は移動入力が効かない=勢いを崩される)
 	m_staggerTimer = DebugParams::Instance().Float(U8("反撃/被弾硬直"), 0.3f, 0.0f, 1.5f);
@@ -704,7 +784,10 @@ void Player::UpdateCounter()
 		if (KdInputManager::Instance().IsPress("DiveAttack"))
 		{
 			std::shared_ptr<KdGameObject> spTarget = m_upTargeting->GetTarget();
-			if (!spTarget) { spTarget = FindNearestEnemy(GetPos(), findRange); }
+			if (!spTarget)
+			{
+				spTarget = FindNearestEnemy(GetPos(), findRange);
+			}
 
 			m_isDodging          = false;   // 回避から突撃へクリーンに移行する
 			m_counterWindowTimer = 0.0f;    // 窓を閉じる(スロー解除は次フレームのAirFocusが担当)

@@ -61,8 +61,14 @@ void EditorCamera::PostUpdate()
 
 		move += forward * moveAxis.y;
 		move += right * moveAxis.x;
-		if (KdInputManager::Instance().IsHold("MoveUp"))	{ move += Math::Vector3::Up; }
-		if (KdInputManager::Instance().IsHold("MoveDown"))	{ move -= Math::Vector3::Up; }
+		if (KdInputManager::Instance().IsHold("MoveUp"))
+		{
+			move += Math::Vector3::Up;
+		}
+		if (KdInputManager::Instance().IsHold("MoveDown"))
+		{
+			move -= Math::Vector3::Up;
+		}
 
 		if (move.LengthSquared() > 0.0f)
 		{

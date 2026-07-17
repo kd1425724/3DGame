@@ -54,7 +54,10 @@ void TPSCamera::PostUpdate()
 
 	// === 追従対象の位置と移動速度 ===
 	Math::Vector3 targetPos = Math::Vector3::Zero;
-	if (_spTarget) { targetPos = _spTarget->GetPos(); }
+	if (_spTarget)
+	{
+		targetPos = _spTarget->GetPos();
+	}
 
 	// 初回フレームは現在値に合わせて、起動直後のスムージング暴れを防ぐ
 	if (!m_smoothInit)
@@ -68,7 +71,10 @@ void TPSCamera::PostUpdate()
 
 	// 対象の移動速度(m/s)。Cのカメラ引きに使う
 	float targetSpeed = 0.0f;
-	if (dt > 0.0f) { targetSpeed = (targetPos - m_prevTargetPos).Length() / dt; }
+	if (dt > 0.0f)
+	{
+		targetSpeed = (targetPos - m_prevTargetPos).Length() / dt;
+	}
 	m_prevTargetPos = targetPos;
 
 	// === A: 追従スムージング(注視点をLerpで遅れて寄せる=振り子軌道の急な揺れを吸収) ===
@@ -83,8 +89,14 @@ void TPSCamera::PostUpdate()
 	{
 		// 角度差を[-180,180]に畳んで最短方向に補間する(ヨーが720度等に累積してもクルッと回らない)
 		float d = tgt - cur;
-		while (d > 180.0f)  { d -= 360.0f; }
-		while (d < -180.0f) { d += 360.0f; }
+		while (d > 180.0f)
+		{
+			d -= 360.0f;
+		}
+		while (d < -180.0f)
+		{
+			d += 360.0f;
+		}
 		return cur + d * t;
 	};
 	m_smoothDegAng.x = lerpAngle(m_smoothDegAng.x, m_DegAng.x, rotT);
@@ -105,7 +117,10 @@ void TPSCamera::PostUpdate()
 	float fovMaxAdd   = DebugParams::Instance().Float(U8("カメラ/速度FOV上限"), 12.0f,  0.0f, 40.0f);
 	float fovTarget   = fovBase + std::clamp(targetSpeed * fovPerSpeed, 0.0f, fovMaxAdd);
 	m_smoothFov      += (fovTarget - m_smoothFov) * followT;
-	if (m_spCamera) { m_spCamera->SetProjectionMatrix(m_smoothFov); }
+	if (m_spCamera)
+	{
+		m_spCamera->SetProjectionMatrix(m_smoothFov);
+	}
 
 	// === カメラ行列の構築 ===
 	// ローカル位置の基準(Initで設定したm_localBaseOffset)に、速度ぶんの引きをzへ足して後ろへ下げる

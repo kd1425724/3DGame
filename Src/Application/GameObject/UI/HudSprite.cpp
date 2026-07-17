@@ -13,8 +13,14 @@ bool HudSprite::SetTexturePath(const std::string& _path)
 	m_spTexture = tex;
 
 	// サイズ未指定(0)なら画像の元サイズを既定にする
-	if (m_width  == 0) { m_width  = static_cast<int>(m_spTexture->GetInfo().Width); }
-	if (m_height == 0) { m_height = static_cast<int>(m_spTexture->GetInfo().Height); }
+	if (m_width  == 0)
+	{
+		m_width  = static_cast<int>(m_spTexture->GetInfo().Width);
+	}
+	if (m_height == 0)
+	{
+		m_height = static_cast<int>(m_spTexture->GetInfo().Height);
+	}
 
 	return true;
 }
@@ -36,7 +42,10 @@ void HudSprite::DrawImGuiEdit()
 
 	ImGui::InputText(U8("画像パス"), &m_texturePath);
 	ImGui::SameLine();
-	if (ImGui::Button(U8("読込"))) { SetTexturePath(m_texturePath); }
+	if (ImGui::Button(U8("読込")))
+	{
+		SetTexturePath(m_texturePath);
+	}
 
 	if (!m_spTexture)
 	{
@@ -67,7 +76,10 @@ void HudSprite::DrawImGuiEdit()
 	}
 
 	float col[4] = { m_color.x, m_color.y, m_color.z, m_color.w };
-	if (ImGui::ColorEdit4(U8("色"), col)) { m_color = Math::Color(col[0], col[1], col[2], col[3]); }
+	if (ImGui::ColorEdit4(U8("色"), col))
+	{
+		m_color = Math::Color(col[0], col[1], col[2], col[3]);
+	}
 }
 
 nlohmann::json HudSprite::ToJson() const
@@ -85,7 +97,10 @@ nlohmann::json HudSprite::ToJson() const
 
 void HudSprite::FromJson(const nlohmann::json& _json)
 {
-	if (_json.contains("name"))    { m_name = _json["name"].get<std::string>(); }
+	if (_json.contains("name"))
+	{
+		m_name = _json["name"].get<std::string>();
+	}
 	if (_json.contains("pos"))
 	{
 		m_posX = _json["pos"].at(0).get<int>();
@@ -96,10 +111,22 @@ void HudSprite::FromJson(const nlohmann::json& _json)
 		m_width = _json["size"].at(0).get<int>();
 		m_height = _json["size"].at(1).get<int>();
 	}
-	if (_json.contains("pivot"))   { m_pivot = Math::Vector2(_json["pivot"].at(0).get<float>(), _json["pivot"].at(1).get<float>()); }
-	if (_json.contains("color"))   { m_color = Math::Color(_json["color"].at(0).get<float>(), _json["color"].at(1).get<float>(), _json["color"].at(2).get<float>(), _json["color"].at(3).get<float>()); }
-	if (_json.contains("visible")) { m_visible = _json["visible"].get<bool>(); }
+	if (_json.contains("pivot"))
+	{
+		m_pivot = Math::Vector2(_json["pivot"].at(0).get<float>(), _json["pivot"].at(1).get<float>());
+	}
+	if (_json.contains("color"))
+	{
+		m_color = Math::Color(_json["color"].at(0).get<float>(), _json["color"].at(1).get<float>(), _json["color"].at(2).get<float>(), _json["color"].at(3).get<float>());
+	}
+	if (_json.contains("visible"))
+	{
+		m_visible = _json["visible"].get<bool>();
+	}
 
 	// テクスチャは最後に読み込む(上でm_width/m_heightを設定済みなら元サイズで上書きしない)
-	if (_json.contains("texture")) { SetTexturePath(_json["texture"].get<std::string>()); }
+	if (_json.contains("texture"))
+	{
+		SetTexturePath(_json["texture"].get<std::string>());
+	}
 }

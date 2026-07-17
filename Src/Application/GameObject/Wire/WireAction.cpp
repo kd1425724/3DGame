@@ -28,8 +28,14 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, float _reel)
 	// 外した瞬間の速度はそのまま残るので、スイングの勢いで飛んでいける(フリング)
 	Math::Vector3 hand = _body.GetPos() + Math::Vector3(0.0f, 1.0f, 0.0f);
 	float occMargin = DebugParams::Instance().Float(U8("ワイヤー/遮蔽の余白"),     1.0f, 0.0f, 5.0f);
-	if (CharaBase::IsWallBetween(hand, m_anchor, occMargin)) { m_occludedTime += _dt; }
-	else                                                     { m_occludedTime = 0.0f; }
+	if (CharaBase::IsWallBetween(hand, m_anchor, occMargin))
+	{
+		m_occludedTime += _dt;
+	}
+	else
+	{
+		m_occludedTime = 0.0f;
+	}
 
 	float releaseDelay = DebugParams::Instance().Float(U8("ワイヤー/自動リリース猶予"), 0.2f, 0.0f, 1.0f);
 	if (m_occludedTime >= releaseDelay)
@@ -72,8 +78,14 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, float _reel)
 			{
 				radial.Normalize();
 				tdir -= radial * tdir.Dot(radial);
-				if (tdir.LengthSquared() > 0.0001f) { tdir.Normalize(); }
-				else                                { tdir = Math::Vector3::Zero; }
+				if (tdir.LengthSquared() > 0.0001f)
+				{
+					tdir.Normalize();
+				}
+				else
+				{
+					tdir = Math::Vector3::Zero;
+				}
 			}
 
 			float pumpMax = DebugParams::Instance().Float(U8("ワイヤー/ポンプ上限速度"), 20.0f, 0.0f, 60.0f);
@@ -83,7 +95,10 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, float _reel)
 			if (add > 0.0f && tdir.LengthSquared() > 0.0f)
 			{
 				float a = pumpAcc * _dt;
-				if (a > add) { a = add; }
+				if (a > add)
+				{
+					a = add;
+				}
 				_body.m_velocity.x += tdir.x * a;
 				_body.m_velocity.z += tdir.z * a;
 			}
@@ -199,8 +214,14 @@ void WireAction::Update(Math::Vector3& _pos, Math::Vector3& _vel, float _dt, flo
 	//    ・縮める量 = _reelInput * リール速度(DebugParams) * _dt を m_length から引く
 	//    ・短くなりすぎないよう下限(例:0.5)でクランプ
 	m_length -= _reelInput * DebugParams::Instance().Float(U8("ワイヤー/リール速度"), 5.0f, 0.1f, 10.0f) * _dt;
-	if (m_length < 0.5f)       { m_length = 0.5f; }        // 短すぎ防止
-	if (m_length > m_maxLength) { m_length = m_maxLength; } // 撃った時の長さより伸ばさない
+	if (m_length < 0.5f)
+	{
+		m_length = 0.5f;
+	}   // 短すぎ防止
+	if (m_length > m_maxLength)
+	{
+		m_length = m_maxLength;
+	}   // 撃った時の長さより伸ばさない
 
 	// ② アンカーから自分へのベクトル toPos = _pos - m_anchor と、その長さ dist を求める
 	//    ・dist がほぼ0なら向きが定義できないので早期return

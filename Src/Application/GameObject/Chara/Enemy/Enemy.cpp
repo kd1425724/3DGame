@@ -123,14 +123,20 @@ void Enemy::Update()
 			break;
 		}
 		// 当たらずに突進時間が切れたら空振りで硬直へ
-		if (m_stateTimer <= 0.0f) { EnterRecover(); }
+		if (m_stateTimer <= 0.0f)
+		{
+			EnterRecover();
+		}
 		break;
 	}
 	case State::Recover:
 	{
 		// 突進の後隙。硬直が明けたら追従に戻る
 		m_stateTimer -= dt;
-		if (m_stateTimer <= 0.0f) { m_state = State::Chase; }
+		if (m_stateTimer <= 0.0f)
+		{
+			m_state = State::Chase;
+		}
 		break;
 	}
 	}
@@ -175,7 +181,10 @@ void Enemy::PostUpdate()
 	// デバッグ表示：接触判定(m_hitRadius)を可視化
 	if (KdGameObject::s_showColliderDebug)
 	{
-		if (!m_pDebugWire) { m_pDebugWire = std::make_unique<KdDebugWireFrame>(); }
+		if (!m_pDebugWire)
+		{
+			m_pDebugWire = std::make_unique<KdDebugWireFrame>();
+		}
 		m_pDebugWire->AddDebugSphere(GetPos(), m_hitRadius, kRedColor);
 	}
 
