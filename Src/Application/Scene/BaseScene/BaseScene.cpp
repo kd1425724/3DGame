@@ -4,6 +4,7 @@
 #include "../../Editor/LevelEditor/LevelEditorManager.h"
 #include "../../GameObject/Camera/EditorCamera/EditorCamera.h"
 #include "../../Effect/EffectManager.h"
+#include "../../Debug/DebugWatch/DebugWatch.h"
 
 void BaseScene::PreUpdate()
 {
@@ -34,6 +35,9 @@ void BaseScene::PreUpdate()
 
 void BaseScene::Update()
 {
+	// デバッグ: シーン内のオブジェクト数をWatchに出す(最適化の効果測定用)
+	DebugWatch::Instance().Watch(U8("Scene/オブジェクト数"), static_cast<int>(m_objList.size()));
+
 	// シーン毎のイベント処理
 	Event();
 
