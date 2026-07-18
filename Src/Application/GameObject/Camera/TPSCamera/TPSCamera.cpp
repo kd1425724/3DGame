@@ -136,60 +136,54 @@ void TPSCamera::PostUpdate()
 	Math::Matrix _targetMat = Math::Matrix::CreateTranslation(m_smoothFollowPos);
 	m_mWorld = m_mLocalPos * m_mRotation * _targetMat;
 
-	// ↓めり込み防止の為の座標補正計算↓
-	// ①当たり判定(レイ判定)用の情報作成
-	KdCollider::RayInfo rayInfo;
-	// レイの発射位置を設定
-	rayInfo.m_pos = GetPos();
-
-	// レイの発射方向を設定
-	rayInfo.m_dir = Math::Vector3::Down;
-	// レイの長さを設定
-	rayInfo.m_range = 1000.f;
-	if (_spTarget)
+	// ↓壁越しに見えないようにするカメラ寄せ↓
+	// 【重要】注視点(orbit中心)→理想カメラ位置 の向きでレイを飛ばし、途中に壁があればその手前に寄せる。
+	//   以前は逆向き(カメラ→プレイヤー)で、当たった壁からプレイヤー方向へ0.4m足していた。
+	//   塔のような薄い壁ならそれで手前に出るが、建物のような分厚いソリッドCOLだと「プレイヤー方向へ0.4m」が
+	//   建物の中へ押し込む形になり、壁越し(建物内部)が見えていた。注視点側から最初の壁の手前に置けば厚みに関係なく必ず外に出る。
+	// ※ 地面(TypeGround)は別途「地面クランプ」で処理するので、ここは壁=TypeBumpのみ対象(注視点足元の地面を拾わない)。
+	Math::Vector3 _pivot   = m_smoothFollowPos;   // カメラが周回する注視点
+	Math::Vector3 _idealCam = GetPos();           // 上で組んだ理想カメラ位置
+	Math::Vector3 _toCam    = _idealCam - _pivot;
+	float _idealDist        = _toCam.Length();
+	if (_idealDist > 0.001f)
 	{
-		Math::Vector3 _targetPos = _spTarget->GetPos();
-		_targetPos.y += 0.1f;
-		rayInfo.m_dir = _targetPos - GetPos();
-		rayInfo.m_range = rayInfo.m_dir.Length();
-		rayInfo.m_dir.Normalize();
-	}
+		Math::Vector3 _dir = _toCam / _idealDist;
 
-	// 当たり判定をしたいタイプを設定
-	// 地面(TypeGround)だけでなく塔などのBlock(TypeBump)にもカメラを遮らせる
-	rayInfo.m_type = KdCollider::TypeGround | KdCollider::TypeBump;
+		KdCollider::RayInfo _rayInfo;
+		_rayInfo.m_pos   = _pivot;
+		_rayInfo.m_dir   = _dir;
+		_rayInfo.m_range = _idealDist;
+		_rayInfo.m_type  = KdCollider::TypeBump;
 
-	// ②カメラ〜プレイヤーのレイ近傍の静的コリジョンだけをbroadphase(CollisionGrid)から取り出して判定する。
-	// ※ 以前は全オブジェクト総当たりだったが、建物を大量に置くと重くなるためグリッド経由に変更。
-	//   グリッドには地面/建物(IStaticCollider)が載っており、CharaBase側の当たりと同じ対象を見る。
-	std::list<KdCollider::CollisionResult> retRayList;
-	std::vector<KdGameObject*> camCandidates;
-	CollisionGrid::Instance().QueryRay(rayInfo.m_pos, rayInfo.m_dir, rayInfo.m_range, camCandidates);
-	for (KdGameObject* spGameObj : camCandidates)
-	{
-		spGameObj->Intersects(rayInfo, &retRayList);
-	}
-
-	// ③ 結果を使って座標を補完する
-	// レイに当たったリストから一番遮った(overlapが最大の)障害物を検出
-	float maxOverLap = 0;
-	Math::Vector3 hitPos = {};
-	bool hit = false;
-	for (auto& ret : retRayList)
-	{
-		if (maxOverLap < ret.m_overlapDistance)
+		// レイ近傍の静的コリジョンだけをbroadphase(CollisionGrid)から取り出して判定する
+		// (全オブジェクト総当たりだと建物大量配置で重い。グリッドには地面/建物のIStaticColliderが載る)
+		std::list<KdCollider::CollisionResult> _retRayList;
+		std::vector<KdGameObject*> _camCandidates;
+		CollisionGrid::Instance().QueryRay(_rayInfo.m_pos, _rayInfo.m_dir, _rayInfo.m_range, _camCandidates);
+		for (KdGameObject* _obj : _camCandidates)
 		{
-			maxOverLap = ret.m_overlapDistance;
-			hitPos = ret.m_hitPos;
-			hit = true;
+			_obj->Intersects(_rayInfo, &_retRayList);
 		}
-	}
-	if (hit)
-	{
-		// 何かしらの障害物に当たっている。障害物の手前にカメラを寄せる
-		Math::Vector3 _hitPos = hitPos;
-		_hitPos += rayInfo.m_dir * 0.4f;
-		SetPos(_hitPos);
+
+		// 注視点から一番近い壁(=最初に遮る壁)を採用し、その手前へカメラを寄せる
+		float _nearest = _idealDist;
+		bool  _hit     = false;
+		for (auto& _ret : _retRayList)
+		{
+			float _d = (_ret.m_hitPos - _pivot).Length();
+			if (_d < _nearest)
+			{
+				_nearest = _d;
+				_hit = true;
+			}
+		}
+		if (_hit)
+		{
+			const float _camMargin = DebugParams::Instance().Float(U8("カメラ/壁からの余白"), 0.4f, 0.0f, 2.0f);
+			float _camDist = std::max(_nearest - _camMargin, 0.3f);   // 壁の手前・プレイヤーに近すぎない範囲
+			SetPos(_pivot + _dir * _camDist);
+		}
 	}
 
 	// 手応え(着地・壁ヒット)の揺れを最後に加える。オフセットは視点ローカルなので
