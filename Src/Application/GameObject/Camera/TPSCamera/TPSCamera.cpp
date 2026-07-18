@@ -11,8 +11,8 @@ void TPSCamera::Init()
 	// 親クラスの初期化呼び出し
 	CameraBase::Init();
 
-	// カメラのローカル位置の基準。x=1.0でカメラを右へずらし、プレイヤーを画面左寄りにして画面中央を見せる
-	m_localBaseOffset = { 1.0f, 0.75f, -4.0f };
+	// カメラのローカル位置の基準。x=0.5でカメラを右へずらし、プレイヤーを画面左寄りにして画面中央を見せる
+	m_localBaseOffset = { 0.5f, 0.75f, -4.0f };
 	m_mLocalPos = Math::Matrix::CreateTranslation(m_localBaseOffset);
 
 	SetCursorPos(m_FixMousePos.x, m_FixMousePos.y);
