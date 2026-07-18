@@ -200,4 +200,45 @@ void TPSCamera::PostUpdate()
 		Math::Vector3 shakeWorld = Math::Vector3::TransformNormal(shakeOffset, m_mRotation);
 		SetPos(GetPos() + shakeWorld);
 	}
+
+	// === 地面より下にカメラが潜らないようにする(上を向いた時の潜り防止) ===
+	// 上を向くとカメラが後ろ下へ回り込み、地面(上向き片面)の下に潜る→地面が透明に見え、
+	// 画面中央のワイヤーが地面に刺さる。カメラ→プレイヤーのレイは地面を下から通り抜けてしまい防げないので、
+	// カメラのXZ真上から下へレイを飛ばして地面の高さを取り、その少し上までカメラを持ち上げる。
+	{
+		Math::Vector3 _camPos = GetPos();
+
+		KdCollider::RayInfo _groundRay;
+		_groundRay.m_pos = Math::Vector3(_camPos.x, _camPos.y + 50.0f, _camPos.z);
+		_groundRay.m_dir = Math::Vector3::Down;
+		_groundRay.m_range = 1000.0f;
+		_groundRay.m_type = KdCollider::TypeGround;
+
+		std::list<KdCollider::CollisionResult> _groundHits;
+		std::vector<KdGameObject*> _groundCandidates;
+		CollisionGrid::Instance().QueryRay(_groundRay.m_pos, _groundRay.m_dir, _groundRay.m_range, _groundCandidates);
+		for (KdGameObject* _obj : _groundCandidates)
+		{
+			_obj->Intersects(_groundRay, &_groundHits);
+		}
+
+		// 一番高い地面ヒットを採用(段差地形でも一番上に合わせる)
+		float _groundY = -1e30f;
+		bool _foundGround = false;
+		for (auto& _h : _groundHits)
+		{
+			if (_h.m_hitPos.y > _groundY)
+			{
+				_groundY = _h.m_hitPos.y;
+				_foundGround = true;
+			}
+		}
+
+		const float _floorMargin = DebugParams::Instance().Float(U8("カメラ/地面からの最低高さ"), 0.3f, 0.0f, 3.0f);
+		if (_foundGround && _camPos.y < _groundY + _floorMargin)
+		{
+			_camPos.y = _groundY + _floorMargin;
+			SetPos(_camPos);
+		}
+	}
 }
