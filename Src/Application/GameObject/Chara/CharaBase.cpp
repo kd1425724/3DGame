@@ -245,74 +245,85 @@ void CharaBase::ResolveBumpSweep(const Math::Vector3& fromPos, Math::Vector3& po
 
 	Math::Vector3 dir = delta / dist;
 
-	// レイを飛ばす高さは体の中心あたり(ResolveBumpの球中心と同じ)
-	float sampleY = pos.y - GetScale().y * 0.5f + radius + 0.02f;
-	Math::Vector3 origin(fromPos.x, sampleY, fromPos.z);
+	// 【トンネリング対策】以前は中心1本のレイだった。高速移動で壁の角をかすめると中心が角を
+	// 通り抜けてすり抜けていた。経路を「壁当たり半径以下」のステップに刻み、各点で"体の球"を当て、
+	// 進行方向が壁へ向かっている壁と最初に重なったステップの1つ手前で止める(球の幅で角も拾う/
+	// 壁沿いの滑りは止めない)。最終的な密着押し出しは後段のResolveBumpに任せる。縦(y)は触らない=壁専用。
+	float walkableNormalY = DebugParams::Instance().Float(U8("キャラ/歩ける斜面のしきい値(法線Y)"), 0.5f, 0.0f, 1.0f);
+	float centerYOff = -GetScale().y * 0.5f + radius + 0.02f;   // 球中心の高さ=ResolveBumpと同じ
+	float step = radius * 0.8f;
+	int steps = (int)(dist / step) + 1;   // 切り上げ(最後のステップはt=distにクランプ)
 
-	// レイ長は「移動量 + 半径」。半径ぶん伸ばすのは、体の表面が壁に触れる所で止めたいから
-	KdCollider::RayInfo ray(KdCollider::TypeBump, origin, dir, dist + radius);
-
-	// デバッグ表示：スイープに使ったレイを可視化
+	// デバッグ表示：スイープ経路を可視化
 	if (KdGameObject::s_showColliderDebug)
 	{
 		if (!m_pDebugWire)
 		{
 			m_pDebugWire = std::make_unique<KdDebugWireFrame>();
 		}
-		m_pDebugWire->AddDebugLine(ray.m_pos, ray.m_dir, ray.m_range, Math::Color(1.0f, 0.4f, 0.0f, 1.0f));
+		m_pDebugWire->AddDebugLine(Math::Vector3(fromPos.x, pos.y + centerYOff, fromPos.z), dir, dist, Math::Color(1.0f, 0.4f, 0.0f, 1.0f));
 	}
 
-	std::list<KdCollider::CollisionResult> results;
-	// 近傍の静的コリジョンだけをグリッドから取り出して判定する(大量配置時のCPU削減)
-	std::vector<KdGameObject*> candidates;
-	CollisionGrid::Instance().QueryRay(origin, dir, dist + radius, candidates);
-	for (KdGameObject* obj : candidates)
+	for (int i = 1; i <= steps; ++i)
 	{
-		obj->Intersects(ray, &results);
-	}
+		float t = step * (float)i;
+		if (t > dist) { t = dist; }
+		float frac = t / dist;
+		// サンプル位置(経路上)。yはfromPos→posを補間して斜め移動にも沿わせる
+		float sy = fromPos.y + (pos.y - fromPos.y) * frac;
+		Math::Vector3 sphereCenter(fromPos.x + dir.x * t, sy + centerYOff, fromPos.z + dir.z * t);
 
-	// 一番手前(overlapが最大=originから最も近い)の壁を採用する
-	float maxOverlap = 0.0f;
-	Math::Vector3 hitPos;
-	bool hit = false;
-	for (auto& ret : results)
-	{
-		if (ret.m_overlapDistance > maxOverlap)
+		KdCollider::SphereInfo sphere(KdCollider::TypeBump, sphereCenter, radius);
+		std::list<KdCollider::CollisionResult> results;
+		std::vector<KdGameObject*> candidates;
+		CollisionGrid::Instance().QuerySphere(sphereCenter, radius, candidates);
+		for (KdGameObject* obj : candidates)
 		{
-			maxOverlap = ret.m_overlapDistance;
-			hitPos = ret.m_hitPos;
-			hit = true;
+			obj->Intersects(sphere, &results);
+		}
+
+		// 進行方向が壁へ向かっている(=すり抜ける恐れがある)壁を探す。床/歩ける斜面・壁沿いは無視。
+		Math::Vector3 wallNormal = Math::Vector3::Zero;   // 壁から体へ向かう押し出し方向(単位)
+		bool wallHit = false;
+		for (auto& ret : results)
+		{
+			if (ret.m_hitDir.y > walkableNormalY) { continue; }   // 床/歩ける斜面は縦の接地ResolveGroundに任せる
+			if (ret.m_overlapDistance <= 0.0f) { continue; }
+			float toward = -(ret.m_hitDir.x * dir.x + ret.m_hitDir.z * dir.z);   // 進行が壁へ向かう成分
+			if (toward > 0.1f)
+			{
+				wallNormal = ret.m_hitDir;
+				wallHit = true;
+				break;
+			}
+		}
+		if (wallHit)
+		{
+			// 1つ手前(安全)の水平位置まで戻す。step<radius なので隙間はできず、密着はResolveBumpが押し出す
+			float safeT = step * (float)(i - 1);
+			pos.x = fromPos.x + dir.x * safeT;
+			pos.z = fromPos.z + dir.z * safeT;
+
+			// 壁法線方向へ向かう速度成分だけ消して壁に沿って滑れるようにする(進行方向まるごとは消さない)
+			float intoWall = -(m_velocity.x * wallNormal.x + m_velocity.z * wallNormal.z);
+			if (intoWall > 0.0f)
+			{
+				m_velocity.x += wallNormal.x * intoWall;
+				m_velocity.z += wallNormal.z * intoWall;
+
+				// 手応え(カメラ揺れ)は壁に当たった瞬間だけ記録(押し付け続けでは毎フレーム揺らさない)
+				if (!m_wasHittingWall)
+				{
+					m_wallImpact = intoWall;
+				}
+				m_wasHittingWall = true;
+			}
+			return;
 		}
 	}
-	// 壁から離れたら接触フラグを解除
-	if (!hit)
-	{
-		m_wasHittingWall = false;
-		return;
-	}
 
-	// 壁の手前(半径ぶん外側)まで水平位置を戻す。縦(y)はいじらない
-	Math::Vector3 stop = hitPos - dir * radius;
-	pos.x = stop.x;
-	pos.z = stop.z;
-
-	// 壁へ向かう水平速度成分を消して、壁に沿って滑るようにする
-	float into = m_velocity.Dot(dir);
-	if (into > 0.0f)
-	{
-		// 手応え(カメラ揺れ)は"壁に当たった瞬間"だけ記録する。押し付け続けても毎フレーム
-		// 揺らさない(連続攻撃で壁の向こうの敵へ突っ込み続けるとシェイクが終わらない不具合の対策)
-		if (!m_wasHittingWall)
-		{
-			m_wallImpact = into;
-		}
-		m_wasHittingWall = true;
-		m_velocity -= dir * into;
-	}
-	else
-	{
-		m_wasHittingWall = false;   // 壁に沿って離れる向きなら接触解除
-	}
+	// 経路上に(向かってくる)壁が無ければ接触フラグを解除
+	m_wasHittingWall = false;
 }
 
 void CharaBase::Jump()
