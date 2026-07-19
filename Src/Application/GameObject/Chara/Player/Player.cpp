@@ -99,36 +99,22 @@ void Player::Update()
 	// 実際の移動はWireAction::UpdateSwingがこのキャラを動かす
 	if (m_upWire->IsAttached())
 	{
-		float thrustUp = 0.0f;
-		if (KdInputManager::Instance().IsHold("Jump"))
-		{
-			thrustUp += 1.0f;
-		}
-		if (KdInputManager::Instance().IsHold("Ctrl"))
-		{
-			thrustUp -= 1.0f;
-		}
-
-		// 上下噴射・漕ぎでもエフェクトを出す(何かを吹かしていることが分かるように)
+		// ※ Space/Ctrl単独の上下噴射は 2026/07/20 に廃止(ユーザー指示)。
+		//    上への推進は加速ボタン(右クリック)＋Spaceへ一本化した。UpdateAccelが担当する
 		Math::Vector2 wireMove = KdInputManager::Instance().GetAxisState("Move");
-		if (thrustUp != 0.0f || wireMove.LengthSquared() > 0.0001f)
+
+		// 前後の漕ぎでもエフェクトを出す(吹かしていることが分かるように)
+		if (wireMove.y != 0.0f)
 		{
-			// 噴射の向き＝上下入力＋進行方向(水平)。出る粒はこの逆へ流れる
-			Math::Vector3 fxDir(0.0f, thrustUp, 0.0f);
 			Math::Vector3 horiz(m_velocity.x, 0.0f, m_velocity.z);
 			if (horiz.LengthSquared() > 0.0001f)
 			{
 				horiz.Normalize();
-				fxDir += horiz * wireMove.y;
-			}
-			if (fxDir.LengthSquared() > 0.0001f)
-			{
-				fxDir.Normalize();
-				SpawnBoostFx(fxDir, dt);
+				SpawnBoostFx(horiz * wireMove.y, dt);
 			}
 		}
 
-		m_upWire->UpdateSwing(*this, dt, wireMove, thrustUp);
+		m_upWire->UpdateSwing(*this, dt, wireMove);
 		return;
 	}
 

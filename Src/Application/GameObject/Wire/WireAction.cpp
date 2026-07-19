@@ -20,7 +20,7 @@ WireAction::WireAction()
 
 WireAction::~WireAction() = default;
 
-void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _moveInput, float _thrustUp)
+void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _moveInput)
 {
 	if (!m_isAttached) { return; }
 
@@ -199,30 +199,10 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 		}
 	}
 
-	// === 上下の噴射(立体機動のガス噴射にあたる) ===
-	// ワイヤーの引きに逆らって軌道を作るためのプレイヤー側の推進力。
-	// 「上へ吹かして建物を越える」ができるかどうかで自由度が大きく変わる。
-	// ※ ガス(燃料)は入れていない。ガスはコストであって制御能力ではないので、
-	//    まず噴射そのものを作る。残量制にするかは後から被せられる
-	if (_thrustUp != 0.0f)
-	{
-		float thrustAcc = DebugParams::Instance().Float(U8("ワイヤー/上下噴射加速"),   34.0f, 0.0f, 150.0f);
-		float riseMax   = DebugParams::Instance().Float(U8("ワイヤー/上昇の上限速度"), 18.0f, 0.0f, 60.0f);
-
-		if (_thrustUp > 0.0f)
-		{
-			// 上昇は上限速度まで(際限なく浮き上がらないように)
-			if (_body.m_velocity.y < riseMax)
-			{
-				_body.m_velocity.y += thrustAcc * _thrustUp * _dt;
-			}
-		}
-		else
-		{
-			// 下向きは重力と同方向なので上限は設けない(急降下に使える)
-			_body.m_velocity.y += thrustAcc * _thrustUp * _dt;
-		}
-	}
+	// ※ ここにあった「Space/Ctrl単独の上下噴射」は 2026/07/20 に廃止した(ユーザー指示)。
+	//    上への推進は Player 側の加速(右クリック＋Space)へ一本化している。
+	//    噴射の入口が複数あると同時押しで二重に効いてしまい、強さが読めなくなるため。
+	//    調整値「ワイヤー/上下噴射加速」「ワイヤー/上昇の上限速度」も未使用になった
 
 	// === 自動リリース＋離脱ブースト ===
 	// 弧の底を通過して上昇に転じた瞬間(垂直速度が負→正)にワイヤーを外し、
