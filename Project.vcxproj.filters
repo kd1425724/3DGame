@@ -64,6 +64,9 @@
     <Filter Include="Library\imgui">
       <UniqueIdentifier>{9e2b992a-9c34-450b-a4cf-c4749feebcc6}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Library\tracy">
+      <UniqueIdentifier>{3f7c1a58-6d24-4b90-8e13-2c5a9b4de701}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\Framework\Font">
       <UniqueIdentifier>{66aaa1ee-9cbd-4422-b7c2-7885620d808f}</UniqueIdentifier>
     </Filter>
@@ -589,6 +592,9 @@
     </ClCompile>
     <ClCompile Include="Src\Framework\Effekseer\KdEffekseerManager.cpp">
       <Filter>Src\Framework\Effekseer</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Library\tracy\TracyClient.cpp">
+      <Filter>Library\tracy</Filter>
     </ClCompile>
     <ClCompile Include="..\Library\imgui\imgui.cpp">
       <Filter>Library\imgui</Filter>
