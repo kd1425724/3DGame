@@ -289,6 +289,27 @@ void Player::UpdateAccel(float dt)
 	}
 }
 
+void Player::ClampSpeed()
+{
+	// 落下は別枠にする。水平の最高速度で落下まで縛ると、高所から落ちた時に
+	// ふわっと減速して不自然になるため(終端速度として別に上限を持たせる)
+	float maxSpeed = DebugParams::Instance().Float(U8("プレイヤー/最高速度"),   45.0f, 5.0f, 200.0f);
+	float maxFall  = DebugParams::Instance().Float(U8("プレイヤー/最大落下速度"), 60.0f, 5.0f, 200.0f);
+
+	// 落下速度の頭打ち
+	if (m_velocity.y < -maxFall)
+	{
+		m_velocity.y = -maxFall;
+	}
+
+	// 全体の速さを上限で抑える。向きは変えず大きさだけ縮める
+	float sp = m_velocity.Length();
+	if (sp > maxSpeed)
+	{
+		m_velocity *= (maxSpeed / sp);
+	}
+}
+
 void Player::SpawnBoostFx(const Math::Vector3& _dir, float _dt)
 {
 	if (_dir.LengthSquared() < 0.0001f) { return; }
@@ -746,6 +767,13 @@ void Player::Respawn()
 
 void Player::PostUpdate()
 {
+	// 速度の上限を掛ける(2026/07/20 追加)。
+	// ワイヤーの巻き取り・重力・加速・離脱ブーストがどれも速度を足すだけで、
+	// 減らす仕組みが無かったため、スイングを繋ぐほど際限なく速くなっていた。
+	// 経路(ワイヤー中/通常)によってUpdateの通り道が変わるので、
+	// 毎フレーム必ず走るPostUpdateで一括して抑える
+	ClampSpeed();
+
 	// 地面(KdCollider::TypeGround)に立つ
 	// ※ ワイヤー中は地面吸着させず、ワイヤー物理(3D速度)に任せる
 	if (!m_upWire->IsAttached())
@@ -846,6 +874,7 @@ void Player::WatchDebug() const
 	DebugWatch& w = DebugWatch::Instance();
 
 	// 速度・接地まわり
+	w.Watch(U8("Player/速度"),       m_velocity.Length());   // 上限の調整用(プレイヤー/最高速度と見比べる)
 	w.Watch(U8("Player/水平速度"),   GetHorizontalSpeed());
 	w.Watch(U8("Player/垂直速度"),   m_velocity.y);
 	w.Watch(U8("Player/接地"),       IsGrounded());

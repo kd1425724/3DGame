@@ -54,6 +54,10 @@ private:
 	void UpdateAccel(float dt);
 	// 加速/空中ステップの方向を求める(移動入力→無入力なら進行方向→Jumpで上向きを加算)
 	Math::Vector3 GetAccelDir() const;
+	// 速度の上限を掛ける(毎フレームPostUpdateから呼ぶ)。
+	// ワイヤーの巻き取り・重力・加速・離脱ブーストがどれも速度を足すだけで減らす仕組みが
+	// 無いため、スイングを繋ぐほど際限なく速くなる。それをここで一括して抑える
+	void ClampSpeed();
 	// 加速中の噴射エフェクトを出す(時間あたりの個数で制御するのでフレームレートに依らない)
 	void SpawnBoostFx(const Math::Vector3& _dir, float _dt);
 	// 噴射エフェクトの発生位置(体の中心あたりから加速方向の少し後ろ)
