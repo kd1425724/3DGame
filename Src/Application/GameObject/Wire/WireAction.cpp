@@ -105,9 +105,23 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 		//
 		// ※ 撃った直後は速度の向きが安定しないので、最短時間が経つまで(A)は判定しない
 		float armTimeWinch = DebugParams::Instance().Float(U8("ワイヤー/自動リリース最短時間"), 0.25f, 0.0f, 2.0f);
+
+		// 追い越した(遠ざかり始めた)状態が続いている時間を測る。
+		// 追い越した瞬間に外すと「超えてすぐ切れる」不自然さが出るため、
+		// 猶予のあいだはそのまま引かれ続けてから外す。
+		// 遠ざかりが途切れたら(再び近づいたら)カウントはリセットする
+		if (m_swingTime >= armTimeWinch && approach <= 0.0f)
+		{
+			m_passedTime += _dt;
+		}
+		else
+		{
+			m_passedTime = 0.0f;
+		}
+
+		float passGrace = DebugParams::Instance().Float(U8("ワイヤー/追い越し後の猶予"), 0.35f, 0.0f, 2.0f);
 		bool passedAnchor = DebugFlags::Instance().Get(U8("ワイヤー/追い越しで離す"), true)
-			&& m_swingTime >= armTimeWinch
-			&& approach <= 0.0f;
+			&& m_passedTime >= passGrace;
 
 		// 0にすれば距離での離脱を無効化できる(追い越しだけで試したい時用)
 		float arriveDist = DebugParams::Instance().Float(U8("ワイヤー/到達で離す距離"), 2.0f, 0.0f, 20.0f);
@@ -345,6 +359,7 @@ bool WireAction::Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, fl
 		m_isAttached = true;
 		m_occludedTime = 0.0f;    // 遮蔽デバウンスをリセット
 		m_swingTime = 0.0f;       // 自動リリースの最短時間を測り直す
+		m_passedTime = 0.0f;      // 追い越しの猶予も測り直す
 		m_prevVelY = 0.0f;        // 底の通過判定をリセット(前回のスイングを引きずらない)
 	}
 
@@ -357,6 +372,7 @@ void WireAction::Release()
 	m_isAttached = false;
 	m_occludedTime = 0.0f;   // 遮蔽デバウンスをリセット
 	m_swingTime = 0.0f;
+	m_passedTime = 0.0f;
 	m_prevVelY = 0.0f;
 }
 
