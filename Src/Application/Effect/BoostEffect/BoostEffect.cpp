@@ -48,18 +48,20 @@ void BoostEffect::DrawUnLit()
 	KdSquarePolygon* pPoly = GetSharedPoly();
 	if (!pPoly) { return; }
 
-	float baseSize = DebugParams::Instance().Float(U8("加速エフェクト/サイズ"), 0.3f, 0.02f, 3.0f);
+	float baseSize = DebugParams::Instance().Float(U8("加速エフェクト/サイズ"), 0.18f, 0.02f, 3.0f);
+	float density  = DebugParams::Instance().Float(U8("加速エフェクト/濃さ"),   0.6f,  0.05f, 1.0f);
 
 	float t = (m_life > 0.0f) ? (m_age / m_life) : 1.0f;   // 0→1
 	float size  = baseSize * (1.0f - 0.6f * t);            // だんだん縮む
-	float alpha = 1.0f - t;                                // フェードアウト
+	float alpha = (1.0f - t) * density;                    // フェードアウト(全体の濃さも掛ける)
 	pPoly->SetScale(Math::Vector2(size, size));
 
 	Math::Matrix world = Math::Matrix::Identity;
 	world.Translation(m_pos);
 
-	// ワイヤーと同系統の水色で光らせる(加速していることが一目で分かる色)
-	Math::Color   col(0.55f, 0.9f, 1.0f, alpha);
-	Math::Vector3 emissive(0.3f, 0.7f, 1.0f);
+	// ワイヤーと同系統の水色。ただし青が濃すぎると「玉が浮いている」ように見えるので、
+	// 白寄りにして発光も抑え、薄く光る噴射に見せる
+	Math::Color   col(0.8f, 0.95f, 1.0f, alpha);
+	Math::Vector3 emissive(0.25f, 0.5f, 0.7f);
 	KdShaderManager::Instance().m_StandardShader.DrawPolygon(*pPoly, world, col, emissive);
 }
