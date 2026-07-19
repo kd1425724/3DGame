@@ -8,11 +8,12 @@ std::unique_ptr<KdSquarePolygon> BoostEffect::s_upPoly;
 
 KdSquarePolygon* BoostEffect::GetSharedPoly()
 {
-	// 初回だけ生成。粒として使うので下地の白テクスチャを流用する
-	// (専用テクスチャを足すまでの間に合わせ。色と発光は描画側で乗せる)
+	// 初回だけ生成。粒用の丸いテクスチャ(中心が濃く外周が透明になる減衰)を使う。
+	// ※ 最初はSystem/WhiteNoise.pngを流用したが、あれはノイズ画像でアルファも無く、
+	//    四角いノイズの塊がそのまま出て見た目が破綻したため専用テクスチャを用意した
 	if (!s_upPoly)
 	{
-		std::shared_ptr<KdTexture> spTex = KdAssets::Instance().m_textures.GetData("Asset/Textures/System/WhiteNoise.png");
+		std::shared_ptr<KdTexture> spTex = KdAssets::Instance().m_textures.GetData("Asset/Textures/Effect/Particle.png");
 		s_upPoly = std::make_unique<KdSquarePolygon>(spTex);
 		s_upPoly->Set2DObject(false);
 		s_upPoly->SetBillboardMode(KdPolygon::BillboardMode::eScreen);
@@ -47,7 +48,7 @@ void BoostEffect::DrawUnLit()
 	KdSquarePolygon* pPoly = GetSharedPoly();
 	if (!pPoly) { return; }
 
-	float baseSize = DebugParams::Instance().Float(U8("加速エフェクト/サイズ"), 0.55f, 0.05f, 3.0f);
+	float baseSize = DebugParams::Instance().Float(U8("加速エフェクト/サイズ"), 0.3f, 0.02f, 3.0f);
 
 	float t = (m_life > 0.0f) ? (m_age / m_life) : 1.0f;   // 0→1
 	float size  = baseSize * (1.0f - 0.6f * t);            // だんだん縮む
