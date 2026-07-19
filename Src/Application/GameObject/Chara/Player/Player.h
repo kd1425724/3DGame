@@ -54,6 +54,10 @@ private:
 	void UpdateAccel(float dt);
 	// 加速/空中ステップの方向を求める(移動入力→無入力なら進行方向→Jumpで上向きを加算)
 	Math::Vector3 GetAccelDir() const;
+	// 加速中の噴射エフェクトを出す(時間あたりの個数で制御するのでフレームレートに依らない)
+	void SpawnBoostFx(const Math::Vector3& _dir, float _dt);
+	// 噴射エフェクトの発生位置(体の中心あたりから加速方向の少し後ろ)
+	Math::Vector3 GetBoostSpawnPos(const Math::Vector3& _dir) const;
 	// 左クリックが「攻撃」か「ワイヤー」かを判定する。
 	// 連続攻撃の受付中、またはE(Focus)を押していてターゲットがいる時だけ攻撃
 	bool IsAttackInput() const;
@@ -108,6 +112,9 @@ private:
 
 	// 右クリックを押している時間。単押し(空中ステップ)と長押し(加速)の区別に使う
 	float m_accelHoldTime = 0.0f;
+
+	// 噴射エフェクトの発生間隔を測るタイマー(時間あたりの個数を一定に保つ)
+	float m_boostFxTimer = 0.0f;
 
 	// 反撃(ジャスト回避カウンター)の状態
 	bool m_counterPending = false;       // 敵の突進を無敵で受けた=次のUpdateCounterでスロー窓を開く

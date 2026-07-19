@@ -28,6 +28,11 @@ public:
 	// 便利関数：斬った位置に斬撃(SlashEffect)を1つ出す(面内回転は散らす)
 	void SpawnSlash(const Math::Vector3& _pos);
 
+	// 便利関数：加速中の噴射(BoostEffect)を1粒出す。
+	//  _pos … 発生位置(プレイヤーの少し後ろ) / _accelDir … 加速している向き
+	// 粒は加速と逆向きに流れるので、後方へ吹き出しているように見える
+	void SpawnBoost(const Math::Vector3& _pos, const Math::Vector3& _accelDir);
+
 	// 管理中のエフェクトの経過を進め、終わったもの(IsExpired)を外す。シーンから毎フレーム呼ぶ
 	// (各エフェクトはKdGameObject同様、dtをApplicationから自分で取る)
 	void Update();

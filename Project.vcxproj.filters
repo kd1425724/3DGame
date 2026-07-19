@@ -160,6 +160,9 @@
     <Filter Include="Src\Application\Effect">
       <UniqueIdentifier>{b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Application\Effect\BoostEffect">
+      <UniqueIdentifier>{7b2d4c19-5e83-4a06-9d71-4f28c6a3b510}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\Application\Effect\SlashEffect">
       <UniqueIdentifier>{c3d4e5f6-a7b8-4c9d-8e0f-2a3b4c5d6e7f}</UniqueIdentifier>
     </Filter>
@@ -395,6 +398,9 @@
     </ClInclude>
     <ClInclude Include="Src\Application\Effect\EffectBase.h">
       <Filter>Src\Application\Effect</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\Application\Effect\BoostEffect\BoostEffect.h">
+      <Filter>Src\Application\Effect\BoostEffect</Filter>
     </ClInclude>
     <ClInclude Include="Src\Application\Effect\SlashEffect\SlashEffect.h">
       <Filter>Src\Application\Effect\SlashEffect</Filter>
@@ -661,6 +667,9 @@
     </ClCompile>
     <ClCompile Include="Src\Application\Effect\EffectManager.cpp">
       <Filter>Src\Application\Effect</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\Effect\BoostEffect\BoostEffect.cpp">
+      <Filter>Src\Application\Effect\BoostEffect</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\Effect\SlashEffect\SlashEffect.cpp">
       <Filter>Src\Application\Effect\SlashEffect</Filter>

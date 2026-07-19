@@ -109,7 +109,26 @@ void Player::Update()
 			thrustUp -= 1.0f;
 		}
 
-		m_upWire->UpdateSwing(*this, dt, KdInputManager::Instance().GetAxisState("Move"), thrustUp);
+		// 上下噴射・漕ぎでもエフェクトを出す(何かを吹かしていることが分かるように)
+		Math::Vector2 wireMove = KdInputManager::Instance().GetAxisState("Move");
+		if (thrustUp != 0.0f || wireMove.LengthSquared() > 0.0001f)
+		{
+			// 噴射の向き＝上下入力＋進行方向(水平)。出る粒はこの逆へ流れる
+			Math::Vector3 fxDir(0.0f, thrustUp, 0.0f);
+			Math::Vector3 horiz(m_velocity.x, 0.0f, m_velocity.z);
+			if (horiz.LengthSquared() > 0.0001f)
+			{
+				horiz.Normalize();
+				fxDir += horiz * wireMove.y;
+			}
+			if (fxDir.LengthSquared() > 0.0001f)
+			{
+				fxDir.Normalize();
+				SpawnBoostFx(fxDir, dt);
+			}
+		}
+
+		m_upWire->UpdateSwing(*this, dt, wireMove, thrustUp);
 		return;
 	}
 
@@ -255,6 +274,9 @@ void Player::UpdateAccel(float dt)
 			{
 				m_velocity += dir * (acc * dt);
 			}
+
+			// 加速していることが一目で分かるよう、後方へ噴射エフェクトを出す
+			SpawnBoostFx(dir, dt);
 		}
 	}
 
@@ -268,10 +290,41 @@ void Player::UpdateAccel(float dt)
 			if (dir.LengthSquared() > 0.0001f)
 			{
 				m_velocity += dir * step;
+
+				// ステップは一瞬なので、まとめて数粒出して"バッ"と見せる
+				int burst = DebugParams::Instance().Int(U8("加速エフェクト/ステップの粒数"), 6, 0, 30);
+				for (int i = 0; i < burst; ++i)
+				{
+					EffectManager::Instance().SpawnBoost(GetBoostSpawnPos(dir), dir);
+				}
 			}
 		}
 		m_accelHoldTime = 0.0f;
 	}
+}
+
+void Player::SpawnBoostFx(const Math::Vector3& _dir, float _dt)
+{
+	if (_dir.LengthSquared() < 0.0001f) { return; }
+
+	// 毎フレーム出すとフレームレートで密度が変わるので、時間あたりの個数で制御する
+	float rate = DebugParams::Instance().Float(U8("加速エフェクト/毎秒の粒数"), 30.0f, 0.0f, 120.0f);
+	if (rate <= 0.0f) { return; }
+
+	m_boostFxTimer += _dt;
+	float interval = 1.0f / rate;
+	while (m_boostFxTimer >= interval)
+	{
+		m_boostFxTimer -= interval;
+		EffectManager::Instance().SpawnBoost(GetBoostSpawnPos(_dir), _dir);
+	}
+}
+
+Math::Vector3 Player::GetBoostSpawnPos(const Math::Vector3& _dir) const
+{
+	// 体の中心あたりから、加速方向の少し後ろに出す
+	float back = DebugParams::Instance().Float(U8("加速エフェクト/後方オフセット"), 0.5f, 0.0f, 3.0f);
+	return GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f) - _dir * back;
 }
 
 Math::Vector3 Player::GetAccelDir() const

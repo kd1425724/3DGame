@@ -2,6 +2,8 @@
 
 #include "EffectBase.h"
 #include "SlashEffect/SlashEffect.h"
+#include "BoostEffect/BoostEffect.h"
+#include "../Debug/DebugParams/DebugParams.h"
 
 // unique_ptr<EffectBase>(前方宣言)を持つvectorの破棄には完全な型が要るので
 // デストラクタは.cpp側(EffectBaseが見える)で定義する
@@ -22,6 +24,22 @@ void EffectManager::SpawnSlash(const Math::Vector3& _pos)
 	float rot = DirectX::XMConvertToRadians((float)(((seed % 360) + 360) % 360));
 
 	Add(std::make_shared<SlashEffect>(_pos, rot));
+}
+
+void EffectManager::SpawnBoost(const Math::Vector3& _pos, const Math::Vector3& _accelDir)
+{
+	// 粒は加速と逆向きに流す＝自分は前へ進むので、後方へ吹き出して見える
+	float flow = DebugParams::Instance().Float(U8("加速エフェクト/流れる速さ"), 6.0f, 0.0f, 40.0f);
+	float scatter = DebugParams::Instance().Float(U8("加速エフェクト/散らばり"), 0.25f, 0.0f, 2.0f);
+
+	// 毎回同じ位置だと1本の線に見えるので、発生ごとに少しずらす
+	int seed = (int)(m_spawnCounter++ * 71);
+	float sx = (float)(((seed * 13) % 200) - 100) / 100.0f;
+	float sy = (float)(((seed * 29) % 200) - 100) / 100.0f;
+	float sz = (float)(((seed * 47) % 200) - 100) / 100.0f;
+	Math::Vector3 jitter(sx * scatter, sy * scatter, sz * scatter);
+
+	Add(std::make_shared<BoostEffect>(_pos + jitter, -_accelDir * flow));
 }
 
 void EffectManager::Update()

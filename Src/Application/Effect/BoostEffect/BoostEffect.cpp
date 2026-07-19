@@ -1,0 +1,64 @@
+﻿#include "BoostEffect.h"
+
+#include "../../main.h"   // Application::GetDeltaTime
+#include "../../Debug/DebugParams/DebugParams.h"
+
+// 共有の板ポリ実体。KdSquarePolygon(前方宣言)の破棄には完全な型が要るので.cpp側に置く
+std::unique_ptr<KdSquarePolygon> BoostEffect::s_upPoly;
+
+KdSquarePolygon* BoostEffect::GetSharedPoly()
+{
+	// 初回だけ生成。粒として使うので下地の白テクスチャを流用する
+	// (専用テクスチャを足すまでの間に合わせ。色と発光は描画側で乗せる)
+	if (!s_upPoly)
+	{
+		std::shared_ptr<KdTexture> spTex = KdAssets::Instance().m_textures.GetData("Asset/Textures/System/WhiteNoise.png");
+		s_upPoly = std::make_unique<KdSquarePolygon>(spTex);
+		s_upPoly->Set2DObject(false);
+		s_upPoly->SetBillboardMode(KdPolygon::BillboardMode::eScreen);
+	}
+	return s_upPoly.get();
+}
+
+BoostEffect::BoostEffect(const Math::Vector3& _pos, const Math::Vector3& _vel)
+	: m_pos(_pos), m_vel(_vel)
+{
+	m_life = DebugParams::Instance().Float(U8("加速エフェクト/寿命"), 0.35f, 0.05f, 2.0f);
+}
+
+BoostEffect::~BoostEffect() = default;
+
+void BoostEffect::Update()
+{
+	float dt = Application::Instance().GetDeltaTime();
+
+	// 置かれた場所から後方へ流れていく
+	m_pos += m_vel * dt;
+
+	m_age += dt;
+	if (m_age >= m_life)
+	{
+		m_isExpired = true;
+	}   // 寿命が尽きたらEffectManagerが外す
+}
+
+void BoostEffect::DrawUnLit()
+{
+	KdSquarePolygon* pPoly = GetSharedPoly();
+	if (!pPoly) { return; }
+
+	float baseSize = DebugParams::Instance().Float(U8("加速エフェクト/サイズ"), 0.55f, 0.05f, 3.0f);
+
+	float t = (m_life > 0.0f) ? (m_age / m_life) : 1.0f;   // 0→1
+	float size  = baseSize * (1.0f - 0.6f * t);            // だんだん縮む
+	float alpha = 1.0f - t;                                // フェードアウト
+	pPoly->SetScale(Math::Vector2(size, size));
+
+	Math::Matrix world = Math::Matrix::Identity;
+	world.Translation(m_pos);
+
+	// ワイヤーと同系統の水色で光らせる(加速していることが一目で分かる色)
+	Math::Color   col(0.55f, 0.9f, 1.0f, alpha);
+	Math::Vector3 emissive(0.3f, 0.7f, 1.0f);
+	KdShaderManager::Instance().m_StandardShader.DrawPolygon(*pPoly, world, col, emissive);
+}

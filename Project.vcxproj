@@ -292,6 +292,7 @@
     <ClInclude Include="Src\Application\GameObject\Environment\FocusPostFx.h" />
     <ClInclude Include="Src\Application\Effect\EffectManager.h" />
     <ClInclude Include="Src\Application\Effect\EffectBase.h" />
+    <ClInclude Include="Src\Application\Effect\BoostEffect\BoostEffect.h" />
     <ClInclude Include="Src\Application\Effect\SlashEffect\SlashEffect.h" />
     <ClInclude Include="Src\Application\GameObject\Camera\CameraBase.h" />
     <ClInclude Include="Src\Application\GameObject\Camera\CameraShake.h" />
@@ -388,6 +389,7 @@
     <ClCompile Include="Src\Application\GameObject\Environment\StageEnvironment.cpp" />
     <ClCompile Include="Src\Application\GameObject\Environment\FocusPostFx.cpp" />
     <ClCompile Include="Src\Application\Effect\EffectManager.cpp" />
+    <ClCompile Include="Src\Application\Effect\BoostEffect\BoostEffect.cpp" />
     <ClCompile Include="Src\Application\Effect\SlashEffect\SlashEffect.cpp" />
     <ClCompile Include="Src\Application\GameObject\Camera\CameraBase.cpp" />
     <ClCompile Include="Src\Application\GameObject\Camera\CameraShake.cpp" />
