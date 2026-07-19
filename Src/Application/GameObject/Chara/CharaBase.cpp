@@ -26,30 +26,7 @@ void CharaBase::GenerateDepthMapFromLight()
 	KdShaderManager::Instance().m_StandardShader.DrawModel(m_modelWork, m_mWorld);
 }
 
-bool CharaBase::IsWallBetween(const Math::Vector3& from, const Math::Vector3& to, float margin)
-{
-	ZoneScoped;	// Tracy計測(2026/07/19)：ワイヤー/ダイブの遮蔽レイ
-
-	Math::Vector3 seg = to - from;
-	float len = seg.Length();
-	if (len <= margin * 2.0f) { return false; }   // 両端marginを除くと区間が無い＝遮蔽なし
-
-	Math::Vector3 dir = seg / len;
-	// 両端をmarginぶん無視する。こうしないと「アンカーが付いている塔自身」や
-	// 「足元/対象のすぐ手前の壁」を拾ってしまい、かすっただけで遮蔽判定になる
-	Math::Vector3 start = from + dir * margin;
-	KdCollider::RayInfo ray(KdCollider::TypeBump, start, dir, len - margin * 2.0f);
-
-	std::list<KdCollider::CollisionResult> results;
-	// レイ近傍の静的コリジョン(建物/地面)だけをグリッドから取り出して判定する
-	std::vector<KdGameObject*> candidates;
-	CollisionGrid::Instance().QueryRay(start, dir, len - margin * 2.0f, candidates);
-	for (KdGameObject* obj : candidates)
-	{
-		obj->Intersects(ray, &results);
-	}
-	return !results.empty();   // 途中(両端margin除く)に壁があれば遮蔽されている
-}
+// ※ IsWallBetween は 2026/07/19 に CollisionGrid へ移動(照準の遮蔽判定からも使うため)
 
 void CharaBase::GroundCheck()
 {

@@ -3,6 +3,8 @@
 #include "../Camera/CameraBase.h"
 #include "../../Scene/SceneManager.h"
 #include "../../Debug/DebugParams/DebugParams.h"
+#include "../../Debug/DebugFlags/DebugFlags.h"   // 遮蔽チェックのON/OFF
+#include "../../Collision/CollisionGrid.h"       // IsWallBetween(敵が建物の陰にいるか)
 
 // 板ポリ(KdSquarePolygon)はPch経由で見える。unique_ptr(前方宣言)の生成/破棄を
 // ここ(完全な型が見える.cpp)で行うため、ctor/dtorを定義する
@@ -39,24 +41,49 @@ void Targeting::Update(const std::shared_ptr<CameraBase>& _spCamera, float _dt)
 	float limitDeg = DebugParams::Instance().Float(U8("照準/有効角度"), 40.0f, 5.0f, 90.0f);
 	float minDot = cosf(DirectX::XMConvertToRadians(limitDeg));
 
-	// カメラの前方向に一番よく揃っている(=中心に近い)敵を探す
-	std::shared_ptr<KdGameObject> best;
-	float bestDot = minDot;   // これ未満は中心から外れすぎなので対象外
+	// 角度内に入っている敵を「画面中心への近さ(内積)」付きで集める
+	// ※ 内積が1に近いほど画面中心。（ベクトルA）toと（ベクトルB）camFwdの向きの一致度
+	m_candidates.clear();
 	for (auto& spEnemy : SceneManager::Instance().FindObjectsWithTag(KdGameObject::ObjectTag::Enemy))
 	{
 		if (!spEnemy) { continue; }
 		Math::Vector3 to = spEnemy->GetPos() - camPos;
 		if (to.LengthSquared() < 0.0001f) { continue; }
 		to.Normalize();
-		float d = to.Dot(camFwd);   // （ベクトルA）toと（ベクトルB）camFwdの内積が1に近いほど画面中心
-		if (d > bestDot)
-		{
-			bestDot = d;
-			best = spEnemy;
-		}
+		float d = to.Dot(camFwd);
+		if (d <= minDot) { continue; }   // 中心から外れすぎ
+		m_candidates.emplace_back(d, spEnemy);
 	}
 
-	m_wpTarget = best;   // 中心に一番近い敵(いなければ空)
+	// 画面中心に近い順に並べる
+	std::sort(m_candidates.begin(), m_candidates.end(),
+		[](const Candidate& _a, const Candidate& _b) { return _a.first > _b.first; });
+
+	// 遮蔽チェックの設定
+	bool  useOcclusion = DebugFlags::Instance().Get(U8("照準/遮蔽チェック"), true);
+	float aimHeight    = DebugParams::Instance().Float(U8("照準/狙う高さ"),         0.9f, 0.0f, 3.0f);
+	float occMargin    = DebugParams::Instance().Float(U8("照準/遮蔽レイのマージン"), 0.5f, 0.0f, 3.0f);
+
+	// 中心に近い順に「カメラから見えているか」を調べ、最初に見えている敵を採用する。
+	// 単に遮蔽された敵を捨てるだけだとターゲットが消えてしまうので、
+	// 一番近い敵が壁の裏なら「次に近い見えている敵」へ自然に落ちるようにしている。
+	// レイは通常1回で済む(先頭が見えていれば即決)
+	std::shared_ptr<KdGameObject> best;
+	for (const Candidate& c : m_candidates)
+	{
+		if (useOcclusion)
+		{
+			// 足元(GetPos)を狙うと地面自身に遮られて常に「見えない」になるので、
+			// マーカーと同じ高さ(胴のあたり)を狙う
+			Math::Vector3 aim = c.second->GetPos() + Math::Vector3(0.0f, aimHeight, 0.0f);
+			if (CollisionGrid::IsWallBetween(camPos, aim, occMargin)) { continue; }
+		}
+
+		best = c.second;
+		break;
+	}
+
+	m_wpTarget = best;   // 中心に一番近い「見えている」敵(いなければ空)
 }
 
 void Targeting::DrawMarker()

@@ -10,6 +10,7 @@
 #include "../../Camera/CameraShake.h"
 #include "../../../Effect/EffectManager.h"
 #include "../../Targeting/Targeting.h"
+#include "../../../Collision/CollisionGrid.h"   // IsWallBetween(落下攻撃の突撃先が壁の裏か)
 
 #include"../../Wire/WireAction.h"
 
@@ -427,7 +428,7 @@ void Player::UpdateDive(float dt)
 		Math::Vector3 aim = spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f);
 
 		// 対象が壁(塔)の裏＝遮蔽されていたら突撃を中断(壁に突っ込んで操作不能になるのを防ぐ)
-		if (IsWallBetween(GetPos(), aim))
+		if (CollisionGrid::IsWallBetween(GetPos(), aim))
 		{
 			m_isDiving = false;
 			m_wpDiveTarget.reset();

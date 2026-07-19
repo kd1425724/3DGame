@@ -4,6 +4,7 @@
 #include "../../Debug/DebugParams/DebugParams.h"// リール速度・引き込み力などの調整値
 #include "../../Debug/DebugFlags/DebugFlags.h"  // 漕ぎ(ポンプ)のON/OFF
 #include "../Chara/CharaBase.h"                 // スイングで動かすキャラ(速度・位置・当たり解決)
+#include "../../Collision/CollisionGrid.h"      // IsWallBetween(手元〜アンカー間の遮蔽判定)
 
 // 見た目の板ポリ(KdSquarePolygon)はPch経由で見える。unique_ptr(前方宣言)の生成/破棄を
 // ここ(完全な型が見える.cpp)で行うため、ctor/dtorを定義する
@@ -28,7 +29,7 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, float _reel)
 	// 外した瞬間の速度はそのまま残るので、スイングの勢いで飛んでいける(フリング)
 	Math::Vector3 hand = _body.GetPos() + Math::Vector3(0.0f, 1.0f, 0.0f);
 	float occMargin = DebugParams::Instance().Float(U8("ワイヤー/遮蔽の余白"),     1.0f, 0.0f, 5.0f);
-	if (CharaBase::IsWallBetween(hand, m_anchor, occMargin))
+	if (CollisionGrid::IsWallBetween(hand, m_anchor, occMargin))
 	{
 		m_occludedTime += _dt;
 	}

@@ -35,8 +35,15 @@ public:
 
 private:
 
-	// 選択中の対象(画面中心に一番近い敵)
+	// 選択中の対象(画面中心に一番近い「見えている」敵)
 	std::weak_ptr<KdGameObject> m_wpTarget;
+
+	// 候補1件 = <画面中心への近さ(内積), 敵>
+	using Candidate = std::pair<float, std::shared_ptr<KdGameObject>>;
+
+	// 角度内の候補を集めて内積の降順に並べる作業用。毎フレームclearして使い回す
+	// (毎フレームvectorを確保し直さないためメンバに持つ)
+	std::vector<Candidate> m_candidates;
 
 	// マーカーの見た目(照準テクスチャ・カメラを向く点ビルボード)
 	std::unique_ptr<KdSquarePolygon> m_upMarkerPoly;

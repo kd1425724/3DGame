@@ -111,6 +111,33 @@ void CollisionGrid::QuerySphere(const Math::Vector3& _center, float _radius, std
 	CollectRange(_center.x - _radius, _center.x + _radius, _center.z - _radius, _center.z + _radius, _out);
 }
 
+// 2026/07/19: CharaBase から移動(実体はキャラに依存しない世界クエリのため)。→ CollisionGrid.h の宣言に経緯
+bool CollisionGrid::IsWallBetween(const Math::Vector3& _from, const Math::Vector3& _to, float _margin)
+{
+	ZoneScoped;	// Tracy計測(2026/07/19)：遮蔽レイ(ワイヤー/ダイブ/照準)
+
+	Math::Vector3 seg = _to - _from;
+	float len = seg.Length();
+	if (len <= _margin * 2.0f) { return false; }   // 両端marginを除くと区間が無い＝遮蔽なし
+
+	Math::Vector3 dir = seg / len;
+	// 両端をmarginぶん無視する。こうしないと「アンカーが付いている塔自身」や
+	// 「足元/対象のすぐ手前の壁」を拾ってしまい、かすっただけで遮蔽判定になる
+	Math::Vector3 start = _from + dir * _margin;
+	const float rayLen = len - _margin * 2.0f;
+	KdCollider::RayInfo ray(KdCollider::TypeBump, start, dir, rayLen);
+
+	std::list<KdCollider::CollisionResult> results;
+	// レイ近傍の静的コリジョン(建物/地面)だけをグリッドから取り出して判定する
+	std::vector<KdGameObject*> candidates;
+	Instance().QueryRay(start, dir, rayLen, candidates);
+	for (KdGameObject* obj : candidates)
+	{
+		obj->Intersects(ray, &results);
+	}
+	return !results.empty();   // 途中(両端margin除く)に壁があれば遮蔽されている
+}
+
 void CollisionGrid::QueryRay(const Math::Vector3& _start, const Math::Vector3& _dir, float _length, std::vector<KdGameObject*>& _out)
 {
 	ZoneScoped;	// Tracy計測(2026/07/19)：broadphaseのレイクエリ

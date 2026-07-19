@@ -42,6 +42,13 @@ public:
 	// レイ(start から dir 方向へ length)の近くにある静的コリジョン候補を out に集める(重複なし)
 	void QueryRay(const Math::Vector3& _start, const Math::Vector3& _dir, float _length, std::vector<KdGameObject*>& _out);
 
+	// from〜to の間が壁(TypeBump)で遮られているか。QueryRayの上に乗った「意味付きの問い合わせ」。
+	// 両端を _margin ぶん無視する ── こうしないと「足元の地面」や「対象のすぐ手前の壁」を拾って
+	// かすっただけで遮蔽扱いになる。
+	// ※ 元は CharaBase の static メンバだったが、実体はキャラに依存しない世界クエリなので
+	//    2026/07/19 にここへ移動した(ワイヤー/ダイブに加えて照準の遮蔽判定からも使うため)
+	static bool IsWallBetween(const Math::Vector3& _from, const Math::Vector3& _to, float _margin = 0.5f);
+
 private:
 
 	CollisionGrid() = default;
