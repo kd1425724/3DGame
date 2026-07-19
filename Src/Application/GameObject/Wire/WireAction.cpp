@@ -62,6 +62,42 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 	//    あとで別入力に割り当て直す予定(パラメータ「ワイヤー/リール速度」は残してある)
 	Update(pos, _body.m_velocity, _dt, 0.0f);
 
+	// === 引き寄せ(ウインチ) ── 立体機動の推進力 ===
+	// DebugFlags「ワイヤー/引き寄せモード」で挙動が2種類に分かれる。
+	//   ON (立体機動)   … 接続中ずっとアンカー方向へ加速する。ワイヤーは「振るもの」ではなく
+	//                     「巻き取って自分を運ぶもの」になる。移動＝アンカーへ飛んでいく
+	//   OFF (Spider-Man)… 引き寄せなし。重力で落ちて振れる純粋な振り子
+	// ※ 同じ「アンカー方向へ引く力」が、目指す方向によって機能にも違和感にもなる。
+	//    2026/07/19 に一度0にしたが、立体機動を目指す方針になったのでモードとして復活させた
+	const bool winchMode = DebugFlags::Instance().Get(U8("ワイヤー/引き寄せモード"), true);
+	if (winchMode)
+	{
+		Math::Vector3 toAnchor = m_anchor - pos;
+		float distToAnchor = toAnchor.Length();
+		if (distToAnchor > 0.001f)
+		{
+			toAnchor /= distToAnchor;
+
+			// 際限なく加速しないよう、アンカーへ近づく速度に上限を設ける
+			float reelAcc = DebugParams::Instance().Float(U8("ワイヤー/引き寄せ加速"),   28.0f, 0.0f, 120.0f);
+			float reelMax = DebugParams::Instance().Float(U8("ワイヤー/引き寄せ上限速度"), 30.0f, 0.0f, 120.0f);
+			float approach = _body.m_velocity.Dot(toAnchor);   // 今アンカーへ向かっている速さ
+			if (approach < reelMax)
+			{
+				_body.m_velocity += toAnchor * (reelAcc * _dt);
+			}
+		}
+
+		// アンカーに着いたら自動で外す。付けたままだと刺した壁に激突して止まる
+		float arriveDist = DebugParams::Instance().Float(U8("ワイヤー/到達で離す距離"), 3.5f, 0.5f, 20.0f);
+		if (distToAnchor <= arriveDist)
+		{
+			Release();
+			// 以降の処理(操舵/自動リリース判定)は不要だが、当たり解決は行う必要があるので
+			// returnせずそのまま下へ抜ける
+		}
+	}
+
 	// === 操舵と漕ぎ(進行方向の水平ベクトルを基準にする) ===
 	// 進行方向(水平)と、それに直交する右向きを作る。
 	// 半径方向(アンカーから外向き)の成分は距離拘束で打ち消されるだけなので、
@@ -126,7 +162,9 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 	// 「進行方向＋上向き」の初速を足す。
 	// 物理的には嘘だが、Spider-Man系の「離した瞬間に伸びる」感触はこれで作られている。
 	// 撃った直後の暴発を避けるため、繋いでから一定時間経つまでは判定しない
-	bool autoRelease = DebugFlags::Instance().Get(U8("ワイヤー/自動リリース"), true);
+	// ※ 引き寄せモード中は無効。弧の底で離すのは振り子(Spider-Man)前提の挙動で、
+	//    アンカーへ飛んでいく立体機動では「到達で離す」の方が担当になる
+	bool autoRelease = !winchMode && DebugFlags::Instance().Get(U8("ワイヤー/自動リリース"), true);
 	float armTime = DebugParams::Instance().Float(U8("ワイヤー/自動リリース最短時間"), 0.25f, 0.0f, 2.0f);
 	if (autoRelease && m_swingTime >= armTime && m_prevVelY <= 0.0f && _body.m_velocity.y > 0.0f)
 	{
