@@ -13,6 +13,10 @@ void CollisionGrid::EnsureBuilt()
 
 void CollisionGrid::Rebuild()
 {
+	// Tracy計測(2026/07/19)：グリッド再構築。ゲーム中は静止していれば呼ばれないはずなので、
+	// これが毎フレーム出ていたらMarkDirtyを呼び過ぎている(＝エディタ以外での無駄な再構築)
+	ZoneScoped;
+
 	m_cells.clear();
 	m_always.clear();
 
@@ -101,12 +105,16 @@ void CollisionGrid::CollectRange(float _minX, float _maxX, float _minZ, float _m
 
 void CollisionGrid::QuerySphere(const Math::Vector3& _center, float _radius, std::vector<KdGameObject*>& _out)
 {
+	ZoneScoped;	// Tracy計測(2026/07/19)：broadphaseの球クエリ
+
 	EnsureBuilt();
 	CollectRange(_center.x - _radius, _center.x + _radius, _center.z - _radius, _center.z + _radius, _out);
 }
 
 void CollisionGrid::QueryRay(const Math::Vector3& _start, const Math::Vector3& _dir, float _length, std::vector<KdGameObject*>& _out)
 {
+	ZoneScoped;	// Tracy計測(2026/07/19)：broadphaseのレイクエリ
+
 	EnsureBuilt();
 
 	// レイ線分のXZ範囲(始点〜終点)を囲むAABBで、通過しうるセルをまとめて拾う

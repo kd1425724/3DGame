@@ -28,6 +28,8 @@ void CharaBase::GenerateDepthMapFromLight()
 
 bool CharaBase::IsWallBetween(const Math::Vector3& from, const Math::Vector3& to, float margin)
 {
+	ZoneScoped;	// Tracy計測(2026/07/19)：ワイヤー/ダイブの遮蔽レイ
+
 	Math::Vector3 seg = to - from;
 	float len = seg.Length();
 	if (len <= margin * 2.0f) { return false; }   // 両端marginを除くと区間が無い＝遮蔽なし
@@ -51,6 +53,8 @@ bool CharaBase::IsWallBetween(const Math::Vector3& from, const Math::Vector3& to
 
 void CharaBase::GroundCheck()
 {
+	ZoneScoped;	// Tracy計測(2026/07/19)：接地/天井/壁の解決をまとめて呼ぶ入口
+
 	float deltaTime = Application::Instance().GetDeltaTime();
 
 	// 重力を垂直速度に加える(重力はDebugParamsで調整可能)
@@ -80,6 +84,8 @@ void CharaBase::GroundCheck()
 
 void CharaBase::ResolveGround(Math::Vector3& pos)
 {
+	ZoneScoped;	// Tracy計測(2026/07/19)：真下レイによる接地解決
+
 	float deltaTime = Application::Instance().GetDeltaTime();
 
 	// この呼び出しの前に接地していたか(着地の"瞬間"だけ手応えを出すためのエッジ検出用)
@@ -163,6 +169,8 @@ void CharaBase::ResolveGround(Math::Vector3& pos)
 
 void CharaBase::ResolveCeiling(const Math::Vector3& fromPos, Math::Vector3& pos)
 {
+	ZoneScoped;	// Tracy計測(2026/07/19)：上昇中の天井判定
+
 	// 上昇中だけ天井を見る。落下・水平移動時はResolveGround/ResolveBumpが担当
 	if (m_velocity.y <= 0.0f) { return; }
 
@@ -229,6 +237,8 @@ void CharaBase::ResolveCeiling(const Math::Vector3& fromPos, Math::Vector3& pos)
 
 void CharaBase::ResolveBump(Math::Vector3& pos)
 {
+	ZoneScoped;	// Tracy計測(2026/07/19)：球の押し出しによる壁解決
+
 	// 体を球で近似し、Block等(TypeBump)にめり込んでいたら水平方向へ押し出して壁にする
 	// ※ 縦の着地はResolveGroundが担当するので、ここは水平方向だけ押す
 	float radius = DebugParams::Instance().Float(U8("キャラ/壁当たり半径"), 0.4f, 0.1f, 2.0f);
@@ -307,6 +317,10 @@ void CharaBase::ResolveBump(Math::Vector3& pos)
 
 void CharaBase::ResolveBumpSweep(const Math::Vector3& fromPos, Math::Vector3& pos)
 {
+	// Tracy計測(2026/07/19)：高速移動時の掃引判定。経路上に球を刻んで当てるので
+	// 速度が上がるほど判定回数が増える＝ここが伸びたら刻み幅を疑う
+	ZoneScoped;
+
 	float radius = DebugParams::Instance().Float(U8("キャラ/壁当たり半径"), 0.4f, 0.1f, 2.0f);
 
 	// 水平移動量だけを見る(縦の乗り降り・着地はResolveGroundが担当)

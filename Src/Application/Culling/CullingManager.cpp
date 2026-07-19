@@ -5,6 +5,11 @@
 
 void CullingManager::Update(const KdCamera& _camera)
 {
+	// Tracy計測(2026/07/19)：視錐台の更新。ここは毎フレーム1回だけの軽い処理。
+	// ※ IsVisible/IsInRangeはオブジェクト毎に何百回も呼ばれる極小関数なので、
+	//    計測を入れるとTracyのオーバーヘッドの方が本体より大きくなる。意図的に入れていない
+	ZoneScoped;
+
 	m_enabled  = DebugFlags::Instance().Get(U8("カリング/有効"), true);
 	m_cullDist = DebugParams::Instance().Float(U8("カリング/距離"), 120.0f, 10.0f, 2000.0f);
 

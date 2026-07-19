@@ -416,6 +416,9 @@ void Application::Execute()
 
 		KdBeginUpdate();
 		{
+			// Tracy計測(2026/07/19)：更新処理ひとまとまりの時間
+			ZoneScopedN("App Update");
+
 			// ※ KdInputManagerの更新(KdBeginUpdate内)より後で判定する必要がある
 			if (KdInputManager::Instance().IsHold("Escape"))
 			{
@@ -442,6 +445,9 @@ void Application::Execute()
 
 		KdBeginDraw();
 		{
+			// Tracy計測(2026/07/19)：描画処理ひとまとまりの時間
+			ZoneScopedN("App Draw");
+
 			PreDraw();
 
 			Draw();
@@ -462,6 +468,10 @@ void Application::Execute()
 
 		std::string titlebar = "タイトル名 FPS:" + std::to_string(m_fpsController.m_nowfps);
 		SetWindowTextA(m_window.GetWndHandle(), titlebar.c_str());
+
+		// Tracy計測(2026/07/19)：ここが1フレームの区切り。
+		// これが無いとTracyのGUIでフレーム単位のグラフが出ない
+		FrameMark;
 	}
 
 	//===================================================================

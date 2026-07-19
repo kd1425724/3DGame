@@ -2,6 +2,38 @@
 
 #include "KdStandardShader.h"
 
+//================================================================================
+// 【Framework変更履歴】2026/07/19  Tracy(フレームプロファイラ)の計測点を追加
+//================================================================================
+// ■ 何を入れたか
+//   DrawMesh / DrawModel(2種) / DrawMeshInstanced / DrawModelInstanced の先頭に
+//   ZoneScoped(またはZoneScopedN)を1行ずつ追加しただけ。既存の処理は一切変えていない。
+//
+// ■ なぜFrameworkを触ったか
+//   ドローコールが本当に描画コストの主因なのかを実測するため。
+//   DrawMeshは「1メッシュ＝1ドローコール」の最小単位で、Application側からは
+//   この粒度が見えない(Application側はDrawLit等のパス単位までしか分からない)。
+//   ここに計測を入れると、Tracyのゾーン一覧で
+//     ・1フレームあたりのドローコール数(＝ゾーンの呼び出し回数)
+//     ・その合計時間
+//   が直接読める。メッシュ結合・マテリアル統合・カリング・GPUインスタンシングの
+//   効果測定は、この2つの数字が無いと推測でしか語れない。
+//
+// ■ 消したコードは無い
+//   追加のみ。Frameworkの既存コードは1行も削除・改変していない。
+//
+// ■ 元に戻す方法
+//   Project.vcxproj の TRACY_ENABLE 定義を外すと ZoneScoped は空マクロになり、
+//   コンパイル結果からも完全に消える(このファイルを編集し直す必要は無い)。
+//   ソースからも消したい場合は "Tracy計測(2026/07/19)" で全文検索すれば全て見つかる。
+//
+// ■ 副作用の注意
+//   DrawMeshは1フレームに千回以上呼ばれるため、ゾーン1回あたり数十ナノ秒の
+//   計測オーバーヘッドが乗る。合計しても数十マイクロ秒程度で、
+//   ミリ秒単位の判断には影響しない想定。ただし「Tracy接続中は僅かに重くなる」ことは
+//   前提として数字を読むこと。
+//================================================================================
+
 
 //================================================
 // 描画準備
@@ -147,6 +179,10 @@ void KdStandardShader::EndGenerateDepthMapFromLight()
 void KdStandardShader::DrawMesh(const KdMesh* mesh, const Math::Matrix& mWorld,
 	const std::vector<KdMaterial>& materials, const Math::Vector4& colRate, const Math::Vector3& emissive)
 {
+	// Tracy計測(2026/07/19)：ドローコールの最小単位。
+	// Tracyのゾーン一覧に出る「呼び出し回数」がそのまま1フレームのドローコール数になる
+	ZoneScopedN("DrawMesh");
+
 	if (mesh == nullptr) { return; }
 
 	// メッシュの頂点情報転送
@@ -181,6 +217,8 @@ void KdStandardShader::DrawMesh(const KdMesh* mesh, const Math::Matrix& mWorld,
 void KdStandardShader::DrawModel(const KdModelData& rModel, const Math::Matrix& mWorld,
 	const Math::Color& colRate, const Math::Vector3& emissive)
 {
+	ZoneScopedN("DrawModel(Data)");	// Tracy計測(2026/07/19)：モデル1体ぶんの描画
+
 	// オブジェクト単位の情報転送
 	if (m_dirtyCBObj)
 	{
@@ -212,6 +250,8 @@ void KdStandardShader::DrawModel(const KdModelData& rModel, const Math::Matrix& 
 void KdStandardShader::DrawModel(KdModelWork& rModel, const Math::Matrix& mWorld,
 	const Math::Color& colRate, const Math::Vector3& emissive)
 {
+	ZoneScopedN("DrawModel(Work)");	// Tracy計測(2026/07/19)：モデル1体ぶんの描画(アニメ有り)
+
 	if (!rModel.IsEnable()) { return; }
 
 	const std::shared_ptr<KdModelData>& data = rModel.GetData();
@@ -324,6 +364,11 @@ bool KdStandardShader::WriteInstanceBuffer(const std::vector<Math::Matrix>& mats
 void KdStandardShader::DrawMeshInstanced(const KdMesh* mesh, const std::vector<KdMaterial>& materials,
 	const Math::Vector4& col, const Math::Vector3& emissive, UINT instanceCount)
 {
+	// Tracy計測(2026/07/19)：インスタンシングのドローコール。
+	// DrawMeshと呼び出し回数を比べれば、インスタンシングでドロー数が
+	// どれだけ減っているかが分かる
+	ZoneScopedN("DrawMeshInstanced");
+
 	if (mesh == nullptr || instanceCount == 0) { return; }
 
 	// 頂点バッファ(slot0)・インデックスバッファ・トポロジをセット
@@ -356,6 +401,8 @@ void KdStandardShader::DrawMeshInstanced(const KdMesh* mesh, const std::vector<K
 void KdStandardShader::DrawModelInstanced(KdModelWork& rModel, const std::vector<Math::Matrix>& worldList,
 	const Math::Color& colRate, const Math::Vector3& emissive)
 {
+	ZoneScopedN("DrawModelInstanced");	// Tracy計測(2026/07/19)
+
 	if (!rModel.IsEnable() || worldList.empty()) { return; }
 
 	const std::shared_ptr<KdModelData>& data = rModel.GetData();

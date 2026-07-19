@@ -8,6 +8,8 @@
 
 void BaseScene::PreUpdate()
 {
+	ZoneScoped;	// Tracy計測(2026/07/19)
+
 	// Updateの前の更新処理
 	// オブジェクトリストの整理 ・・・ 無効なオブジェクトを削除
 	auto it = m_objList.begin();
@@ -35,6 +37,8 @@ void BaseScene::PreUpdate()
 
 void BaseScene::Update()
 {
+	ZoneScoped;	// Tracy計測(2026/07/19)
+
 	// デバッグ: シーン内のオブジェクト数をWatchに出す(最適化の効果測定用)
 	DebugWatch::Instance().Watch(U8("Scene/オブジェクト数"), static_cast<int>(m_objList.size()));
 
@@ -55,6 +59,8 @@ void BaseScene::Update()
 
 void BaseScene::PostUpdate()
 {
+	ZoneScoped;	// Tracy計測(2026/07/19)：当たり判定の解決はここに集まる
+
 	// フリーカメラ使用中はエディタカメラ以外のゲーム進行を止める(自由に見渡せるようにするため)
 	std::shared_ptr<KdGameObject> spEditorCamera = LevelEditorManager::Instance().GetEditorCamera();
 
@@ -71,6 +77,8 @@ void BaseScene::PostUpdate()
 
 void BaseScene::PreDraw()
 {
+	ZoneScoped;	// Tracy計測(2026/07/19)：カリングの視錐台更新もここ(CameraBase::PreDraw)
+
 	for (auto& obj : m_objList)
 	{
 		obj->PreDraw();
@@ -79,10 +87,15 @@ void BaseScene::PreDraw()
 
 void BaseScene::Draw()
 {
+	ZoneScoped;	// Tracy計測(2026/07/19)
+
 	// ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 	// 光を遮るオブジェクト(影を生み出す要因となるオブジェクト)をBeginとEndの間にまとめてDrawする
 	KdShaderManager::Instance().m_StandardShader.BeginGenerateDepthMapFromLight();
 	{
+		// Tracy計測(2026/07/19)：影の生成パス。重ければ影を落とす対象を減らす判断材料になる
+		ZoneScopedN("Draw: ShadowMap");
+
 		for (auto& obj : m_objList)
 		{
 			obj->GenerateDepthMapFromLight();
@@ -94,6 +107,9 @@ void BaseScene::Draw()
 	// 陰影のないオブジェクト(背景など)はBeginとEndの間にまとめてDrawする
 	KdShaderManager::Instance().m_StandardShader.BeginUnLit();
 	{
+		// Tracy計測(2026/07/19)：陰影なしパス(背景など)
+		ZoneScopedN("Draw: UnLit");
+
 		for (auto& obj : m_objList)
 		{
 			obj->DrawUnLit();
@@ -108,6 +124,9 @@ void BaseScene::Draw()
 	// 陰影のあるオブジェクト(光源の影響を受けるオブジェクト)はBeginとEndの間にまとめてDrawする
 	KdShaderManager::Instance().m_StandardShader.BeginLit();
 	{
+		// Tracy計測(2026/07/19)：陰影ありパス。建物のドローはここ。最重要の計測点
+		ZoneScopedN("Draw: Lit");
+
 		for (auto& obj : m_objList)
 		{
 			obj->DrawLit();
@@ -119,6 +138,9 @@ void BaseScene::Draw()
 	// 陰影のないオブジェクト(エフェクトなど)はBeginとEndの間にまとめてDrawする
 	KdShaderManager::Instance().m_StandardShader.BeginUnLit();
 	{
+		// Tracy計測(2026/07/19)：エフェクト描画パス
+		ZoneScopedN("Draw: Effect");
+
 		for (auto& obj : m_objList)
 		{
 			obj->DrawEffect();
@@ -130,6 +152,9 @@ void BaseScene::Draw()
 	// 光源オブジェクト(自ら光るオブジェクトやエフェクト)はBeginとEndの間にまとめてDrawする
 	KdShaderManager::Instance().m_postProcessShader.BeginBright();
 	{
+		// Tracy計測(2026/07/19)：発光パス(ブルームの元)
+		ZoneScopedN("Draw: Bright");
+
 		for (auto& obj : m_objList)
 		{
 			obj->DrawBright();
@@ -140,6 +165,8 @@ void BaseScene::Draw()
 
 void BaseScene::DrawSprite()
 {
+	ZoneScoped;	// Tracy計測(2026/07/19)：2D(UI/HUD)描画
+
 	// ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== ===== =====
 	// 2Dの描画はこの間で行う
 	KdShaderManager::Instance().m_spriteShader.Begin();
