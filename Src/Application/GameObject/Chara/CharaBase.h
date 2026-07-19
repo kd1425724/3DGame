@@ -46,6 +46,14 @@ protected:
 	// ※ ワイヤー中など、GroundCheckを通さず自前で移動するときのすり抜け防止にも使う
 	void ResolveGround(Math::Vector3& pos);
 
+	// 上昇中(ジャンプ/ワイヤー/ダイブ)に頭上の天井(TypeBump)へ潜り込むのを止める。
+	// 移動前の頭の高さ fromPos から現在の頭の高さまで上向きレイで掃引し、天井があれば
+	// 頭がその直下に収まる高さへクランプして上向き速度を0にする(次フレームから重力で落ちる)。
+	// ※ ResolveGroundの上下反転(下から上)。始点を「頭」にするのは、体の中心より下から飛ばすと
+	//    立っている床の天面を裏から拾って誤検知するため。射程が移動量ぶん伸びるので高速上昇の
+	//    トンネリングも拾える。縦専用=水平の壁はResolveBump/Sweepが担当。落下中(velocity.y<=0)は何もしない
+	void ResolveCeiling(const Math::Vector3& fromPos, Math::Vector3& pos);
+
 	// 体を球で近似し、Block等(TypeBump)にめり込んでいたら水平方向へ押し出す(壁として働く)
 	// ※ 縦の乗り上げ/着地はResolveGroundが担当。ワイヤー中もすり抜け防止に使う
 	void ResolveBump(Math::Vector3& pos);

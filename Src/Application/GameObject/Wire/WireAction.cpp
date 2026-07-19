@@ -108,6 +108,9 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, float _reel)
 	// 地面に潜らないよう押し上げる(ワイヤー中もすり抜け防止)。m_isGroundedもここで更新される
 	_body.ResolveGround(pos);
 
+	// 上昇スイング中に頭上の天井へ潜り込むのを止める(高速上昇のトンネリングも掃引で拾う)
+	_body.ResolveCeiling(startPos, pos);
+
 	// スイングは高速なので、まず壁を飛び越えるトンネリングを止める(startPos→posを掃引)
 	_body.ResolveBumpSweep(startPos, pos);
 

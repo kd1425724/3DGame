@@ -66,6 +66,9 @@ void CharaBase::GroundCheck()
 	// 地面に潜っていたら押し上げて落下を止める(接地状態もここで更新される)
 	ResolveGround(pos);
 
+	// 上昇中に頭上の天井へ潜り込むのを止める(接地とは上昇/落下で排他)
+	ResolveCeiling(startPos, pos);
+
 	// 高速移動で壁を飛び越える(トンネリング)のを先に止める
 	ResolveBumpSweep(startPos, pos);
 
@@ -151,6 +154,72 @@ void CharaBase::ResolveGround(Math::Vector3& pos)
 
 	// それ以外は空中
 	m_isGrounded = false;
+}
+
+void CharaBase::ResolveCeiling(const Math::Vector3& fromPos, Math::Vector3& pos)
+{
+	// 上昇中だけ天井を見る。落下・水平移動時はResolveGround/ResolveBumpが担当
+	if (m_velocity.y <= 0.0f) { return; }
+
+	// このフレームで頭がどれだけ上がったか(=掃引区間の長さ)
+	float rise = pos.y - fromPos.y;
+	if (rise <= 0.0f) { return; }
+
+	float halfH = GetScale().y * 0.5f;
+
+	// レイの始点は「移動前の頭の高さ」。ここは前フレームに天井へ潜っていない安全な位置なので、
+	// 下から上へ飛ばしても立っている床の天面を裏から拾わない(体中心より下から飛ばすと誤検知する)。
+	// x,z は現在位置(頭が最終的に来る場所)を使う。射程=上昇量+余裕で高速上昇のトンネリングも拾う
+	Math::Vector3 rayStart(pos.x, fromPos.y + halfH, pos.z);
+	float rayRange = rise + 0.1f;
+
+	KdCollider::RayInfo ray(KdCollider::TypeBump, rayStart, Math::Vector3::Up, rayRange);
+
+	// デバッグ表示：天井判定に使用したレイを可視化(下向きの地面レイと色を変える=マゼンタ)
+	if (KdGameObject::s_showColliderDebug)
+	{
+		if (!m_pDebugWire)
+		{
+			m_pDebugWire = std::make_unique<KdDebugWireFrame>();
+		}
+		m_pDebugWire->AddDebugLine(ray.m_pos, ray.m_dir, ray.m_range, Math::Color(1.0f, 0.0f, 1.0f, 1.0f));
+	}
+
+	std::list<KdCollider::CollisionResult> retRayList;
+
+	// 近傍の静的コリジョンだけをグリッドから取り出して判定する(大量配置時のCPU削減)
+	std::vector<KdGameObject*> candidates;
+	CollisionGrid::Instance().QueryRay(rayStart, Math::Vector3::Up, rayRange, candidates);
+	for (KdGameObject* obj : candidates)
+	{
+		obj->Intersects(ray, &retRayList);
+	}
+
+	// 一番手前(下)の天井=overlapが最大のヒットを採用(ResolveGroundと同じ選び方)
+	float maxOverLap = 0;
+	Math::Vector3 hitPos;
+	bool hit = false;
+
+	for (auto& ret : retRayList)
+	{
+		if (maxOverLap < ret.m_overlapDistance)
+		{
+			maxOverLap = ret.m_overlapDistance;
+			hitPos = ret.m_hitPos;
+			hit = true;
+		}
+	}
+
+	// 天井に届いていたら、頭の天面がその直下に収まる高さへ下げて上向きの勢いを止める
+	if (hit)
+	{
+		float ceilCenterY = hitPos.y - halfH - 0.02f;   // 体中心の上限(頭が天井の少し下に来る)
+		if (pos.y > ceilCenterY)
+		{
+			pos.y = ceilCenterY;
+			m_velocity.y = 0.0f;   // 上向きの勢いだけ止める(次フレームから重力で落下)
+		}
+	}
 }
 
 void CharaBase::ResolveBump(Math::Vector3& pos)
