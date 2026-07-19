@@ -74,6 +74,7 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 	{
 		Math::Vector3 toAnchor = m_anchor - pos;
 		float distToAnchor = toAnchor.Length();
+		float approach = 0.0f;   // アンカーへ近づいている速さ(負なら遠ざかっている=追い越した)
 		if (distToAnchor > 0.001f)
 		{
 			toAnchor /= distToAnchor;
@@ -81,16 +82,35 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 			// 際限なく加速しないよう、アンカーへ近づく速度に上限を設ける
 			float reelAcc = DebugParams::Instance().Float(U8("ワイヤー/引き寄せ加速"),   28.0f, 0.0f, 120.0f);
 			float reelMax = DebugParams::Instance().Float(U8("ワイヤー/引き寄せ上限速度"), 30.0f, 0.0f, 120.0f);
-			float approach = _body.m_velocity.Dot(toAnchor);   // 今アンカーへ向かっている速さ
+			approach = _body.m_velocity.Dot(toAnchor);
 			if (approach < reelMax)
 			{
 				_body.m_velocity += toAnchor * (reelAcc * _dt);
 			}
 		}
 
-		// アンカーに着いたら自動で外す。付けたままだと刺した壁に激突して止まる
-		float arriveDist = DebugParams::Instance().Float(U8("ワイヤー/到達で離す距離"), 3.5f, 0.5f, 20.0f);
-		if (distToAnchor <= arriveDist)
+		// === 離脱条件は2つ。役割が違うので両方入れている ===
+		//
+		//  (A) アンカーを追い越した … 立体機動として自然な離脱。
+		//      ビルの角に刺して引かれ、その脇を通り過ぎた瞬間に外れて勢いで飛んでいく形。
+		//      「近づく速度が0以下になった」= もう遠ざかり始めた = 追い越した、で判定する。
+		//      勢いを保ったまま次のワイヤーへ繋がるのでこちらが主役。
+		//
+		//  (B) 近すぎる … 壁への激突防止の安全網。
+		//      正面の壁に水平に刺した場合は(A)の追い越しが起きず、アンカーへ真っ直ぐ
+		//      飛んでいって激突する。その時だけ効かせたいので、距離は小さめが良い。
+		//
+		// ※ 撃った直後は速度の向きが安定しないので、最短時間が経つまで(A)は判定しない
+		float armTimeWinch = DebugParams::Instance().Float(U8("ワイヤー/自動リリース最短時間"), 0.25f, 0.0f, 2.0f);
+		bool passedAnchor = DebugFlags::Instance().Get(U8("ワイヤー/追い越しで離す"), true)
+			&& m_swingTime >= armTimeWinch
+			&& approach <= 0.0f;
+
+		// 0にすれば距離での離脱を無効化できる(追い越しだけで試したい時用)
+		float arriveDist = DebugParams::Instance().Float(U8("ワイヤー/到達で離す距離"), 2.0f, 0.0f, 20.0f);
+		bool tooClose = (arriveDist > 0.0f) && (distToAnchor <= arriveDist);
+
+		if (passedAnchor || tooClose)
 		{
 			Release();
 			// 以降の処理(操舵/自動リリース判定)は不要だが、当たり解決は行う必要があるので
