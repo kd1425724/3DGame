@@ -20,9 +20,11 @@ WireAction::WireAction()
 
 WireAction::~WireAction() = default;
 
-void WireAction::UpdateSwing(CharaBase& _body, float _dt, float _reel)
+void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _moveInput)
 {
 	if (!m_isAttached) { return; }
+
+	m_swingTime += _dt;
 
 	// 手元とアンカーの間に壁(塔など)が入ったら、線が壁を突き抜けるのでワイヤーを外す(貫通させない)。
 	// ただし一瞬のかすりで外れないよう、一定時間(自動リリース猶予)遮蔽が続いた時だけ外す(デバウンス)。
@@ -54,57 +56,95 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, float _reel)
 	Math::Vector3 startPos = pos;   // 移動前の位置(スイープの始点)
 	pos += _body.m_velocity * _dt;
 
-	// たぐり寄せ/伸ばし(入力はキャラ側が決めて_reelで渡す)
-	Update(pos, _body.m_velocity, _dt, _reel);
+	// 距離拘束を解く。
+	// ※ リール(たぐり寄せ)は 2026/07/19 に廃止したので 0 を渡す。
+	//    前進入力でワイヤーが縮み、アンカー側へ引き寄せられてしまっていたため。
+	//    あとで別入力に割り当て直す予定(パラメータ「ワイヤー/リール速度」は残してある)
+	Update(pos, _body.m_velocity, _dt, 0.0f);
 
-	// === 漕ぎ(ポンプ) ===
-	// DebugFlags「ワイヤー/漕ぎ(ポンプ)」でON/OFF。
-	//   OFF … 元の純粋な振り子(下りで加速→上りで減速。地面すれすれは速度が落ちる)
-	//   ON  … 振り子に接線方向の加速を足す(ブランコを漕ぐイメージ)。上限速度まで勢いを
-	//          維持できるので、Spider-Man風に地面すれすれでも速度が落ちにくくなる
-	if (DebugFlags::Instance().Get(U8("ワイヤー/漕ぎ(ポンプ)"), false))
+	// === 操舵と漕ぎ(進行方向の水平ベクトルを基準にする) ===
+	// 進行方向(水平)と、それに直交する右向きを作る。
+	// 半径方向(アンカーから外向き)の成分は距離拘束で打ち消されるだけなので、
+	// 接線成分だけに力を入れる = 弧に沿ってのみ加速・旋回する
+	Math::Vector3 horiz(_body.m_velocity.x, 0.0f, _body.m_velocity.z);
+	float sp = horiz.Length();
+	if (sp > 0.0001f)
 	{
-		// 今の進行方向(水平)
-		Math::Vector3 horiz(_body.m_velocity.x, 0.0f, _body.m_velocity.z);
-		float sp = horiz.Length();
-		if (sp > 0.0001f)
+		Math::Vector3 tdir = horiz / sp;                       // 進行方向(水平)
+		Math::Vector3 side = Math::Vector3::Up.Cross(tdir);    // 進行方向の右手側
+		if (side.LengthSquared() > 0.0001f)
 		{
-			Math::Vector3 tdir = horiz / sp;
+			side.Normalize();
+		}
 
-			// アンカーから外向き(半径方向)の水平成分を除き、接線方向だけに加速する。
-			// (半径方向へ足しても距離拘束で打ち消されるだけ＝弧に沿ってのみ漕ぐ)
-			Math::Vector3 radial = pos - m_anchor;
-			radial.y = 0.0f;
-			if (radial.LengthSquared() > 0.0001f)
+		// アンカーから外向きの水平成分を落として、接線方向だけ残す
+		Math::Vector3 radial = pos - m_anchor;
+		radial.y = 0.0f;
+		if (radial.LengthSquared() > 0.0001f)
+		{
+			radial.Normalize();
+			tdir -= radial * tdir.Dot(radial);
+			if (tdir.LengthSquared() > 0.0001f)
 			{
-				radial.Normalize();
-				tdir -= radial * tdir.Dot(radial);
-				if (tdir.LengthSquared() > 0.0001f)
-				{
-					tdir.Normalize();
-				}
-				else
-				{
-					tdir = Math::Vector3::Zero;
-				}
+				tdir.Normalize();
 			}
-
-			float pumpMax = DebugParams::Instance().Float(U8("ワイヤー/ポンプ上限速度"), 20.0f, 0.0f, 60.0f);
-			float pumpAcc = DebugParams::Instance().Float(U8("ワイヤー/ポンプ加速"),     15.0f, 0.0f, 100.0f);
-
-			float add = pumpMax - sp;   // 上限速度まであとどれだけ足せるか(それ以上は加速しない)
-			if (add > 0.0f && tdir.LengthSquared() > 0.0f)
+			else
 			{
-				float a = pumpAcc * _dt;
-				if (a > add)
-				{
-					a = add;
-				}
-				_body.m_velocity.x += tdir.x * a;
-				_body.m_velocity.z += tdir.z * a;
+				tdir = Math::Vector3::Zero;
 			}
 		}
+
+		// --- 前方への漕ぎ(W/S) ---
+		// ブランコを漕ぐイメージで接線方向に加速する。上限速度までしか足さないので
+		// 押しっぱなしでも際限なく速くならない
+		float pumpMax = DebugParams::Instance().Float(U8("ワイヤー/ポンプ上限速度"), 20.0f, 0.0f, 60.0f);
+		float pumpAcc = DebugParams::Instance().Float(U8("ワイヤー/ポンプ加速"),     15.0f, 0.0f, 100.0f);
+		float add = pumpMax - sp;
+		if (_moveInput.y != 0.0f && add > 0.0f && tdir.LengthSquared() > 0.0f)
+		{
+			float a = pumpAcc * _moveInput.y * _dt;
+			if (a > add)
+			{
+				a = add;
+			}
+			_body.m_velocity.x += tdir.x * a;
+			_body.m_velocity.z += tdir.z * a;
+		}
+
+		// --- 操舵(A/D) ---
+		// 進行方向の横へ加速して、振り子の面ごと向きを変える。
+		// 曲がりたい方向へ velocity を寄せるので、次の弧が違う方向へ向く
+		float steerAcc = DebugParams::Instance().Float(U8("ワイヤー/操舵加速"), 14.0f, 0.0f, 60.0f);
+		if (_moveInput.x != 0.0f)
+		{
+			_body.m_velocity += side * (steerAcc * _moveInput.x * _dt);
+		}
 	}
+
+	// === 自動リリース＋離脱ブースト ===
+	// 弧の底を通過して上昇に転じた瞬間(垂直速度が負→正)にワイヤーを外し、
+	// 「進行方向＋上向き」の初速を足す。
+	// 物理的には嘘だが、Spider-Man系の「離した瞬間に伸びる」感触はこれで作られている。
+	// 撃った直後の暴発を避けるため、繋いでから一定時間経つまでは判定しない
+	bool autoRelease = DebugFlags::Instance().Get(U8("ワイヤー/自動リリース"), true);
+	float armTime = DebugParams::Instance().Float(U8("ワイヤー/自動リリース最短時間"), 0.25f, 0.0f, 2.0f);
+	if (autoRelease && m_swingTime >= armTime && m_prevVelY <= 0.0f && _body.m_velocity.y > 0.0f)
+	{
+		Math::Vector3 fwd(_body.m_velocity.x, 0.0f, _body.m_velocity.z);
+		if (fwd.LengthSquared() > 0.0001f)
+		{
+			fwd.Normalize();
+		}
+
+		float boostFwd = DebugParams::Instance().Float(U8("ワイヤー/離脱ブースト前方"), 6.0f, 0.0f, 40.0f);
+		float boostUp  = DebugParams::Instance().Float(U8("ワイヤー/離脱ブースト上"),   5.0f, 0.0f, 40.0f);
+		_body.m_velocity += fwd * boostFwd;
+		_body.m_velocity.y += boostUp;
+
+		Release();
+	}
+
+	m_prevVelY = _body.m_velocity.y;
 
 	// 地面に潜らないよう押し上げる(ワイヤー中もすり抜け防止)。m_isGroundedもここで更新される
 	_body.ResolveGround(pos);
@@ -191,6 +231,8 @@ bool WireAction::Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, fl
 		m_maxLength = m_length;   // 撃った瞬間の長さをリールアウトの上限にする
 		m_isAttached = true;
 		m_occludedTime = 0.0f;    // 遮蔽デバウンスをリセット
+		m_swingTime = 0.0f;       // 自動リリースの最短時間を測り直す
+		m_prevVelY = 0.0f;        // 底の通過判定をリセット(前回のスイングを引きずらない)
 	}
 
 	// TODO: 上の①〜④を実装する
@@ -201,6 +243,8 @@ void WireAction::Release()
 {
 	m_isAttached = false;
 	m_occludedTime = 0.0f;   // 遮蔽デバウンスをリセット
+	m_swingTime = 0.0f;
+	m_prevVelY = 0.0f;
 }
 
 bool WireAction::IsAttached() const
@@ -254,7 +298,16 @@ void WireAction::Update(Math::Vector3& _pos, Math::Vector3& _vel, float _dt, flo
 			_vel -= dir * radialSpeed;
 		}
 
-		_vel -= dir * DebugParams::Instance().Float(U8("ワイヤー/引き込み力"), 5, 0.1f, 10) * _dt;
+		// 【2026/07/19 既定値を 5 → 0 に変更】
+		// 拘束中ずっとアンカー方向へ加速し続けていたため、「前や上へ行きたいのに
+		// すぐ内側へ寄ってしまう」原因になっていた。実際のロープに内向きの力は無く、
+		// 張力は「外へ出るのを止める」だけでよい。
+		// 意図的に内へ寄せたい時のためにパラメータ自体は残す(0で無効)
+		float pullIn = DebugParams::Instance().Float(U8("ワイヤー/引き込み力"), 0.0f, 0.0f, 10.0f);
+		if (pullIn > 0.0f)
+		{
+			_vel -= dir * pullIn * _dt;
+		}
 	}
 
 

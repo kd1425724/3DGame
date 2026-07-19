@@ -90,10 +90,11 @@ void Player::Update()
 	UpdateWireInput();
 
 	// ワイヤー接続中はスイング物理だけ行い、通常移動・ジャンプ・レーザーは止める。
-	// たぐり寄せ入力(W/S=Move.y)を渡し、実際の移動はWireAction::UpdateSwingがこのキャラを動かす
+	// 移動入力をそのまま渡す：X=操舵(振り子の向きを曲げる) / Y=前方への漕ぎ。
+	// 実際の移動はWireAction::UpdateSwingがこのキャラを動かす
 	if (m_upWire->IsAttached())
 	{
-		m_upWire->UpdateSwing(*this, dt, KdInputManager::Instance().GetAxisState("Move").y);
+		m_upWire->UpdateSwing(*this, dt, KdInputManager::Instance().GetAxisState("Move"));
 		return;
 	}
 
