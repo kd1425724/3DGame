@@ -127,12 +127,36 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 		float arriveDist = DebugParams::Instance().Float(U8("ワイヤー/到達で離す距離"), 2.0f, 0.0f, 20.0f);
 		bool tooClose = (arriveDist > 0.0f) && (distToAnchor <= arriveDist);
 
-		if (passedAnchor || tooClose)
+		// === 離脱を「上を向いてから」に遅らせる ===
+		// (A)の条件が揃っても、まだ下降中に切ると そのまま落ちるだけになって気持ちよくない。
+		// 条件が揃ったら"離脱待ち"にして、上昇に転じてから実際に外す。
+		// 引き寄せは続いているので、アンカーが上にあれば自然に上向きへ転じる。
+		// ※ アンカーが下や真横だと永久に上を向かないので、待ちには上限時間を設ける
+		if (passedAnchor)
+		{
+			m_releasePending = true;
+		}
+
+		if (m_releasePending)
+		{
+			m_releasePendingTime += _dt;
+
+			bool  waitUp  = DebugFlags::Instance().Get(U8("ワイヤー/上を向いてから離す"), true);
+			float maxWait = DebugParams::Instance().Float(U8("ワイヤー/上向き待ちの上限"), 0.6f, 0.0f, 3.0f);
+			bool  rising  = _body.m_velocity.y > 0.0f;
+
+			if (!waitUp || rising || m_releasePendingTime >= maxWait)
+			{
+				Release();
+			}
+		}
+
+		// 激突防止(B)は待たずに即座に外す。待っている間に壁へ突っ込んでは意味がないため
+		if (tooClose)
 		{
 			Release();
-			// 以降の処理(操舵/自動リリース判定)は不要だが、当たり解決は行う必要があるので
-			// returnせずそのまま下へ抜ける
 		}
+		// ※ 外れた後も、以降の当たり解決は行う必要があるのでreturnせず下へ抜ける
 	}
 
 	// === 操舵と漕ぎ(進行方向の水平ベクトルを基準にする) ===
@@ -340,6 +364,8 @@ bool WireAction::Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, fl
 		m_occludedTime = 0.0f;    // 遮蔽デバウンスをリセット
 		m_swingTime = 0.0f;       // 自動リリースの最短時間を測り直す
 		m_passedTime = 0.0f;      // 追い越しの猶予も測り直す
+		m_releasePending = false; // 離脱待ちを解除
+		m_releasePendingTime = 0.0f;
 		m_prevVelY = 0.0f;        // 底の通過判定をリセット(前回のスイングを引きずらない)
 	}
 
@@ -353,6 +379,8 @@ void WireAction::Release()
 	m_occludedTime = 0.0f;   // 遮蔽デバウンスをリセット
 	m_swingTime = 0.0f;
 	m_passedTime = 0.0f;
+	m_releasePending = false;
+	m_releasePendingTime = 0.0f;
 	m_prevVelY = 0.0f;
 }
 
