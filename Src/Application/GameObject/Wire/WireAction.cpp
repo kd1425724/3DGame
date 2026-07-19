@@ -204,8 +204,13 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 
 	m_prevVelY = _body.m_velocity.y;
 
-	// 地面に潜らないよう押し上げる(ワイヤー中もすり抜け防止)。m_isGroundedもここで更新される
-	_body.ResolveGround(pos);
+	// 地面に潜らないよう押し上げる(ワイヤー中もすり抜け防止)。
+	// ※ ワイヤー中は原則「着地しない」= 地面スレスレを飛べるようにする。
+	//    着地扱いにすると地面に触れるたび止まって勢いが死に、低空を飛べないため。
+	//    ただしアンカーを地面そのものに刺した場合は別で、そこへ引かれて降りていくのが
+	//    正しい動きなので通常どおり着地させる
+	bool allowLanding = m_anchorIsGround || !DebugFlags::Instance().Get(U8("ワイヤー/地面スレスレ飛行"), true);
+	_body.ResolveGround(pos, allowLanding);
 
 	// 上昇スイング中に頭上の天井へ潜り込むのを止める(高速上昇のトンネリングも掃引で拾う)
 	_body.ResolveCeiling(startPos, pos);
@@ -247,34 +252,51 @@ void WireAction::Draw(const Math::Vector3& _from, const Math::Vector3& _to)
 
 bool WireAction::Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, float _maxLength)
 {
-	// ① _from から _dir 方向へ、長さ _maxLength のレイ(KdCollider::RayInfo)を作る
-	//    当てたい種類は地形系。例: KdCollider::TypeGround | KdCollider::TypeBump
-	KdCollider::RayInfo ray(KdCollider::TypeGround | KdCollider::TypeBump, _from, _dir, _maxLength);
+	// 建物(TypeBump)と地面(TypeGround)を別々に撃って、どちらが手前だったかを覚える。
+	// 「地面に刺したか」が分かると、ワイヤー中に着地させるかどうかを切り替えられる
+	// (地面スレスレを飛ぶのが基本だが、地面そのものに刺した時は降りていくのが正しいため)
+	auto castNearest = [&](UINT _type, Math::Vector3& _outPos) -> float
+		{
+			KdCollider::RayInfo ray(_type, _from, _dir, _maxLength);
+			std::list<KdCollider::CollisionResult> results;
+			for (auto& obj : SceneManager::Instance().GetObjList())
+			{
+				if (!obj) { continue; }
+				obj->Intersects(ray, &results);
+			}
 
-	// ② SceneManager の全オブジェクトに Intersects(ray, &結果リスト) して、当たりを集める
-	//    (CharaBase::GroundCheck が同じ書き方をしているので参考になる)
-	std::list<KdCollider::CollisionResult> retRayList;
+			float nearest = _maxLength;
+			bool found = false;
+			for (auto& ret : results)
+			{
+				float dist = Math::Vector3::Distance(_from, ret.m_hitPos);
+				if (dist < nearest)
+				{
+					nearest = dist;
+					_outPos = ret.m_hitPos;
+					found = true;
+				}
+			}
+			return found ? nearest : -1.0f;   // 当たらなければ-1
+		};
 
-	for (auto& obj : SceneManager::Instance().GetObjList())
-	{
-		if (!obj) { continue; }
-		obj->Intersects(ray, &retRayList);
-	}
-
-	// ③ 集めた当たりの中から「_from に一番近い交点」を選ぶ
-	//    (Math::Vector3::Distance で距離を比べて、一番小さいものを採用)
+	Math::Vector3 bumpPos;
+	Math::Vector3 groundPos;
+	float bumpDist   = castNearest(KdCollider::TypeBump,   bumpPos);
+	float groundDist = castNearest(KdCollider::TypeGround, groundPos);
 
 	bool hit = false;
-	float nearest = _maxLength;   // 「今のところ最短」を最大長で初期化
-	for (auto& ret : retRayList)
+	if (bumpDist >= 0.0f && (groundDist < 0.0f || bumpDist <= groundDist))
 	{
-		float dist = Math::Vector3::Distance(_from, ret.m_hitPos);
-		if (dist<nearest)
-		{
-			nearest = dist;
-			m_anchor = ret.m_hitPos;
-			hit = true;
-		}
+		m_anchor = bumpPos;
+		m_anchorIsGround = false;
+		hit = true;
+	}
+	else if (groundDist >= 0.0f)
+	{
+		m_anchor = groundPos;
+		m_anchorIsGround = true;
+		hit = true;
 	}
 
 	// ④ 命中したら:

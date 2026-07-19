@@ -44,7 +44,12 @@ protected:
 	// 縦の落下を止める。接地状態(m_isGrounded)も更新する。
 	// ※ 重力・移動の積分は呼び出し側で済ませておくこと(この関数は地面との"解決"だけ行う)
 	// ※ ワイヤー中など、GroundCheckを通さず自前で移動するときのすり抜け防止にも使う
-	void ResolveGround(Math::Vector3& pos);
+	//
+	// _allowLanding = false にすると「着地」しなくなる(2026/07/19 追加)。
+	//   地面へのめり込みだけ直して落下は止めるが、接地フラグを立てず、着地の手応え
+	//   (CameraShake用のm_landingImpact)も記録しない。
+	//   ワイヤーで地面スレスレを飛ぶ用。着地扱いにするとそのたびに止まって勢いが死ぬため。
+	void ResolveGround(Math::Vector3& pos, bool _allowLanding = true);
 
 	// 上昇中(ジャンプ/ワイヤー/ダイブ)に頭上の天井(TypeBump)へ潜り込むのを止める。
 	// 移動前の頭の高さ fromPos から現在の頭の高さまで上向きレイで掃引し、天井があれば

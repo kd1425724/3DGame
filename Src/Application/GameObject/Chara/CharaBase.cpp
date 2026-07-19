@@ -59,7 +59,7 @@ void CharaBase::GroundCheck()
 	SetPos(pos);
 }
 
-void CharaBase::ResolveGround(Math::Vector3& pos)
+void CharaBase::ResolveGround(Math::Vector3& pos, bool _allowLanding)
 {
 	ZoneScoped;	// Tracy計測(2026/07/19)：真下レイによる接地解決
 
@@ -127,6 +127,21 @@ void CharaBase::ResolveGround(Math::Vector3& pos)
 		float standY = hitPos.y + (GetScale().y * 0.5f);
 		if (pos.y <= standY)
 		{
+			// 「着地しない」モード(ワイヤーで地面スレスレを飛ぶ用)。
+			// 地面へのめり込みだけ直し、落下は止めるが、接地扱いにはしない。
+			// 着地の手応えも記録しない(地面に触れるたびカメラが揺れるのを防ぐ)。
+			// 横の勢いはそのままなので、地面を舐めるように飛び続けられる
+			if (!_allowLanding)
+			{
+				pos.y = standY;
+				if (m_velocity.y < 0.0f)
+				{
+					m_velocity.y = 0.0f;
+				}
+				m_isGrounded = false;
+				return;
+			}
+
 			// 空中から着地した"瞬間"だけ、落下の速さを手応え(カメラ揺れ)用に記録する
 			if (!wasGrounded)
 			{
