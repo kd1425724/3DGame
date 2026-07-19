@@ -86,14 +86,19 @@ void CharaBase::ResolveGround(Math::Vector3& pos)
 	bool wasGrounded = m_isGrounded;
 
 	// あたる側の設定＝＝＝＝＝＝＝＝＝＝
-	// レイの始点は少し上(rayStartUp)、長さは「開始高さ + モデルの半分 + このフレームの落下量 + 余裕」
-	// で可変にする。落下量を足すことで、高速落下しても地面をすり抜けにくくする(=可変レイ判定)
-	const float rayStartUp = 1.0f;
+	// レイの始点は「足元の少し上」。下向きに撃って接地面を拾う。落下が速いほど始点を上げ(fallThisFrame)、
+	// 高速落下でも地面を飛び越さない(=可変レイ判定)。
+	// ※ 以前は「体の中心から1.0上」=頭より上から出しており、デバッグ表示で邪魔＆過剰だったため足元基準に変更。
+	//    足元より上を見るぶん(rayStepUp)が段差の自動乗り上げ許容高さになる(頭上までは伸ばさない)
+	float feetY = pos.y - GetScale().y * 0.5f;
 	float fallThisFrame = (m_velocity.y < 0.0f) ? (-m_velocity.y * deltaTime) : 0.0f;
-	float rayRange = rayStartUp + (GetScale().y * 0.5f) + fallThisFrame + 0.1f;
+	const float rayStepUp = 0.3f;   // 足元より上をどれだけ見るか(=乗り上げできる段差の高さ・接地の許容)
+	const float rayBelow  = 0.2f;   // 足元より下をどれだけ見るか(接地の許容)
+	Math::Vector3 rayPos(pos.x, feetY + rayStepUp + fallThisFrame, pos.z);
+	float rayRange = rayStepUp + fallThisFrame + rayBelow;
 
 	// 地面(TypeGround)に加えてBlock等(TypeBump)の天面にも乗れるようにする
-	KdCollider::RayInfo ray(KdCollider::TypeGround | KdCollider::TypeBump, pos + Math::Vector3(0, rayStartUp, 0), Math::Vector3::Down, rayRange);
+	KdCollider::RayInfo ray(KdCollider::TypeGround | KdCollider::TypeBump, rayPos, Math::Vector3::Down, rayRange);
 
 	// デバッグ表示：地面判定に使用したレイを可視化
 	if (KdGameObject::s_showColliderDebug)
@@ -110,7 +115,7 @@ void CharaBase::ResolveGround(Math::Vector3& pos)
 
 	// 近傍の静的コリジョンだけをグリッドから取り出して判定する(大量配置時のCPU削減)
 	std::vector<KdGameObject*> candidates;
-	CollisionGrid::Instance().QueryRay(pos + Math::Vector3(0, rayStartUp, 0), Math::Vector3::Down, rayRange, candidates);
+	CollisionGrid::Instance().QueryRay(rayPos, Math::Vector3::Down, rayRange, candidates);
 	for (KdGameObject* obj : candidates)
 	{
 		obj->Intersects(ray, &retRayList);
