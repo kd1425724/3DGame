@@ -91,10 +91,22 @@ void Player::Update()
 
 	// ワイヤー接続中はスイング物理だけ行い、通常移動・ジャンプ・レーザーは止める。
 	// 移動入力をそのまま渡す：X=操舵(振り子の向きを曲げる) / Y=前方への漕ぎ。
+	// 加えて上下の噴射(立体機動のガス噴射にあたる)を Space=上 / Ctrl=下 で渡す。
+	// ※ ワイヤー中はジャンプが使われないのでSpaceを転用している
 	// 実際の移動はWireAction::UpdateSwingがこのキャラを動かす
 	if (m_upWire->IsAttached())
 	{
-		m_upWire->UpdateSwing(*this, dt, KdInputManager::Instance().GetAxisState("Move"));
+		float thrustUp = 0.0f;
+		if (KdInputManager::Instance().IsHold("Jump"))
+		{
+			thrustUp += 1.0f;
+		}
+		if (KdInputManager::Instance().IsHold("Ctrl"))
+		{
+			thrustUp -= 1.0f;
+		}
+
+		m_upWire->UpdateSwing(*this, dt, KdInputManager::Instance().GetAxisState("Move"), thrustUp);
 		return;
 	}
 

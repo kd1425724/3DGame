@@ -20,7 +20,7 @@ WireAction::WireAction()
 
 WireAction::~WireAction() = default;
 
-void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _moveInput)
+void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _moveInput, float _thrustUp)
 {
 	if (!m_isAttached) { return; }
 
@@ -80,7 +80,10 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 			toAnchor /= distToAnchor;
 
 			// 際限なく加速しないよう、アンカーへ近づく速度に上限を設ける
-			float reelAcc = DebugParams::Instance().Float(U8("ワイヤー/引き寄せ加速"),   28.0f, 0.0f, 120.0f);
+			// ※ 既定を 28 → 20 に下げた(2026/07/19)。
+			//   引きが強すぎると操舵や噴射で軌道を変えられず、アンカーへ運ばれるだけになる。
+			//   ワイヤーは「大まかな方向を決める」程度に留め、細かい制御はプレイヤー側に渡す
+			float reelAcc = DebugParams::Instance().Float(U8("ワイヤー/引き寄せ加速"),   20.0f, 0.0f, 120.0f);
 			float reelMax = DebugParams::Instance().Float(U8("ワイヤー/引き寄せ上限速度"), 30.0f, 0.0f, 120.0f);
 			approach = _body.m_velocity.Dot(toAnchor);
 			if (approach < reelMax)
@@ -170,10 +173,40 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 		// --- 操舵(A/D) ---
 		// 進行方向の横へ加速して、振り子の面ごと向きを変える。
 		// 曲がりたい方向へ velocity を寄せるので、次の弧が違う方向へ向く
-		float steerAcc = DebugParams::Instance().Float(U8("ワイヤー/操舵加速"), 14.0f, 0.0f, 60.0f);
+		//
+		// ※ 既定を 14 → 26 に引き上げた(2026/07/19)。
+		//   引き寄せ加速に対して操舵が弱すぎると「ワイヤーに乗せられて建物へ運ばれる」感覚になる。
+		//   立体機動が自由に感じるのは、ワイヤーが大まかな方向を決めるだけで
+		//   細かい軌道は自分の推進力で作れるから。引きと操舵の比率が手触りを決める
+		float steerAcc = DebugParams::Instance().Float(U8("ワイヤー/操舵加速"), 26.0f, 0.0f, 80.0f);
 		if (_moveInput.x != 0.0f)
 		{
 			_body.m_velocity += side * (steerAcc * _moveInput.x * _dt);
+		}
+	}
+
+	// === 上下の噴射(立体機動のガス噴射にあたる) ===
+	// ワイヤーの引きに逆らって軌道を作るためのプレイヤー側の推進力。
+	// 「上へ吹かして建物を越える」ができるかどうかで自由度が大きく変わる。
+	// ※ ガス(燃料)は入れていない。ガスはコストであって制御能力ではないので、
+	//    まず噴射そのものを作る。残量制にするかは後から被せられる
+	if (_thrustUp != 0.0f)
+	{
+		float thrustAcc = DebugParams::Instance().Float(U8("ワイヤー/上下噴射加速"),   34.0f, 0.0f, 150.0f);
+		float riseMax   = DebugParams::Instance().Float(U8("ワイヤー/上昇の上限速度"), 18.0f, 0.0f, 60.0f);
+
+		if (_thrustUp > 0.0f)
+		{
+			// 上昇は上限速度まで(際限なく浮き上がらないように)
+			if (_body.m_velocity.y < riseMax)
+			{
+				_body.m_velocity.y += thrustAcc * _thrustUp * _dt;
+			}
+		}
+		else
+		{
+			// 下向きは重力と同方向なので上限は設けない(急降下に使える)
+			_body.m_velocity.y += thrustAcc * _thrustUp * _dt;
 		}
 	}
 
