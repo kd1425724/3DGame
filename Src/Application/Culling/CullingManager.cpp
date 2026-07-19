@@ -11,7 +11,10 @@ void CullingManager::Update(const KdCamera& _camera)
 	ZoneScoped;
 
 	m_enabled  = DebugFlags::Instance().Get(U8("カリング/有効"), true);
-	m_cullDist = DebugParams::Instance().Float(U8("カリング/距離"), 120.0f, 10.0f, 2000.0f);
+	// ※ 既定を 120 → 260 に引き上げた(2026/07/20)。
+	//   街を拡張してX方向に±185ほど広がったため、120のままだと通りの先の建物が
+	//   丸ごと消えて不自然になる。CPUには余裕がある(→Tracyの実測)ので距離を伸ばした
+	m_cullDist = DebugParams::Instance().Float(U8("カリング/距離"), 260.0f, 10.0f, 2000.0f);
 
 	// カメラのワールド行列(m_mCam)。平行移動成分がカメラ位置
 	const Math::Matrix& camMat = _camera.GetCameraMatrix();
