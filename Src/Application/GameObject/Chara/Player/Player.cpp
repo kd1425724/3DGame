@@ -24,13 +24,16 @@ Player::~Player()
 
 void Player::Init()
 {
-	SetAsset("Asset/Models/Test/Block/Block.gltf");
+	// スキンメッシュのキャラ(身長約1.95m・変形ボーン77本・アニメ13本を内包)。
+	// ※ 立方体だった頃の名残で、当たり判定は「モデル＝1辺1mの立方体」前提のまま
+	//    (CharaBaseがGetScale().y*0.5を体の半分の高さとして使う)。表示と当たりのサイズは
+	//    まだ一致していない ── 表示を確認してから合わせる
+	SetAsset("Asset/Models/Character/Scifi_girl/Scifi_girl.gltf");
 
-	// 他のオブジェクトと見分けが付くように水色にする
-	m_color = Math::Color(0.4f, 0.8f, 1.0f, 1.0f);
+	// モデルは頂点カラーで色が付いているので、色の乗算は白(=素の色)にする
+	m_color = Math::Color(1.0f, 1.0f, 1.0f, 1.0f);
 
-	// 縮小したGroundとの比率に合わせて小さくする
-	SetScale(Math::Vector3(0.5f, 0.5f, 0.5f));
+	SetScale(Math::Vector3(1.0f, 1.0f, 1.0f));
 
 	//ワイヤー(物理＋見た目を内包。見た目の板ポリ生成はWireActionのctorが行う)
 	m_upWire = std::make_unique<WireAction>();
