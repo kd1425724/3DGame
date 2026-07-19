@@ -288,23 +288,27 @@ bool Application::Init(int w, int h)
 		pKeyboardMouse->AddButton("MoveUp", new KdInputButtonForWindows('E'));
 		pKeyboardMouse->AddButton("MoveDown", new KdInputButtonForWindows('Q'));
 
-		// Playerのスキル「振り回し一掃」(周囲の敵を一掃)：E
-		pKeyboardMouse->AddButton("Skill", new KdInputButtonForWindows('E'));
+		// ※ スキル「振り回し一掃」(旧"Skill"=E)は2026/07/19に廃止。Eは下記のFocusへ回した
 
-		// Playerのジャンプ
+		// Playerのジャンプ。ワイヤー中は上への噴射、空中ステップ中は上向き成分の追加を兼ねる
 		pKeyboardMouse->AddButton("Jump", new KdInputButtonForWindows(VK_SPACE));
 
-		// Playerのワイヤーアクション(発射/解除)：右クリック
-		pKeyboardMouse->AddButton("WireShoot", new KdInputButtonForWindows(VK_RBUTTON));
+		// Playerの照準＋スロー：E(押している間だけターゲットを取り、世界がスローになる)
+		// 進撃の巨人2に寄せた入力再設計(2026/07/19)で追加
+		pKeyboardMouse->AddButton("Focus", new KdInputButtonForWindows('E'));
 
-		// Playerのロックオン：中クリック(右クリックはワイヤーに使うため分離)
+		// Playerのアンカー射出＋攻撃：左クリック(移動用ワイヤーと攻撃を1つに統一)
+		// ターゲットがいる/連続攻撃の受付中なら攻撃、そうでなければワイヤーを撃つ
+		pKeyboardMouse->AddButton("Anchor", new KdInputButtonForWindows(VK_LBUTTON));
+
+		// Playerの加速：右クリック(長押しで加速し続ける／単押しで空中ステップ)
+		pKeyboardMouse->AddButton("Accel", new KdInputButtonForWindows(VK_RBUTTON));
+
+		// Playerのロックオン：中クリック(未使用)
 		pKeyboardMouse->AddButton("LockOn", new KdInputButtonForWindows(VK_MBUTTON));
 
 		// Playerのリセット(開始位置へ即復帰)
 		pKeyboardMouse->AddButton("Respawn", new KdInputButtonForWindows('R'));
-
-		// Playerの落下攻撃(空中で急降下)：左クリック
-		pKeyboardMouse->AddButton("DiveAttack", new KdInputButtonForWindows(VK_LBUTTON));
 
 		// Playerの回避ダッシュ(短距離クイックムーブ＋無敵)：Shift
 		pKeyboardMouse->AddButton("Dodge", new KdInputButtonForWindows(VK_SHIFT));

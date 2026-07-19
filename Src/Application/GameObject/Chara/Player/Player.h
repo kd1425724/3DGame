@@ -49,16 +49,25 @@ private:
 	void UpdateJump(float dt);
 	// 回避ダッシュ：Shiftで移動入力方向(なければカメラ前方)へ短距離クイックムーブ＋無敵＋クールダウン
 	void UpdateDodge(float dt);
-	// スキル「振り回し一掃」：Eで周囲の敵を一掃する(クールダウンあり)
-	void UpdateSweep(float dt);
+	// 加速/空中ステップ：右クリック長押しで加速し続ける／単押しで空中ステップ。
+	// 方向は移動入力(カメラ基準)、無入力なら進行方向。Jump併用で上向き成分が混ざる
+	void UpdateAccel(float dt);
+	// 加速/空中ステップの方向を求める(移動入力→無入力なら進行方向→Jumpで上向きを加算)
+	Math::Vector3 GetAccelDir() const;
+	// 左クリックが「攻撃」か「ワイヤー」かを判定する。
+	// 連続攻撃の受付中、またはE(Focus)を押していてターゲットがいる時だけ攻撃
+	bool IsAttackInput() const;
+	// 突撃(落下攻撃)を開始する。左クリックを押した瞬間にUpdateWireInputから呼ばれる
+	void StartDive();
+
 	// 反撃(ジャスト回避カウンター)：敵の突進を回避の無敵で受けるとスロー猶予窓を開き、
 	// その窓の間に攻撃(左クリック)を押すと今の突撃(ダイブ)へ移行する。回避の早期returnより前で呼ぶ
 	void UpdateCounter();
-	// 空中スロー(エアフォーカス)：空中で左クリック長押し中は時間をスローにして狙う。
-	// フォーカスゲージで制限。離した瞬間に突撃(UpdateDiveがrelease発火)する
+	// 空中スロー(エアフォーカス)：空中でE(Focus)長押し中は時間をスローにして狙う。
+	// フォーカスゲージで制限する
 	void UpdateAirFocus();
-	// 落下攻撃：空中で左クリックを離した瞬間→対象へワイヤーで引き寄せ突撃(未ロックは真下ダイブ)。
-	// 斬ったら受付窓中に長押し→離して周りの敵へ続けて突撃する連続攻撃
+	// 落下攻撃：対象へワイヤーで引き寄せ突撃(未ロックは真下ダイブ)。
+	// 斬ったら受付窓中にもう一度押して周りの敵へ続けて突撃する連続攻撃
 	void UpdateDive(float dt);
 	// 範囲内で最も近い生きている敵を返す(連続攻撃の次の突撃先選び)。いなければnull
 	std::shared_ptr<KdGameObject> FindNearestEnemy(const Math::Vector3& center, float range) const;
@@ -93,8 +102,12 @@ private:
 	Math::Vector3 m_dodgeDir = {};
 	float m_invincibleTimer = 0.0f;   // ※ ダメージ実装後に使う想定(今は参照側が無いので無敵は実質未使用)
 
-	// スキル「振り回し一掃」のクールダウン残り時間
-	float m_sweepCooldownTimer = 0.0f;
+	// 左クリックを押した時、それが「ワイヤーとして」だったか。
+	// ワイヤーで押した時だけ、離したらワイヤーを外す(攻撃で押した時は離しても無視する)
+	bool m_anchorPressWasWire = false;
+
+	// 右クリックを押している時間。単押し(空中ステップ)と長押し(加速)の区別に使う
+	float m_accelHoldTime = 0.0f;
 
 	// 反撃(ジャスト回避カウンター)の状態
 	bool m_counterPending = false;       // 敵の突進を無敵で受けた=次のUpdateCounterでスロー窓を開く

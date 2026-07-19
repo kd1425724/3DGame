@@ -89,6 +89,9 @@ void Player::Update()
 	// ワイヤーの発射/解除(入力・狙いはPlayer側。スイング物理はWireActionに委譲)
 	UpdateWireInput();
 
+	// 加速/空中ステップ(右クリック)。ワイヤー中でも使えるよう、ワイヤー分岐より前で処理する
+	UpdateAccel(dt);
+
 	// ワイヤー接続中はスイング物理だけ行い、通常移動・ジャンプ・レーザーは止める。
 	// 移動入力をそのまま渡す：X=操舵(振り子の向きを曲げる) / Y=前方への漕ぎ。
 	// 加えて上下の噴射(立体機動のガス噴射にあたる)を Space=上 / Ctrl=下 で渡す。
@@ -124,13 +127,38 @@ void Player::Update()
 		UpdateJump(dt);
 	}
 	UpdateDive(dt);
-	UpdateSweep(dt);   // Eキーのスキル「振り回し一掃」
 }
 
 void Player::UpdateWireInput()
 {
-	// === ワイヤーの発射 / 解除 ===
-	if (KdInputManager::Instance().IsPress("WireShoot"))
+	// === アンカー射出 / 攻撃（左クリックに統一） ===
+	// 進撃の巨人2に寄せた入力(2026/07/19)。同じボタンで文脈により役割が変わる：
+	//   ・E(Focus)でターゲットを取っている、または連続攻撃の受付中 → 攻撃(突撃)
+	//   ・それ以外                                                  → ワイヤーを撃つ(移動)
+	// 押した時にどちらだったかを m_anchorPressWasWire に覚えておき、
+	// 「ワイヤーを撃った時に限り」離したら外す。攻撃で押した時は離しても何もしない
+	if (KdInputManager::Instance().IsPress("Anchor"))
+	{
+		// 突撃中／連続攻撃の受付中は、この押下の扱いを UpdateDive 側が持っている
+		// (受付中は最寄りの敵を探して繋ぐ処理があるため、ここで横取りしない)
+		if (m_isDiving || m_comboWindowTimer > 0.0f)
+		{
+			m_anchorPressWasWire = false;
+			return;
+		}
+
+		// E(Focus)でターゲットを取れていれば攻撃、そうでなければワイヤー
+		if (IsAttackInput())
+		{
+			m_anchorPressWasWire = false;
+			StartDive();
+			return;
+		}
+
+		m_anchorPressWasWire = true;
+	}
+
+	if (KdInputManager::Instance().IsPress("Anchor") && m_anchorPressWasWire)
 	{
 		Math::Vector3 from = GetPos() + Math::Vector3(0, 1.0f, 0);   // ワイヤーの手元
 		float maxLen = DebugParams::Instance().Float(U8("ワイヤー/最大長"), 30.0f, 1.0f, 100.0f);
@@ -185,11 +213,131 @@ void Player::UpdateWireInput()
 		// (走りながら撃てば横の勢いが乗る。速度は基底CharaBaseの共通m_velocity)
 		m_upWire->Shoot(from, dir, maxLen);
 	}
-	if (KdInputManager::Instance().IsRelease("WireShoot"))
+
+	// ワイヤーとして撃った時だけ、離したら外す(攻撃で押した時は無視)。
+	// 離しても速度(m_velocity)はそのまま=スイングの勢いで飛んでいける(フリング)
+	if (KdInputManager::Instance().IsRelease("Anchor"))
 	{
-		// 離しても速度(m_velocity)はそのまま=スイングの勢いで飛んでいける(フリング)
-		m_upWire->Release();
+		if (m_anchorPressWasWire)
+		{
+			m_upWire->Release();
+		}
+		m_anchorPressWasWire = false;
 	}
+}
+
+void Player::UpdateAccel(float dt)
+{
+	// 右クリック：長押しで加速し続ける／単押し(短く離す)で空中ステップ。
+	// 進撃の巨人2の×ボタン(加速・空中ステップ)にあたる、プレイヤー側の推進力。
+	// 方向は「移動入力の方向(カメラ基準)」。無入力なら今の進行方向へ。
+	// Jumpを併用していれば上向き成分も足す(ユーザー指定)
+	const float tapTime = DebugParams::Instance().Float(U8("加速/単押しとみなす時間"), 0.18f, 0.05f, 0.6f);
+
+	if (KdInputManager::Instance().IsPress("Accel"))
+	{
+		m_accelHoldTime = 0.0f;
+	}
+
+	bool holding = KdInputManager::Instance().IsHold("Accel");
+	if (holding)
+	{
+		m_accelHoldTime += dt;
+
+		// 単押し判定の時間を過ぎたら「長押し＝加速」に確定して、以降は加速し続ける
+		if (m_accelHoldTime >= tapTime)
+		{
+			float acc    = DebugParams::Instance().Float(U8("加速/加速度"),     30.0f, 0.0f, 150.0f);
+			float maxSpd = DebugParams::Instance().Float(U8("加速/上限速度"),   35.0f, 0.0f, 120.0f);
+
+			Math::Vector3 dir = GetAccelDir();
+			if (dir.LengthSquared() > 0.0001f && m_velocity.Length() < maxSpd)
+			{
+				m_velocity += dir * (acc * dt);
+			}
+		}
+	}
+
+	// 短く離したら空中ステップ(その場から入力方向へ一気に飛ぶ)
+	if (KdInputManager::Instance().IsRelease("Accel"))
+	{
+		if (m_accelHoldTime < tapTime && !m_isGrounded)
+		{
+			float step = DebugParams::Instance().Float(U8("加速/空中ステップの速さ"), 18.0f, 0.0f, 60.0f);
+			Math::Vector3 dir = GetAccelDir();
+			if (dir.LengthSquared() > 0.0001f)
+			{
+				m_velocity += dir * step;
+			}
+		}
+		m_accelHoldTime = 0.0f;
+	}
+}
+
+Math::Vector3 Player::GetAccelDir() const
+{
+	// 移動入力(カメラ基準)の方向。無入力なら今の進行方向。
+	// Jumpを押していれば上向き成分を混ぜる(上へ吹かしながら加速できる)
+	Math::Vector2 axis = KdInputManager::Instance().GetAxisState("Move");
+	Math::Vector3 dir = Math::Vector3::Zero;
+
+	if (axis.LengthSquared() > 0.0001f)
+	{
+		// ※ Forward/Backwardの定義上、見た目と前後が逆に感じたため入れ替えてある(UpdateMoveと同じ)
+		Math::Vector3 wish = Math::Vector3::Backward * axis.y + Math::Vector3::Right * axis.x;
+		wish.Normalize();
+
+		if (std::shared_ptr<CameraBase> spCamera = m_wpCamera.lock())
+		{
+			// カメラの水平向きに合わせて回す(UpdateMoveと同じやり方)
+			wish = Math::Vector3::TransformNormal(wish, spCamera->GetRotationYMatrix());
+		}
+		dir = wish;
+	}
+	else
+	{
+		// 無入力なら今の進行方向(水平)。止まっていればカメラ前方
+		Math::Vector3 horiz(m_velocity.x, 0.0f, m_velocity.z);
+		if (horiz.LengthSquared() > 0.0001f)
+		{
+			horiz.Normalize();
+			dir = horiz;
+		}
+		else if (std::shared_ptr<CameraBase> spCamera = m_wpCamera.lock())
+		{
+			Math::Vector3 fwd = Math::Vector3::TransformNormal(Math::Vector3::Backward, spCamera->GetRotationMatrix());
+			fwd.y = 0.0f;
+			if (fwd.LengthSquared() > 0.0001f)
+			{
+				fwd.Normalize();
+				dir = fwd;
+			}
+		}
+	}
+
+	// Jump併用で上向きを足す
+	if (KdInputManager::Instance().IsHold("Jump"))
+	{
+		float upRate = DebugParams::Instance().Float(U8("加速/Jump併用の上向き割合"), 0.8f, 0.0f, 2.0f);
+		dir.y += upRate;
+		if (dir.LengthSquared() > 0.0001f)
+		{
+			dir.Normalize();
+		}
+	}
+
+	return dir;
+}
+
+bool Player::IsAttackInput() const
+{
+	// E(Focus)を押していて、かつターゲットがいる時だけ「攻撃」として扱う。
+	// ※ 連続攻撃の受付中はEを押していなくても攻撃になるが(ユーザー指定)、
+	//    その分岐は UpdateWireInput の入口で先に処理している(UpdateDiveへ渡す)
+	if (!KdInputManager::Instance().IsHold("Focus")) { return false; }
+	if (!m_upTargeting) { return false; }
+
+	return m_upTargeting->GetTarget() != nullptr;
 }
 
 void Player::UpdateMove(float dt)
@@ -350,11 +498,13 @@ void Player::UpdateAirFocus()
 	// フォーカスゲージは"現実の時間"で増減させる(スローで薄まらないように実時間dtを使う)
 	float realDt = Application::Instance().GetRealDeltaTime();
 
-	// スロー可能：空中(ワイヤー未接続) && 左クリック長押し && 突撃していない && ゲージ残
+	// スロー可能：空中(ワイヤー未接続) && E(Focus)長押し && 突撃していない && ゲージ残
 	//   ※ スローは初弾を"ためて狙う"時だけ。連続攻撃中(突撃/受付窓)はスローしない
+	//   ※ 2026/07/19の入力再設計で、長押し元を左クリックからE(Focus)へ移した。
+	//     左クリックはアンカー射出＋攻撃に統一したため
 	bool airborne = !m_isGrounded && !m_upWire->IsAttached();
 	bool canAim   = airborne && !m_isDiving;
-	bool holding  = KdInputManager::Instance().IsHold("DiveAttack");
+	bool holding  = KdInputManager::Instance().IsHold("Focus");
 
 	// 「スローを掛けたい状況か(空中で長押し中)」と「実際に掛けられるか(ゲージ残あり)」を分ける
 	bool wantSlow = canAim && holding;
@@ -413,9 +563,11 @@ void Player::UpdateDive(float dt)
 			float windowDamp = DebugParams::Instance().Float(U8("連続攻撃/継続中の減速"), 8.0f, 0.0f, 30.0f);
 			m_velocity *= std::clamp(1.0f - windowDamp * dt, 0.0f, 1.0f);
 
-			if (KdInputManager::Instance().IsRelease("DiveAttack"))
+			// ※ 2026/07/19の入力再設計で「離した瞬間」→「押した瞬間」に変更。
+			//    狙い(スロー)がEへ移り、長押しで溜める必要がなくなったため
+			if (KdInputManager::Instance().IsPress("Anchor"))
 			{
-				spTarget = FindNearestEnemy(GetPos(), chainRange);   // 離した瞬間に次の敵へ
+				spTarget = FindNearestEnemy(GetPos(), chainRange);   // 押した瞬間に次の敵へ
 				if (spTarget)
 				{
 					m_wpDiveTarget = spTarget;
@@ -484,9 +636,14 @@ void Player::UpdateDive(float dt)
 		return;
 	}
 
-	// === 開始判定：空中で左クリックを"離した瞬間"に突撃(長押し中はUpdateAirFocusがスロー＋狙い) ===
-	if (m_isGrounded) { return; }                                        // 空中専用
-	if (!KdInputManager::Instance().IsRelease("DiveAttack")) { return; } // 離した瞬間だけ発火
+	// ※ 突撃の開始は UpdateWireInput 側(左クリックを押した瞬間)から StartDive() で行う。
+	//    以前は「左クリックを離した瞬間」に発火していたが、2026/07/19の入力再設計で
+	//    狙い(スロー)がEへ移り、長押しで溜める必要がなくなったため押下開始に変えた
+}
+
+void Player::StartDive()
+{
+	if (m_isGrounded) { return; }   // 空中専用
 
 	m_isDiving = true;
 	m_comboWindowTimer = 0.0f;
@@ -524,43 +681,9 @@ std::shared_ptr<KdGameObject> Player::FindNearestEnemy(const Math::Vector3& cent
 	return best;
 }
 
-void Player::UpdateSweep(float dt)
-{
-	// クールダウンを消化
-	if (m_sweepCooldownTimer > 0.0f)
-	{
-		m_sweepCooldownTimer -= dt;
-	}
-
-	// === 発動判定 ===
-	if (m_isDiving) { return; }                                    // 突撃中は使わない
-	if (m_sweepCooldownTimer > 0.0f) { return; }                   // クールダウン中
-	if (!KdInputManager::Instance().IsPress("Skill")) { return; }
-
-	float range = DebugParams::Instance().Float(U8("振り回し/範囲"), 5.0f, 1.0f, 20.0f);
-
-	// 周囲(半径range)の敵をまとめて斬る(振り回しの一掃)
-	for (auto& spEnemy : SceneManager::Instance().FindObjectsWithTag(ObjectTag::Enemy))
-	{
-		if (!spEnemy || spEnemy->IsExpired()) { continue; }
-		if (Math::Vector3::Distance(GetPos(), spEnemy->GetPos()) <= range)
-		{
-			spEnemy->OnHit(this);
-		}
-	}
-
-	// 見た目：プレイヤーの周りに斬撃を輪状に出して"振り回し"を表現
-	const int kNum = 8;
-	float visR = range * 0.6f;
-	for (int i = 0; i < kNum; ++i)
-	{
-		float a = (float)i / (float)kNum * DirectX::XM_2PI;
-		EffectManager::Instance().SpawnSlash(GetPos() + Math::Vector3(cosf(a) * visR, 0.6f, sinf(a) * visR));
-	}
-
-	CameraShake::Instance().AddTrauma(0.6f);
-	m_sweepCooldownTimer = DebugParams::Instance().Float(U8("振り回し/クールダウン"), 1.0f, 0.0f, 5.0f);
-}
+// ※ スキル「振り回し一掃」(Eキー)は 2026/07/19 に廃止した。
+//    進撃の巨人2に寄せた入力へ再設計するにあたり、Eキーを「ターゲット＋スロー」に
+//    割り当てる必要が生じたため。ユーザー判断で移設ではなく削除。
 
 void Player::Respawn()
 {
@@ -580,7 +703,6 @@ void Player::Respawn()
 	m_isDodging = false;
 	m_dodgeTimer = 0.0f;
 	m_invincibleTimer = 0.0f;
-	m_sweepCooldownTimer = 0.0f;
 }
 
 void Player::PostUpdate()
@@ -621,8 +743,13 @@ void Player::PostUpdate()
 		CameraShake::Instance().AddTrauma(std::clamp(wall / 25.0f, 0.0f, 0.7f));
 	}
 
-	// 照準：画面中心に一番近い敵を自動ターゲット(カメラは回さない)。選定とマーカーはTargetingが持つ
-	m_upTargeting->Update(m_wpCamera.lock(), Application::Instance().GetDeltaTime());
+	// 照準：E(Focus)を押している間だけターゲットを取る(2026/07/19の入力再設計)。
+	// 常時ロックだと移動中もマーカーが付きっぱなしになるため、「狙う」を明示的な操作にした。
+	// 連続攻撃の受付中はEを押していなくてもロックを維持する(次の対象へ繋げるため)。
+	// カメラを渡さずに呼ぶとTargeting側がターゲットを解除する
+	bool wantTarget = KdInputManager::Instance().IsHold("Focus") || m_comboWindowTimer > 0.0f;
+	m_upTargeting->Update(wantTarget ? m_wpCamera.lock() : nullptr,
+		Application::Instance().GetDeltaTime());
 
 	// デバッグ用：状態値をDebugWatchへ(このフレームの最終状態を出す。PostUpdateは毎フレーム必ず走る)
 	WatchDebug();
@@ -693,7 +820,6 @@ void Player::WatchDebug() const
 
 	// クールタイム・猶予窓まわり
 	w.Watch(U8("Player/回避クールタイム"),     m_dodgeCooldownTimer);
-	w.Watch(U8("Player/振り回しクールタイム"), m_sweepCooldownTimer);
 	w.Watch(U8("Player/反撃スロー窓"),         m_counterWindowTimer);
 	w.Watch(U8("Player/被弾硬直"),             m_staggerTimer);
 	w.Watch(U8("Player/無敵"),                 IsInvincible());
@@ -710,9 +836,6 @@ void Player::DrawDebugRanges()
 	float slashR = DebugParams::Instance().Float(U8("落下攻撃/斬撃範囲"), 1.5f, 0.5f, 15.0f);
 	m_pDebugWire->AddDebugSphere(pos, slashR, Math::Color(1.0f, 0.2f, 0.2f, 1.0f));
 
-	// 攻撃判定：振り回し一掃の範囲(黄)
-	float sweepR = DebugParams::Instance().Float(U8("振り回し/範囲"), 5.0f, 1.0f, 20.0f);
-	m_pDebugWire->AddDebugSphere(pos, sweepR, Math::Color(1.0f, 0.9f, 0.2f, 1.0f));
 
 	// 索敵範囲：連続攻撃で次の敵を探す範囲(緑)
 	float findR = DebugParams::Instance().Float(U8("連続攻撃/範囲"), 8.0f, 1.0f, 30.0f);
@@ -798,7 +921,7 @@ void Player::UpdateCounter()
 		m_counterWindowTimer -= Application::Instance().GetRealDeltaTime();
 
 		// 攻撃ボタン(左クリック)を押したら突撃へ移行する(狙いはauto-target、無ければ最寄りの敵)
-		if (KdInputManager::Instance().IsPress("DiveAttack"))
+		if (KdInputManager::Instance().IsPress("Anchor"))
 		{
 			std::shared_ptr<KdGameObject> spTarget = m_upTargeting->GetTarget();
 			if (!spTarget)
