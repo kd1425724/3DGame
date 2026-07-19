@@ -540,20 +540,46 @@ std::shared_ptr<KdGLTFModel> KdLoadGLTFModel(std::string_view path)
 					{
 						Math::Color color(1,1,1,1);
 
+						//================================================================
+						// 【Framework修正】2026/07/19  頂点カラーを GetValue_Float → GetValue_UNORM に変更
+						//================================================================
+						// ■ 症状
+						//   Blenderから出した頂点カラー付きモデル(Scifi_girl)が、色が乗らず
+						//   のっぺりした白/グレーで表示されていた。
+						//
+						// ■ 原因
+						//   glTFのCOLOR_0は「符号なし8bit整数 + normalized=true」で格納されるのが普通
+						//   (Blenderの既定出力もこれ。componentType=5121)。
+						//   ところがここは GetValue_Float() 決め打ちで、1バイト単位のデータを
+						//   32bit floatとして解釈していたため値が壊れていた。
+						//   すぐ上のUV読み取り(GetValue_UNORM)は型で分岐できているのに、
+						//   頂点カラーだけ float 固定になっていた、という取りこぼし。
+						//
+						// ■ なぜ GetValue_UNORM で良いか
+						//   GetValue_UNORM は BYTE/UNSIGNED_BYTE/SHORT/UNSIGNED_SHORT を正規化して返し、
+						//   FLOAT の場合は GetValue_Float() にそのまま委譲する(このファイル上部の実装参照)。
+						//   つまり従来動いていた float 形式のモデルは挙動が変わらず、
+						//   正規化整数形式が新たに正しく読めるようになるだけ。退行の心配がない。
+						//
+						// ■ 元のコード(戻す場合はこちら。GetValue_UNORM→GetValue_Floatに戻すだけ)
+						//     color.x = colorGetter.GetValue_Float(vi * 3 + 0);  … VEC3
+						//     color.x = colorGetter.GetValue_Float(vi * 4 + 0);  … VEC4
+						//================================================================
+
 						// RGB
 						if (colorGetter.GetAccessor()->type == TINYGLTF_TYPE_VEC3)
 						{
-							color.x = colorGetter.GetValue_Float(vi * 3 + 0);
-							color.y = colorGetter.GetValue_Float(vi * 3 + 1);
-							color.z = colorGetter.GetValue_Float(vi * 3 + 2);
+							color.x = colorGetter.GetValue_UNORM(vi * 3 + 0);
+							color.y = colorGetter.GetValue_UNORM(vi * 3 + 1);
+							color.z = colorGetter.GetValue_UNORM(vi * 3 + 2);
 						}
 						// RGBA
 						else if (colorGetter.GetAccessor()->type == TINYGLTF_TYPE_VEC4)
 						{
-							color.x = colorGetter.GetValue_Float(vi * 4 + 0);
-							color.y = colorGetter.GetValue_Float(vi * 4 + 1);
-							color.z = colorGetter.GetValue_Float(vi * 4 + 2);
-							color.w = colorGetter.GetValue_Float(vi * 4 + 3);
+							color.x = colorGetter.GetValue_UNORM(vi * 4 + 0);
+							color.y = colorGetter.GetValue_UNORM(vi * 4 + 1);
+							color.z = colorGetter.GetValue_UNORM(vi * 4 + 2);
+							color.w = colorGetter.GetValue_UNORM(vi * 4 + 3);
 						}
 
 						destPrimitive->Vertices[vi].Color = color.RGBA().v;
