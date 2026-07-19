@@ -59,9 +59,14 @@ void BoostEffect::DrawUnLit()
 	Math::Matrix world = Math::Matrix::Identity;
 	world.Translation(m_pos);
 
-	// ワイヤーと同系統の水色。ただし青が濃すぎると「玉が浮いている」ように見えるので、
-	// 白寄りにして発光も抑え、薄く光る噴射に見せる
-	Math::Color   col(0.8f, 0.95f, 1.0f, alpha);
-	Math::Vector3 emissive(0.25f, 0.5f, 0.7f);
+	// 【注意】このシェーダは発光色で最終色を"上書き"する
+	//   KdStandardShader_PS_Lit.hlsl:  outColor = 発光テクスチャ * g_Emissive * 頂点色
+	// つまり見た目の色を決めているのは基本色(col.rgb)ではなく emissive のほう。
+	// 最初 emissive を青寄り(0.25,0.5,0.7)にしていたため、col を白にしても
+	// 青い玉のままだった。色は emissive 側で調整すること
+	Math::Vector3 emissive = DebugParams::Instance().Vector3Param(
+		U8("加速エフェクト/発光色"), Math::Vector3(0.65f, 0.85f, 1.0f));
+
+	Math::Color col(1.0f, 1.0f, 1.0f, alpha);
 	KdShaderManager::Instance().m_StandardShader.DrawPolygon(*pPoly, world, col, emissive);
 }
