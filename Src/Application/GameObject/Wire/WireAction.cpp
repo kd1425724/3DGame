@@ -56,20 +56,38 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 	Math::Vector3 startPos = pos;   // 移動前の位置(スイープの始点)
 	pos += _body.m_velocity * _dt;
 
-	// 距離拘束を解く。
-	// ※ リール(たぐり寄せ)は 2026/07/19 に廃止したので 0 を渡す。
-	//    前進入力でワイヤーが縮み、アンカー側へ引き寄せられてしまっていたため。
-	//    あとで別入力に割り当て直す予定(パラメータ「ワイヤー/リール速度」は残してある)
+	const bool winchMode = DebugFlags::Instance().Get(U8("ワイヤー/引き寄せモード"), true);
+
+	// === 巻き取り(ウインチ) ── 立体機動の推進力の本体 ===
+	// 【重要】ここは拘束を解く"前"に行う。ワイヤー長を縮めてから拘束を解くことで、
+	// 「ピンと張ったまま巻き取られる」状態が作れる。
+	//
+	// ※ 2026/07/20 に作り直し。
+	//   以前は「アンカー方向へ加速」で実装していたが、半径方向にだけ力を掛けると
+	//   アンカーへ一直線に飛ぶだけで弧を描かず、回転しないので上にも飛ばなかった。
+	//   張った紐を短くすると、接線方向の速度は保たれたまま半径だけ縮むので、
+	//   角速度が上がって振り回されながら上へ抜ける(紐に繋いだ球を手繰る動き)。
+	//   これが立体機動の「巻き取られて振られる」感触の正体。
+	if (winchMode)
+	{
+		float reelSpeed = DebugParams::Instance().Float(U8("ワイヤー/巻き取り速度"), 14.0f, 0.0f, 60.0f);
+		float minLen    = DebugParams::Instance().Float(U8("ワイヤー/最短の長さ"),   3.0f, 0.5f, 30.0f);
+
+		m_length -= reelSpeed * _dt;
+		if (m_length < minLen)
+		{
+			m_length = minLen;
+		}
+	}
+
+	// 距離拘束を解く(球の外へは出られない。内側は自由＝紐であって棒ではない)。
+	// ※ 手動リールは 2026/07/19 に廃止したので入力は 0。巻き取りは上の自動ウインチが担当
 	Update(pos, _body.m_velocity, _dt, 0.0f);
 
-	// === 引き寄せ(ウインチ) ── 立体機動の推進力 ===
+	// === 離脱判定と、補助的な半径方向の引き ===
 	// DebugFlags「ワイヤー/引き寄せモード」で挙動が2種類に分かれる。
-	//   ON (立体機動)   … 接続中ずっとアンカー方向へ加速する。ワイヤーは「振るもの」ではなく
-	//                     「巻き取って自分を運ぶもの」になる。移動＝アンカーへ飛んでいく
-	//   OFF (Spider-Man)… 引き寄せなし。重力で落ちて振れる純粋な振り子
-	// ※ 同じ「アンカー方向へ引く力」が、目指す方向によって機能にも違和感にもなる。
-	//    2026/07/19 に一度0にしたが、立体機動を目指す方針になったのでモードとして復活させた
-	const bool winchMode = DebugFlags::Instance().Get(U8("ワイヤー/引き寄せモード"), true);
+	//   ON (立体機動)   … 上の巻き取りでワイヤーが縮み、張ったまま振り回される
+	//   OFF (Spider-Man)… 巻き取りなし。重力で落ちて振れる純粋な振り子
 	if (winchMode)
 	{
 		Math::Vector3 toAnchor = m_anchor - pos;
@@ -79,14 +97,15 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 		{
 			toAnchor /= distToAnchor;
 
-			// 際限なく加速しないよう、アンカーへ近づく速度に上限を設ける
-			// ※ 既定を 28 → 20 に下げた(2026/07/19)。
-			//   引きが強すぎると操舵や噴射で軌道を変えられず、アンカーへ運ばれるだけになる。
-			//   ワイヤーは「大まかな方向を決める」程度に留め、細かい制御はプレイヤー側に渡す
-			float reelAcc = DebugParams::Instance().Float(U8("ワイヤー/引き寄せ加速"),   20.0f, 0.0f, 120.0f);
-			float reelMax = DebugParams::Instance().Float(U8("ワイヤー/引き寄せ上限速度"), 30.0f, 0.0f, 120.0f);
 			approach = _body.m_velocity.Dot(toAnchor);
-			if (approach < reelMax)
+
+			// 半径方向への加速。※ 既定を 20 → 0 にした(2026/07/20)。
+			// 半径方向に力を掛けるとアンカーへ一直線に向かってしまい、弧を描かなくなる
+			// (＝回転しないので上に飛ばない)。推進は上の「巻き取り」に任せるのが正しい。
+			// 真下にぶら下がった時など、どうしても寄せたい場合用にパラメータは残す(0で無効)
+			float reelAcc = DebugParams::Instance().Float(U8("ワイヤー/引き寄せ加速"),    0.0f, 0.0f, 120.0f);
+			float reelMax = DebugParams::Instance().Float(U8("ワイヤー/引き寄せ上限速度"), 30.0f, 0.0f, 120.0f);
+			if (reelAcc > 0.0f && approach < reelMax)
 			{
 				_body.m_velocity += toAnchor * (reelAcc * _dt);
 			}
