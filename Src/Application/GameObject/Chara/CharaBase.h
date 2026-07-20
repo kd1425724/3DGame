@@ -102,8 +102,26 @@ protected:
 		return v;
 	}
 
+	// アニメーションを再生する。SelectAnimation()が返した名前のアニメへ切り替え、時間を進める。
+	// ※ アニメは「接地・速度が確定したあとの結果」なので、PostUpdateの最後で呼ぶ
+	//    (CLAUDE.mdの「Updateは意思決定・PostUpdateはworld状態の解決」に合わせた位置)
+	void UpdateAnimation();
+
+	// いま再生すべきアニメ名を返す。空文字なら再生しない(アニメを持たないキャラ用)。
+	// 状態の判断は派生クラスの責務で、CharaBaseは「再生する仕組み」だけを持つ
+	virtual std::string SelectAnimation() const { return ""; }
+
+	// 再生中のアニメ名(デバッグ表示から読む)
+	const std::string& GetCurrentAnimName() const { return m_currentAnimName; }
+
 	// 表示用モデルワーク
 	KdModelWork m_modelWork;
+
+	// アニメーション再生機と、いま流しているアニメ名。
+	// 名前を覚えておくのは、同じアニメのときにSetAnimationを呼び直さないため
+	// (呼ぶたび再生時間が0に戻るので、毎フレーム呼ぶと先頭で固まって見える)
+	KdAnimator m_animator;
+	std::string m_currentAnimName;
 
 	// 描画時の色味(サブクラスで変更して他のキャラクターと見分けられるようにする)
 	Math::Color m_color = kWhiteColor;

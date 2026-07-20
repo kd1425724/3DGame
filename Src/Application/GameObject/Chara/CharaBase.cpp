@@ -26,6 +26,38 @@ void CharaBase::GenerateDepthMapFromLight()
 	KdShaderManager::Instance().m_StandardShader.DrawModel(m_modelWork, m_mWorld);
 }
 
+void CharaBase::UpdateAnimation()
+{
+	if (!m_modelWork.IsEnable()) { return; }
+
+	// 再生すべきアニメ名を派生クラスから受け取る。空ならアニメを持たないキャラ(Enemyなど)
+	std::string next = SelectAnimation();
+	if (next.empty()) { return; }
+
+	// 名前が変わったときだけ切り替える
+	if (next != m_currentAnimName)
+	{
+		std::shared_ptr<KdAnimationData> spAnim = m_modelWork.GetAnimation(next);
+
+		// 名前が見つからないときは切り替えず、前のアニメを流し続ける。
+		// m_currentAnimNameも更新しないので、名前が直れば次のフレームで復帰できる
+		if (spAnim)
+		{
+			m_animator.SetAnimation(spAnim, true);
+			m_currentAnimName = next;
+		}
+	}
+
+	// KdGLTFLoaderがキー時刻を「秒×60」= 60fps基準のフレーム値に変換して読み込んでいる
+	// (KdGLTFLoader.cpp:786 「元が60fpsとして変換」)ので、AdvanceTimeへ渡す値は
+	// 「1フレームあたり1.0」が等速になる。実時間で進めるため deltaTime*60 を渡す
+	// (フレームレートが変動しても再生速度が変わらない)。
+	// GetDeltaTimeはtimeScale適用済みなので、集中スロー中はアニメも一緒に遅くなる
+	float animSpeed = Application::Instance().GetDeltaTime() * 60.0f;
+
+	m_animator.AdvanceTime(m_modelWork.WorkNodes(), animSpeed);
+}
+
 // ※ IsWallBetween は 2026/07/19 に CollisionGrid へ移動(照準の遮蔽判定からも使うため)
 
 void CharaBase::GroundCheck()

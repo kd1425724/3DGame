@@ -988,8 +988,19 @@ void Player::PostUpdate()
 	m_upTargeting->Update(wantTarget ? m_wpCamera.lock() : nullptr,
 		Application::Instance().GetDeltaTime());
 
+	// アニメーションを進める(2026/07/20 追加)。
+	// 接地・速度・突撃などの状態が全て確定したあとで呼ぶので、PostUpdateの最後に置く
+	UpdateAnimation();
+
 	// デバッグ用：状態値をDebugWatchへ(このフレームの最終状態を出す。PostUpdateは毎フレーム必ず走る)
 	WatchDebug();
+}
+
+std::string Player::SelectAnimation() const
+{
+	// 【段階1】まず待機モーションだけを流し、glTFのアニメ再生とスキニングが
+	// 生きているかを確認する。状態(待機/走り/落下/着地)ごとの割り当ては次の段階で入れる
+	return "01 idle";
 }
 
 void Player::DrawUnLit()
@@ -1049,6 +1060,10 @@ void Player::WatchDebug() const
 	w.Watch(U8("Player/垂直速度"),   m_velocity.y);
 	w.Watch(U8("Player/接地"),       IsGrounded());
 	w.Watch(U8("Player/ワイヤー接続"), m_upWire && m_upWire->IsAttached());
+
+	// 再生中のアニメ名。空のままなら「名前が見つかっていない」= glTFのアニメ名との
+	// 綴り違いを疑う(Scifi_girlは "01 idle" のように番号＋半角スペース＋英字)
+	w.Watch(U8("Player/アニメ"), GetCurrentAnimName());
 
 	// 地上ダッシュまわり(右クリック押下でステップ=回避、押しっぱなしでダッシュ)。
 	// ステップが出ない時は「ステップの残り」が0になっていないかを見る

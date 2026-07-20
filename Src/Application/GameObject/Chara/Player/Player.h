@@ -30,6 +30,9 @@ public:
 	void DrawUnLit()	override;   // ワイヤーの見た目(陰影なしパス)。中身は DrawWire() に委譲
 	void DrawDebug()	override;
 
+	// 状態に応じた再生アニメ名を返す(CharaBase::UpdateAnimationが毎フレーム呼ぶ)
+	std::string SelectAnimation() const override;
+
 	// 種別タグ：シーン内からPlayerを探すときの判定に使う(dynamic_pointer_castの代わり)
 	ObjectTag GetObjectTag() override { return ObjectTag::Player; }
 
