@@ -118,8 +118,25 @@ protected:
 	// 再生中のアニメ名(デバッグ表示から読む)
 	const std::string& GetCurrentAnimName() const { return m_currentAnimName; }
 
+	// 体の半分の高さ(pos=体の中心 から足元までの距離)。
+	// 当たり判定(接地/天井/壁)が「足元」「頭」を求めるのに使う共通の基準。
+	// ※ 以前は GetScale().y*0.5 を直接使っており「モデル＝1辺1mの立方体」前提だった。
+	//    実寸のキャラモデルに差し替えたとき当たりと見た目がずれたのでここへ集約した
+	float GetBodyHalfHeight() const { return m_bodyHeight * GetScale().y * 0.5f; }
+
+	// モデル描画用の行列。原点が足元にあるモデルは半身ぶん下げて pos(体の中心)に合わせる。
+	// ※ 影(GenerateDepthMapFromLight)も必ずこれで描くこと。片方だけだと影がずれる
+	Math::Matrix GetDrawMatrix() const;
+
 	// 表示用モデルワーク
 	KdModelWork m_modelWork;
+
+	// 体の高さ(実寸m)。既定1.0は「1辺1mの立方体」だった頃と同じ挙動(Enemyなどは据え置き)
+	float m_bodyHeight = 1.0f;
+
+	// モデルの原点が足元にあるか。trueなら描画時に半身ぶん下げる。
+	// 既定false=原点が中心のモデル(Block等)。実寸のキャラモデルだけtrueにする
+	bool m_modelOriginIsFeet = false;
 
 	// アニメーション再生機と、いま流しているアニメ名。
 	// 名前を覚えておくのは、同じアニメのときにSetAnimationを呼び直さないため

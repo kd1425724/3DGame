@@ -10,11 +10,21 @@ void CharaBase::SetAsset(const std::string& assetName)
 	m_modelWork.SetModelData(KdAssets::Instance().m_modeldatas.GetData(assetName));
 }
 
+Math::Matrix CharaBase::GetDrawMatrix() const
+{
+	// 原点が中心のモデル(Block等)はそのまま描く
+	if (!m_modelOriginIsFeet) { return m_mWorld; }
+
+	// 原点が足元のモデル(Scifi_girlは頂点のYが0〜1.946)は、そのまま描くと
+	// 足が pos の高さに来て半身ぶん浮く。半身下げて体の中心を pos に合わせる
+	return m_mWorld * Math::Matrix::CreateTranslation(0.0f, -GetBodyHalfHeight(), 0.0f);
+}
+
 void CharaBase::DrawLit()
 {
 	if (!m_modelWork.IsEnable()) { return; }
 
-	KdShaderManager::Instance().m_StandardShader.DrawModel(m_modelWork, m_mWorld, m_color);
+	KdShaderManager::Instance().m_StandardShader.DrawModel(m_modelWork, GetDrawMatrix(), m_color);
 }
 
 void CharaBase::GenerateDepthMapFromLight()
@@ -23,7 +33,8 @@ void CharaBase::GenerateDepthMapFromLight()
 
 	// 深度パス用シェーダはBaseScene側のBeginGenerateDepthMapFromLightで既にセット済み。
 	// ここは通常のモデル描画を呼ぶだけで、光から見た深度が深度マップに書き込まれる
-	KdShaderManager::Instance().m_StandardShader.DrawModel(m_modelWork, m_mWorld);
+	// ※ 描画と同じ行列を使う。DrawLitだけ下げると影が体からずれる
+	KdShaderManager::Instance().m_StandardShader.DrawModel(m_modelWork, GetDrawMatrix());
 }
 
 void CharaBase::UpdateAnimation()
@@ -108,7 +119,7 @@ void CharaBase::ResolveGround(Math::Vector3& pos, bool _allowLanding)
 	// 高速落下でも地面を飛び越さない(=可変レイ判定)。
 	// ※ 以前は「体の中心から1.0上」=頭より上から出しており、デバッグ表示で邪魔＆過剰だったため足元基準に変更。
 	//    足元より上を見るぶん(rayStepUp)が段差の自動乗り上げ許容高さになる(頭上までは伸ばさない)
-	float feetY = pos.y - GetScale().y * 0.5f;
+	float feetY = pos.y - GetBodyHalfHeight();
 	float fallThisFrame = (m_velocity.y < 0.0f) ? (-m_velocity.y * deltaTime) : 0.0f;
 	const float rayStepUp = 0.3f;   // 足元より上をどれだけ見るか(=乗り上げできる段差の高さ・接地の許容)
 	const float rayBelow  = 0.2f;   // 足元より下をどれだけ見るか(接地の許容)
@@ -158,8 +169,8 @@ void CharaBase::ResolveGround(Math::Vector3& pos, bool _allowLanding)
 	// ※ 上昇中(ジャンプ直後)は吸着しないので、そのまま上へ飛べる
 	if (hit && m_velocity.y <= 0.0f)
 	{
-		// 見た目のモデル(単位立方体想定)の半分だけ持ち上げて、地面に埋まらず立たせる
-		float standY = hitPos.y + (GetScale().y * 0.5f);
+		// 体の半分の高さだけ持ち上げて、足が地面に接する位置に立たせる
+		float standY = hitPos.y + GetBodyHalfHeight();
 		if (pos.y <= standY)
 		{
 			// 「着地しない」モード(ワイヤーで地面スレスレを飛ぶ用)。
@@ -205,7 +216,7 @@ void CharaBase::ResolveCeiling(const Math::Vector3& fromPos, Math::Vector3& pos)
 	float rise = pos.y - fromPos.y;
 	if (rise <= 0.0f) { return; }
 
-	float halfH = GetScale().y * 0.5f;
+	float halfH = GetBodyHalfHeight();
 
 	// レイの始点は「移動前の頭の高さ」。ここは前フレームに天井へ潜っていない安全な位置なので、
 	// 下から上へ飛ばしても立っている床の天面を裏から拾わない(体中心より下から飛ばすと誤検知する)。
@@ -273,7 +284,7 @@ void CharaBase::ResolveBump(Math::Vector3& pos)
 	// 球の中心の高さ。球の底が足元のほんの少し上に来るように持ち上げる。
 	// こうしないと塔の天面に立ったとき球が天面に潜り込み、水平へ押し出されて引っかかる。
 	// (縦の乗り上げ・着地はResolveGroundが担当。ここは壁=体の高さだけを見る)
-	float centerY = pos.y - GetScale().y * 0.5f + radius + 0.02f;
+	float centerY = pos.y - GetBodyHalfHeight() + radius + 0.02f;
 
 	// デバッグ表示：壁当たり用の球を可視化(DebugFlags「当たり判定/AABB表示」でON/OFF)
 	if (KdGameObject::s_showColliderDebug)
@@ -379,7 +390,7 @@ void CharaBase::ResolveBumpSweep(const Math::Vector3& fromPos, Math::Vector3& po
 	// 進行方向が壁へ向かっている壁と最初に重なったステップの1つ手前で止める(球の幅で角も拾う/
 	// 壁沿いの滑りは止めない)。最終的な密着押し出しは後段のResolveBumpに任せる。縦(y)は触らない=壁専用。
 	float walkableNormalY = DebugParams::Instance().Float(U8("キャラ/歩ける斜面のしきい値(法線Y)"), 0.5f, 0.0f, 1.0f);
-	float centerYOff = -GetScale().y * 0.5f + radius + 0.02f;   // 球中心の高さ=ResolveBumpと同じ
+	float centerYOff = -GetBodyHalfHeight() + radius + 0.02f;   // 球中心の高さ=ResolveBumpと同じ
 	float step = radius * 0.8f;
 	int steps = (int)(dist / step) + 1;   // 切り上げ(最後のステップはt=distにクランプ)
 
