@@ -580,11 +580,11 @@ void Player::UpdateJump(float dt)
 void Player::UpdateDodge(float dt)
 {
 	// === ストックの再充填 ===
-	// 「2回までは続けてすぐ出せて、使い切ると少し待ってまた出せる」を作る。
-	// 1回のクールダウンだと、連打した時に出る/出ないが交互になって挙動が読めなかった
-	// (ユーザー指摘「連打した時変な感じになる」)。
-	// ※ 戻す時は2回分まとめて全快させる(ユーザー指示)。1つずつ戻すと、
-	//   「1つだけ戻った半端な状態」で出してすぐまた空になり、リズムが読めなかった
+	// 「2回までは続けてすぐ出せて、しばらくステップしなければ2回とも戻る」形(ユーザー指定)。
+	// 計測するのは"最後にステップしてからの経過時間"なので、ステップするたび測り直す。
+	// ※ 以前は「満タンから使い始めた時だけ測る」方式だったが、それだと1回だけ使って
+	//   すぐ2回目を出しても1回目の予定時刻に回復してしまい、「ステップし続けている間は
+	//   戻らない」という意図と合わなかった
 	const int maxCharges = GetMaxDodgeCharges();
 
 	// 実行中にImGuiでストック数を減らされた時の保険
@@ -593,14 +593,31 @@ void Player::UpdateDodge(float dt)
 		m_dodgeCharges = maxCharges;
 	}
 
-	if (m_dodgeCharges < maxCharges)
+	if (m_dodgeRechargeTimer > 0.0f)
 	{
 		m_dodgeRechargeTimer -= dt;
-		if (m_dodgeRechargeTimer <= 0.0f)
-		{
-			m_dodgeCharges = maxCharges;
-			m_dodgeRechargeTimer = 0.0f;
-		}
+	}
+
+	// 戻す時は2回分まとめて全快させる(ユーザー指示)。1つずつ戻すと、
+	// 「1つだけ戻った半端な状態」で出してすぐまた空になり、リズムが読めなかった
+	if (m_dodgeRechargeTimer <= 0.0f && m_dodgeCharges < maxCharges)
+	{
+		m_dodgeCharges = maxCharges;
+	}
+
+	// === 次のステップの先行入力(ユーザー指定) ===
+	// ステップ中に押した分を覚えておき、今のステップが明けた瞬間に次へ繋ぐ。
+	// ジャンプの先行入力(m_jumpBufferTimer)と同じ考え方。
+	// ※ 猶予はステップ時間(0.18)より長いので、ここで覚えるだけだと1回押しただけで
+	//   2回目が勝手に出てしまう。開始時に必ず0へ消費すること(下の開始処理を参照)
+	if (m_dodgeBufferTimer > 0.0f)
+	{
+		m_dodgeBufferTimer -= dt;
+	}
+
+	if (KdInputManager::Instance().IsPress("Accel"))
+	{
+		m_dodgeBufferTimer = DebugParams::Instance().Float(U8("回避/先行入力"), 0.2f, 0.0f, 1.0f);
 	}
 
 	// === 回避ダッシュ実行中：水平にフラットに素早く移動(縦は止めて空中でもキレよく) ===
@@ -614,11 +631,14 @@ void Player::UpdateDodge(float dt)
 		m_dodgeTimer -= dt;
 		// ※ 無敵時間(m_invincibleTimer)の消化はUpdate()側で毎フレーム行う。
 		//   ここ(回避中のみ)で減らすと、無敵時間>回避時間のとき端数が残って永久無敵になる
-		if (m_dodgeTimer <= 0.0f)
+		if (m_dodgeTimer > 0.0f)
 		{
-			m_isDodging = false;
+			return;
 		}
-		return;
+
+		// 今フレームで終了。ここでreturnせず下の開始判定へ落とすことで、
+		// 先行入力が入っていれば"間を空けずに"次のステップへ繋がる
+		m_isDodging = false;
 	}
 
 	// === 開始判定 ===
@@ -627,10 +647,12 @@ void Player::UpdateDodge(float dt)
 	// ※ 2026/07/20にShift("Dodge")から移した。無敵は反撃(ジャスト回避カウンター)の唯一の
 	//   入口なので、トリガーを移してもここを消してはいけない
 	// ※ 空中で押した時は回避せず、従来どおり空中ステップ／加速(UpdateAccel)に任せる
+	// ※ 入力は上で先行入力タイマーに変換済み。押した瞬間もタイマーを張るので、
+	//   ここは「押された or ステップ中に押されていた」をまとめて見ていることになる
 	if (m_isDiving) { return; }                                      // 突撃中は回避しない
 	if (m_dodgeCharges <= 0) { return; }                             // ストックを使い切っている
 	if (!m_isGrounded) { return; }                                   // 空中は空中ステップ/加速の担当
-	if (!KdInputManager::Instance().IsPress("Accel")) { return; }
+	if (m_dodgeBufferTimer <= 0.0f) { return; }                      // 押していない(先行入力も切れている)
 
 	// 方向：移動入力があればその向き(カメラ基準)、無ければカメラ前方(水平)
 	Math::Vector2 moveAxis = KdInputManager::Instance().GetAxisState("Move");
@@ -651,14 +673,14 @@ void Player::UpdateDodge(float dt)
 	dir.Normalize();
 	m_dodgeDir = dir;
 
-	// 満タンから使い始めた時だけ、再充填の計測を開始する。
-	// 減っている途中(既に計測中)なら測り直さない。測り直すと、2回目を出した瞬間に
-	// 1回目の待ち時間がリセットされて、続けて出すほど戻りが遅くなってしまう
-	if (m_dodgeCharges >= maxCharges)
-	{
-		m_dodgeRechargeTimer = DebugParams::Instance().Float(U8("回避/再充填時間"), 0.7f, 0.05f, 5.0f);
-	}
 	--m_dodgeCharges;
+
+	// ステップしたので、回復までの待ちを測り直す(=最後にステップしてからの経過時間)
+	m_dodgeRechargeTimer = DebugParams::Instance().Float(U8("回避/再充填時間"), 0.7f, 0.05f, 5.0f);
+
+	// 先行入力を消費する。猶予(0.2)がステップ時間(0.18)より長いので、
+	// ここで消さないと1回押しただけで2回目が勝手に出てしまう
+	m_dodgeBufferTimer = 0.0f;
 
 	// 開始：無敵を張り、実行時間だけステップする
 	m_isDodging       = true;
@@ -910,6 +932,7 @@ void Player::Respawn()
 	m_accelPressWasGround = false;
 	m_dodgeCharges = GetMaxDodgeCharges();   // ステップのストックは満タンで再開する
 	m_dodgeRechargeTimer = 0.0f;
+	m_dodgeBufferTimer = 0.0f;               // 先行入力を持ち越さない
 }
 
 void Player::PostUpdate()
@@ -1031,8 +1054,9 @@ void Player::WatchDebug() const
 	// ステップが出ない時は「ステップの残り」が0になっていないかを見る
 	w.Watch(U8("Player/ダッシュ中"),     m_isSprinting);
 	w.Watch(U8("Player/ステップ中"),     m_isDodging);
-	w.Watch(U8("Player/ステップの残り"), m_dodgeCharges);
-	w.Watch(U8("Player/ステップ再充填"), m_dodgeRechargeTimer);
+	w.Watch(U8("Player/ステップの残り"),   m_dodgeCharges);
+	w.Watch(U8("Player/ステップ再充填"),   m_dodgeRechargeTimer);
+	w.Watch(U8("Player/ステップ先行入力"), m_dodgeBufferTimer);
 
 	// 壁走りまわり(発動条件の調整用。壁に触れているのに走り出さない時は
 	// 「壁の接触」がtrueで「壁走り中」がfalseのまま＝速度不足を疑う)
