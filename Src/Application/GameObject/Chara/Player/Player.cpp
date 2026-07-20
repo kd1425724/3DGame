@@ -294,12 +294,17 @@ void Player::UpdateAccel(float dt)
 	}
 
 	// 地上で押しっぱなし＝ダッシュ。実際の速度切り替えは UpdateMove が行う。
-	// 【単押し判定の時間を待つ理由】押した瞬間から立てると、連打したときに
-	// 通常速度とダッシュ速度のあいだで速度が毎フレーム跳ねて挙動が汚くなる
-	// (接地中は水平速度を入力へ即セットしているので、定数の差がそのまま出る)。
-	// ちょうどこの待ち時間のあいだはステップ(回避)が速度を握っているので、
-	// 「ステップが終わった頃にダッシュへ移る」という狙いどおりの流れにもなる
-	m_isSprinting = m_isGrounded && holding && m_accelHoldTime >= tapTime;
+	//
+	// 【単押し判定の時間で待ってはいけない】2026/07/20 に一度
+	// 「m_accelHoldTime >= tapTime になってからダッシュ」にしたが、これは誤りだった。
+	// ボタンを離すと押し時間が0に戻るので、ステップ中に離して押し直すと
+	// そこから0.18秒だけ歩き速度に落ちる("一瞬歩きに戻ってからダッシュに入る")。
+	// 原神はステップが終わった瞬間そのままダッシュへ繋がり、この隙間が無い。
+	//
+	// 正しくは「接地して押していて、ステップ中でなければダッシュ」。
+	// 押した瞬間はステップ(UpdateDodge)が速度を握っているので歩き速度は挟まらず、
+	// ステップが明けた時にまだ押していればそのままダッシュへ移る
+	m_isSprinting = m_isGrounded && holding && !m_isDodging;
 
 	// 空中の加速は接地中には効かせない。地上で押している間はダッシュが担当なので、
 	// ここで加速度まで足すと二重に効いて地上だけ異常に伸びる
@@ -578,7 +583,8 @@ void Player::UpdateDodge(float dt)
 	// 「2回までは続けてすぐ出せて、使い切ると少し待ってまた出せる」を作る。
 	// 1回のクールダウンだと、連打した時に出る/出ないが交互になって挙動が読めなかった
 	// (ユーザー指摘「連打した時変な感じになる」)。
-	// ※ 1つずつ戻す。全快させると「待ちきると急に2回分戻る」不連続な感じになるため
+	// ※ 戻す時は2回分まとめて全快させる(ユーザー指示)。1つずつ戻すと、
+	//   「1つだけ戻った半端な状態」で出してすぐまた空になり、リズムが読めなかった
 	const int maxCharges = GetMaxDodgeCharges();
 
 	// 実行中にImGuiでストック数を減らされた時の保険
@@ -592,17 +598,8 @@ void Player::UpdateDodge(float dt)
 		m_dodgeRechargeTimer -= dt;
 		if (m_dodgeRechargeTimer <= 0.0f)
 		{
-			++m_dodgeCharges;
-
-			// まだ満タンでなければ、次の1つ分を続けて測り始める
-			if (m_dodgeCharges < maxCharges)
-			{
-				m_dodgeRechargeTimer = DebugParams::Instance().Float(U8("回避/再充填時間"), 0.7f, 0.05f, 5.0f);
-			}
-			else
-			{
-				m_dodgeRechargeTimer = 0.0f;
-			}
+			m_dodgeCharges = maxCharges;
+			m_dodgeRechargeTimer = 0.0f;
 		}
 	}
 
