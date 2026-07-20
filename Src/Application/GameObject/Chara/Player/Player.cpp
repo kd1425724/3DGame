@@ -37,7 +37,10 @@ void Player::Init()
 	// モデルは頂点カラーで色が付いているので、色の乗算は白(=素の色)にする
 	m_color = Math::Color(1.0f, 1.0f, 1.0f, 1.0f);
 
-	SetScale(Math::Vector3(1.0f, 1.0f, 1.0f));
+	// 【2026/07/20 実験】街を1/6スケールにしたので、プレイヤーも同じ比率へ。
+	// これをしないと世界に対して巨人になり、影の見え方の比較にならない。
+	// 戻す時は 1.0f へ(GetBodyHalfHeightがこのスケールを掛けるので当たりも一緒に縮む)
+	SetScale(Math::Vector3(0.1667f, 0.1667f, 0.1667f));
 
 	//ワイヤー(物理＋見た目を内包。見た目の板ポリ生成はWireActionのctorが行う)
 	m_upWire = std::make_unique<WireAction>();
