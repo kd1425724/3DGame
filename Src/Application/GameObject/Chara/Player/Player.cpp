@@ -263,19 +263,38 @@ void Player::UpdateWireInput()
 
 void Player::UpdateAccel(float dt)
 {
-	// 右クリック：長押しで加速し続ける／単押し(短く離す)で空中ステップ。
-	// 進撃の巨人2の×ボタン(加速・空中ステップ)にあたる、プレイヤー側の推進力。
-	// 方向は「移動入力の方向(カメラ基準)」。無入力なら今の進行方向へ。
-	// Jumpを併用していれば上向き成分も足す(ユーザー指定)
+	// 右クリックは接地と空中で意味が変わる。
+	//   空中 … 長押しで加速し続ける／単押し(短く離す)で空中ステップ
+	//          進撃の巨人2の×ボタン(加速・空中ステップ)にあたる、プレイヤー側の推進力。
+	//          方向は移動入力(カメラ基準)、無入力なら進行方向。Jump併用で上向き成分も足す
+	//   地上 … 押した瞬間にステップ(回避)、押し続けているあいだダッシュ(原神と同じ形)
+	//
+	// 【なぜ地上だけ「押した瞬間」なのか】
+	// 空中ステップは離した時に出している。単押しか長押しかを単押し判定の時間で見分けてから
+	// 出す必要があるためで、その分だけ反応が遅れる。地上ではこの遅れがそのままキレの無さになる。
+	// 地上は「押したら必ずステップが出る／押し続けていたらダッシュへ移る」にすることで、
+	// 事前に単押しと長押しを見分ける必要そのものを無くしている。
+	// 逆に空中を押下発火に揃えてはいけない：空中は長押しの加速が主役なので、
+	// 加速しようとするたび毎回ステップが暴発してしまう
 	const float tapTime = DebugParams::Instance().Float(U8("加速/単押しとみなす時間"), 0.18f, 0.05f, 0.6f);
 
 	if (KdInputManager::Instance().IsPress("Accel"))
 	{
 		m_accelHoldTime = 0.0f;
+		m_accelPressWasGround = m_isGrounded;
+
+		// ※ 地上ステップ(回避)の発動は UpdateDodge が同じ押下を見て行う。
+		//   無敵・クールダウン・速度の上書きが既にあちらに揃っているため、二重に持たない
 	}
 
 	bool holding = KdInputManager::Instance().IsHold("Accel");
-	if (holding)
+
+	// 地上で押しっぱなし＝ダッシュ。実際の速度切り替えは UpdateMove が行う
+	m_isSprinting = m_isGrounded && holding;
+
+	// 空中の加速は接地中には効かせない。地上で押している間はダッシュが担当なので、
+	// ここで加速度まで足すと二重に効いて地上だけ異常に伸びる
+	if (holding && !m_isGrounded)
 	{
 		m_accelHoldTime += dt;
 
@@ -296,10 +315,12 @@ void Player::UpdateAccel(float dt)
 		}
 	}
 
-	// 短く離したら空中ステップ(その場から入力方向へ一気に飛ぶ)
+	// 短く離したら空中ステップ(その場から入力方向へ一気に飛ぶ)。
+	// ※ 地上で押し始めた場合は出さない。押した瞬間に地上ステップ(回避)が既に出ているので、
+	//   段差から落ちながら離すとステップが二重に出てしまうため
 	if (KdInputManager::Instance().IsRelease("Accel"))
 	{
-		if (m_accelHoldTime < tapTime && !m_isGrounded)
+		if (m_accelHoldTime < tapTime && !m_isGrounded && !m_accelPressWasGround)
 		{
 			float step = DebugParams::Instance().Float(U8("加速/空中ステップの速さ"), 18.0f, 0.0f, 60.0f);
 			Math::Vector3 dir = GetAccelDir();
@@ -316,6 +337,7 @@ void Player::UpdateAccel(float dt)
 			}
 		}
 		m_accelHoldTime = 0.0f;
+		m_accelPressWasGround = false;
 	}
 }
 
@@ -459,7 +481,12 @@ void Player::UpdateMove(float dt)
 	// === 通常移動(velocityベース。接地=キビキビ、空中=勢いを保つ) ===
 	Math::Vector3 wishDir = GetWishDir();
 
-	float moveSpeed = DebugParams::Instance().Float(U8("プレイヤー/移動速度"), 5.0f, 0.0f, 20.0f);
+	// 地上ダッシュ中は速度の定数を差し替えるだけ。接地中は下で水平速度を入力へ即セットするので、
+	// これだけで「速く走る・離せば即止まる・向きも即変わる」が手に入る(追加の計算が要らない)。
+	// ※ 空中では m_isSprinting は立たないので、空中の推進は従来どおり加速(UpdateAccel)が担当する
+	float moveSpeed = m_isSprinting
+		? DebugParams::Instance().Float(U8("プレイヤー/ダッシュ速度"), 11.0f, 0.0f, 40.0f)
+		: DebugParams::Instance().Float(U8("プレイヤー/移動速度"),     5.0f, 0.0f, 20.0f);
 	Math::Vector3 wishVel = Math::Vector3::Zero;
 	if (wishDir.LengthSquared() > 0.0f)
 	{
@@ -565,9 +592,15 @@ void Player::UpdateDodge(float dt)
 	}
 
 	// === 開始判定 ===
+	// トリガーは右クリック(Accel)の押下＋接地。地上ダッシュの初動がそのまま回避になる形で、
+	// 押し続けているとこのステップが終わったあとダッシュ(UpdateAccel/UpdateMove)へ流れる。
+	// ※ 2026/07/20にShift("Dodge")から移した。無敵は反撃(ジャスト回避カウンター)の唯一の
+	//   入口なので、トリガーを移してもここを消してはいけない
+	// ※ 空中で押した時は回避せず、従来どおり空中ステップ／加速(UpdateAccel)に任せる
 	if (m_isDiving) { return; }                                      // 突撃中は回避しない
 	if (m_dodgeCooldownTimer > 0.0f) { return; }                     // クールダウン中
-	if (!KdInputManager::Instance().IsPress("Dodge")) { return; }
+	if (!m_isGrounded) { return; }                                   // 空中は空中ステップ/加速の担当
+	if (!KdInputManager::Instance().IsPress("Accel")) { return; }
 
 	// 方向：移動入力があればその向き(カメラ基準)、無ければカメラ前方(水平)
 	Math::Vector2 moveAxis = KdInputManager::Instance().GetAxisState("Move");
@@ -830,6 +863,8 @@ void Player::Respawn()
 	m_isDodging = false;
 	m_dodgeTimer = 0.0f;
 	m_invincibleTimer = 0.0f;
+	m_isSprinting = false;
+	m_accelPressWasGround = false;
 }
 
 void Player::PostUpdate()
@@ -946,6 +981,12 @@ void Player::WatchDebug() const
 	w.Watch(U8("Player/垂直速度"),   m_velocity.y);
 	w.Watch(U8("Player/接地"),       IsGrounded());
 	w.Watch(U8("Player/ワイヤー接続"), m_upWire && m_upWire->IsAttached());
+
+	// 地上ダッシュまわり(右クリック押下でステップ=回避、押しっぱなしでダッシュ)。
+	// ステップが出ない時は「ステップのCD」が残っていないかを見る
+	w.Watch(U8("Player/ダッシュ中"),   m_isSprinting);
+	w.Watch(U8("Player/ステップ中"),   m_isDodging);
+	w.Watch(U8("Player/ステップのCD"), m_dodgeCooldownTimer);
 
 	// 壁走りまわり(発動条件の調整用。壁に触れているのに走り出さない時は
 	// 「壁の接触」がtrueで「壁走り中」がfalseのまま＝速度不足を疑う)

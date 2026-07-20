@@ -310,8 +310,9 @@ bool Application::Init(int w, int h)
 		// Playerのリセット(開始位置へ即復帰)
 		pKeyboardMouse->AddButton("Respawn", new KdInputButtonForWindows('R'));
 
-		// Playerの回避ダッシュ(短距離クイックムーブ＋無敵)：Shift
-		pKeyboardMouse->AddButton("Dodge", new KdInputButtonForWindows(VK_SHIFT));
+		// ※ Playerの回避ダッシュのShift("Dodge")は 2026/07/20 に廃止(ユーザー指示)。
+		//    回避は地上ダッシュの入り(ステップ)に統合し、右クリック("Accel")の押下で出る。
+		//    原神と同じく「ダッシュの初動がそのまま回避になる」形
 
 		// 加速(EditorCamera)
 		pKeyboardMouse->AddButton("Boost", new KdInputButtonForWindows(VK_SHIFT));
