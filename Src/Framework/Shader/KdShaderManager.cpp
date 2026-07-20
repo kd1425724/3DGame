@@ -456,6 +456,29 @@ void KdShaderManager::WriteCBShadowArea(const Math::Matrix& proj, float dirLight
 {
 	Math::Vector3 lightDir = m_cb9_Light.Get().DirLight_Dir;
 	Math::Vector3 lightPos = m_cb7_Camera.Get().CamPos;
+
+	// 【2026/07/20 追加】影の箱の中心をカメラの前方へずらす。
+	// 以前は箱の中心＝カメラ位置だったため、箱の半分が「カメラの後ろ＝画面に映らない場所」に
+	// 使われていた。TPSはカメラが後方にあるので、前方の到達距離がさらに短くなる。
+	// 箱の幅の1/4だけ前へずらすと、後方1/4・前方3/4の配分になり前方の到達距離が実質2倍になる。
+	// 言い換えると、同じ範囲をカバーするのに影エリアを半分にできる＝テクセルも半分になる。
+	// ※ 箱の幅は射影行列から復元する(XMMatrixOrthographicLH は _11 = 2/幅)
+	// ※ カメラ前方はビュー行列の3列目(ワールド空間のZ軸)。水平成分だけ使い、
+	//    見上げ/見下ろしで箱が上下に飛んで足元が範囲外になるのを防ぐ
+	{
+		const Math::Matrix& mView = m_cb7_Camera.Get().mView;
+		Math::Vector3 camFwd(mView._13, mView._23, mView._33);
+		camFwd.y = 0.0f;
+
+		if (camFwd.LengthSquared() > 0.0001f && proj._11 != 0.0f)
+		{
+			camFwd.Normalize();
+
+			float areaWidth = 2.0f / proj._11;
+			lightPos += camFwd * (areaWidth * 0.25f);
+		}
+	}
+
 	Math::Vector3 upVec = (lightDir == Math::Vector3::Up) ? Math::Vector3::Right : Math::Vector3::Up ;
 
 	Math::Matrix shadowVP = DirectX::XMMatrixLookAtLH(lightPos - lightDir * dirLightHeight, lightPos, upVec);
