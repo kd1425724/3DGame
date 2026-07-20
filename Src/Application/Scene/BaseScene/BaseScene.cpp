@@ -5,7 +5,6 @@
 #include "../../GameObject/Camera/EditorCamera/EditorCamera.h"
 #include "../../Effect/EffectManager.h"
 #include "../../Debug/DebugWatch/DebugWatch.h"
-#include "../../Debug/DebugFlags/DebugFlags.h"   // [SHADOWDEBUG] シャドウマップ表示の切り替え
 
 void BaseScene::PreUpdate()
 {
@@ -175,22 +174,6 @@ void BaseScene::DrawSprite()
 		for (auto& obj : m_objList)
 		{
 			obj->DrawSprite();
-		}
-
-		// [SHADOWDEBUG] 影の調査用の一時表示(2026/07/20)。
-		// 「影の範囲が狭い/遠くが暗い」の原因を、推測でなくシャドウマップを直接見て切り分ける。
-		// 白い部分=遠い(何も無い) / 黒っぽい部分=近い(影を落とす物が書き込まれている)。
-		// 建物がどこまで書き込まれているか、範囲に対してどれくらい詰まっているかを見る。
-		// ※ 原因が確定したらこのブロックごと削除する(grep: SHADOWDEBUG)
-		if (DebugFlags::Instance().Get(U8("影/シャドウマップ表示"), false))
-		{
-			const std::shared_ptr<KdTexture>& spDepth =
-				KdShaderManager::Instance().m_StandardShader.GetDepthTex();
-
-			if (spDepth)
-			{
-				KdShaderManager::Instance().m_spriteShader.DrawTex(spDepth.get(), 0, 0, 512, 512);
-			}
 		}
 	}
 	KdShaderManager::Instance().m_spriteShader.End();
