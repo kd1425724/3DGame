@@ -1,7 +1,6 @@
 ﻿#include "Ground.h"
 
 #include "../../Culling/CullingManager.h"   // CalcLocalBoundingSphere(モデル全体の境界球)
-#include "../../Debug/DebugFlags/DebugFlags.h"   // 「影/地面も影を落とす」の切り替え
 
 void Ground::Init()
 {
@@ -54,28 +53,6 @@ void Ground::DrawLit()
 {
 	if (!m_spModelWork || !m_spModelWork->IsEnable()) { return; }
 
-	KdShaderManager::Instance().m_StandardShader.DrawModel(*m_spModelWork, m_mWorld);
-}
-
-void Ground::GenerateDepthMapFromLight()
-{
-	if (!m_spModelWork || !m_spModelWork->IsEnable()) { return; }
-
-	// 【2026/07/20】地面は既定で影を落とさない。
-	//
-	// 地面は332x297mの巨大な平面で、これをシャドウマップに書き込むと、地面自身を描くときに
-	// 「自分の深度」と比較して影と誤判定する(シャドウアクネ)。症状は
-	//   ・カメラから少し離れた地面が一様に暗くなる(建物の影と区別がつかない)
-	//   ・ライトカメラの中心付近だけ正しく明るい = 「近づかないと影が出ない」ように見える
-	//   ・影エリアの外は shadow=1 で強制的に明るいので、箱の境界がくっきり出る
-	// で、実際に「遠くが暗い/影が出ない」として報告された不具合の原因がこれだった。
-	//
-	// 地面の下には何も無いので、影を落とす側にする必要がそもそも無い。
-	// 落とすのをやめると自己遮蔽が消え、シャドウパスの描画も1つ減る(軽くなる)。
-	// ※ 比較できるようフラグは残す。ONにすると従来どおり地面も影を落とす
-	if (!DebugFlags::Instance().Get(U8("影/地面も影を落とす"), false)) { return; }
-
-	// 深度パス用シェーダはBeginGenerateDepthMapFromLightでセット済み。モデルを描くだけで影の元になる
 	KdShaderManager::Instance().m_StandardShader.DrawModel(*m_spModelWork, m_mWorld);
 }
 

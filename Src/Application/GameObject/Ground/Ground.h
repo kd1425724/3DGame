@@ -21,7 +21,10 @@ public:
 
 	void DrawLit()			override;
 
-	void GenerateDepthMapFromLight() override;   // 影を落とす側：深度マップへモデルを描く
+	// ※ GenerateDepthMapFromLight は意図的に持たない(=地面は影を落とさない)。
+	//    332x297mの地面を深度マップに書き込むと、地面自身を描くときに自分の深度と
+	//    比較して影と誤判定し(シャドウアクネ)、カメラから離れた地面が一様に暗くなる。
+	//    地面の下には何も無いので落とす必要が無い。詳細は 2026/07/20 のコミット参照
 
 	void DrawDebug()		override;   // 当たり判定(モデル立方体)を箱で可視化
 
