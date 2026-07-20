@@ -988,6 +988,20 @@ void Player::PostUpdate()
 	m_upTargeting->Update(wantTarget ? m_wpCamera.lock() : nullptr,
 		Application::Instance().GetDeltaTime());
 
+	// 着地した瞬間を捉えて、着地モーションを流す時間を確保する。
+	// 「接地しているか」だけで判定すると、着地の次のフレームには走り/待機へ移ってしまい
+	// 着地モーションがほぼ見えないため、瞬間にタイマーを立ててその間だけ再生する
+	if (IsGrounded() && !m_wasGroundedForAnim)
+	{
+		m_landingAnimTimer = DebugParams::Instance().Float(U8("アニメ/着地モーションの長さ"), 0.25f, 0.0f, 1.0f);
+	}
+	m_wasGroundedForAnim = IsGrounded();
+
+	if (m_landingAnimTimer > 0.0f)
+	{
+		m_landingAnimTimer -= Application::Instance().GetDeltaTime();
+	}
+
 	// アニメーションを進める(2026/07/20 追加)。
 	// 接地・速度・突撃などの状態が全て確定したあとで呼ぶので、PostUpdateの最後に置く
 	UpdateAnimation();
@@ -998,9 +1012,52 @@ void Player::PostUpdate()
 
 std::string Player::SelectAnimation() const
 {
-	// 【段階1】まず待機モーションだけを流し、glTFのアニメ再生とスキニングが
-	// 生きているかを確認する。状態(待機/走り/落下/着地)ごとの割り当ては次の段階で入れる
+	// 上から順に「より特殊な状態」を見て、最初に当てはまったものを再生する。
+	// ※ Scifi_girlの13本には ワイヤー・壁走り・斬撃 の専用モーションが無いので、
+	//    近いモーションで暫定的に代用している。最終的には手付けの静止ポーズを
+	//    用意して差し替える想定(モデルを差し替える時に一緒に作る)
+
+	// 被弾硬直。空中で食らったか地上かで分ける
+	if (m_staggerTimer > 0.0f)
+	{
+		if (IsGrounded()) { return "12 hurt"; }
+		return "11 hurt (air)";
+	}
+
+	// ワイヤーでぶら下がっている間／突撃中。専用が無いので落下で代用
+	if (m_upWire && m_upWire->IsAttached()) { return "08 fall (air)"; }
+	if (m_isDiving) { return "08 fall (air)"; }
+
+	// 壁走り・よじ登り。走りで代用
+	if (m_upWall && (m_upWall->IsRunning() || m_upWall->IsClimbing())) { return "03 run"; }
+
+	// ステップ(回避)。踏み込みの出だしが近い「加速」で代用
+	if (m_isDodging) { return "02 speed up"; }
+
+	// 空中
+	if (!IsGrounded()) { return "08 fall (air)"; }
+
+	// 着地の余韻(PostUpdateでタイマーを立てている)
+	if (m_landingAnimTimer > 0.0f) { return "10 fall (landing)"; }
+
+	// 接地：動いていれば走り、止まっていれば待機
+	float runThreshold = DebugParams::Instance().Float(U8("アニメ/走りに切り替わる速さ"), 0.5f, 0.0f, 5.0f);
+	if (GetHorizontalSpeed() > runThreshold) { return "03 run"; }
+
 	return "01 idle";
+}
+
+float Player::SelectAnimationSpeed() const
+{
+	// 走り以外は等速。走りだけ、実際の水平速度に比例させて再生を速める。
+	// 歩き(5.0)もダッシュ(11.0)も同じ速度で流すと足が地面を滑って見えるため
+	if (m_currentAnimName != "03 run") { return 1.0f; }
+
+	float baseSpeed = DebugParams::Instance().Float(U8("アニメ/走りの基準速度"), 5.0f, 1.0f, 20.0f);
+	if (baseSpeed <= 0.0f) { return 1.0f; }
+
+	// 上下に振り切れると不自然なので倍率を制限する
+	return std::clamp(GetHorizontalSpeed() / baseSpeed, 0.5f, 2.5f);
 }
 
 void Player::DrawUnLit()

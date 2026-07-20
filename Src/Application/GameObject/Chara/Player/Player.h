@@ -33,6 +33,9 @@ public:
 	// 状態に応じた再生アニメ名を返す(CharaBase::UpdateAnimationが毎フレーム呼ぶ)
 	std::string SelectAnimation() const override;
 
+	// 走りだけ、実際の速さに合わせて再生速度を変える
+	float SelectAnimationSpeed() const override;
+
 	// 種別タグ：シーン内からPlayerを探すときの判定に使う(dynamic_pointer_castの代わり)
 	ObjectTag GetObjectTag() override { return ObjectTag::Player; }
 
@@ -177,6 +180,12 @@ private:
 
 	// 落下攻撃(突撃)中フラグ(対象へ引き寄せ→斬ったら周りの敵へ続けて突撃)
 	bool m_isDiving = false;
+
+	// 着地モーションの残り時間と、前フレームの接地状態(着地した瞬間を捉えるため)。
+	// 接地しただけで判定すると着地モーションが1フレームで終わって見えないので、
+	// 着地の瞬間に時間をセットして、その間だけ着地モーションを流す
+	float m_landingAnimTimer = 0.0f;
+	bool m_wasGroundedForAnim = false;
 	// チェイン数：一撃ごとに増える(手応えを段階的に強く/将来のコンボUI用)。接地・待機でリセット
 	int m_diveChainCount = 0;
 	// 斬った後、次の突撃入力を受け付ける残り時間(この間に長押し→離しで次の敵へ続けて突撃)

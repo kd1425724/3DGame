@@ -111,6 +111,10 @@ protected:
 	// 状態の判断は派生クラスの責務で、CharaBaseは「再生する仕組み」だけを持つ
 	virtual std::string SelectAnimation() const { return ""; }
 
+	// 再生速度の倍率(1.0=等速)。走りを実際の速さに合わせて速める用。
+	// 同じ走りモーションを歩きでもダッシュでも等速で流すと、足が地面を滑って見える
+	virtual float SelectAnimationSpeed() const { return 1.0f; }
+
 	// 再生中のアニメ名(デバッグ表示から読む)
 	const std::string& GetCurrentAnimName() const { return m_currentAnimName; }
 

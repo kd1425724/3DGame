@@ -53,7 +53,8 @@ void CharaBase::UpdateAnimation()
 	// 「1フレームあたり1.0」が等速になる。実時間で進めるため deltaTime*60 を渡す
 	// (フレームレートが変動しても再生速度が変わらない)。
 	// GetDeltaTimeはtimeScale適用済みなので、集中スロー中はアニメも一緒に遅くなる
-	float animSpeed = Application::Instance().GetDeltaTime() * 60.0f;
+	// ※ SelectAnimationSpeed()は切り替え後に呼ぶ(派生クラスが現在のアニメ名を見て倍率を決めるため)
+	float animSpeed = Application::Instance().GetDeltaTime() * 60.0f * SelectAnimationSpeed();
 
 	m_animator.AdvanceTime(m_modelWork.WorkNodes(), animSpeed);
 }
