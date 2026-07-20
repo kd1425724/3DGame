@@ -52,11 +52,7 @@ void StageEnvironment::Apply()
 	// 街を2倍(最大29.3m)に広げた後は 40 = カメラ中心±20m しか影が出ず、通りの先が影無しになっていた。
 	// 100 にすると±50mまで影が出る。代償は影の精度(1024x1024の深度を広い範囲に伸ばすため
 	// 40のとき約4cm/テクセル → 100では約10cm/テクセル)
-	// 上限は 2026/07/20 に 200 → 600 へ拡張。
-	// 「影が粗くなってもいいので、遠くまで影が出ることを優先したい」というユーザー判断による。
-	// 影の箱はカメラ中心なので、エリア600なら前方±300mまで影が出る。
-	// 代償は精度(1024x1024の深度を広い範囲へ伸ばすため、600だと約59cm/テクセル)
-	float shadowArea  = DebugParams::Instance().Float(U8("環境/影エリア"),    100.0f, 5.0f, 600.0f);
+	float shadowArea  = DebugParams::Instance().Float(U8("環境/影エリア"),    100.0f, 5.0f, 200.0f);
 	float heightRatio = DebugParams::Instance().Float(U8("環境/影の高さ比率"), 0.75f, 0.3f,   2.0f);
 	float shadowHeight = shadowArea * heightRatio;
 	if (shadowHeight < 25.0f)
