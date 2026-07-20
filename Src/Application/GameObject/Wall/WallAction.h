@@ -55,11 +55,18 @@ private:
 	// 壁ジャンプ：壁の法線方向へ蹴り出し＋上向き＋壁に沿った勢いを一部維持する
 	void WallJump(CharaBase& _body);
 
+	// 壁を擦っている火花を出す(壁走り中であることを見て分かるようにするため)。
+	// 時間あたりの個数で制御するのでフレームレートに依らない
+	void SpawnFx(const CharaBase& _body, float _dt);
+
 	// 走行中か
 	bool m_isRunning = false;
 
 	// 走り出してからの経過時間(上限を超えたら剥がれる)
 	float m_runTime = 0.0f;
+
+	// 火花の発生間隔を測るタイマー(時間あたりの個数を一定に保つ)
+	float m_fxTimer = 0.0f;
 
 	// 走っている壁の法線(水平・正規化済み)
 	Math::Vector3 m_wallNormal = {};

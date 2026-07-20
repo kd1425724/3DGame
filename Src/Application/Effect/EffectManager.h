@@ -33,6 +33,12 @@ public:
 	// 粒は加速と逆向きに流れるので、後方へ吹き出しているように見える
 	void SpawnBoost(const Math::Vector3& _pos, const Math::Vector3& _accelDir);
 
+	// 便利関数：壁走り中の火花を1粒出す(粒はBoostEffectを流用する)。
+	//  _pos … 壁との接点 / _runDir … 走っている向き / _wallNormal … 壁の法線(壁から外向き)
+	// 粒は進行方向の逆へ流しつつ、壁から少し離れて下へ落とす＝壁を擦った火花に見える
+	void SpawnWallRun(const Math::Vector3& _pos, const Math::Vector3& _runDir,
+		const Math::Vector3& _wallNormal);
+
 	// 管理中のエフェクトの経過を進め、終わったもの(IsExpired)を外す。シーンから毎フレーム呼ぶ
 	// (各エフェクトはKdGameObject同様、dtをApplicationから自分で取る)
 	void Update();

@@ -2,6 +2,7 @@
 
 #include "../Chara/CharaBase.h"
 #include "../../Debug/DebugParams/DebugParams.h"
+#include "../../Effect/EffectManager.h"
 
 void WallAction::Update(CharaBase& _body, float _dt)
 {
@@ -85,6 +86,35 @@ void WallAction::Update(CharaBase& _body, float _dt)
 	v -= m_wallNormal * stick;
 
 	_body.m_velocity = v;
+
+	// 壁を擦っている火花を出す(壁走り中だと見て分かるように)
+	SpawnFx(_body, _dt);
+}
+
+void WallAction::SpawnFx(const CharaBase& _body, float _dt)
+{
+	// 毎フレーム出すとフレームレートで密度が変わるので、時間あたりの個数で制御する
+	float rate = DebugParams::Instance().Float(U8("壁走りエフェクト/毎秒の粒数"), 45.0f, 0.0f, 150.0f);
+	if (rate <= 0.0f) { return; }
+
+	// 走っている向き＝壁に沿った水平の進行方向。止まっていたら火花も出さない
+	Math::Vector3 runDir(_body.m_velocity.x, 0.0f, _body.m_velocity.z);
+	if (runDir.LengthSquared() < 0.0001f) { return; }
+	runDir.Normalize();
+
+	// 発生位置は壁との接点(体の中心から壁へ寄せた所)の、少し足元寄り
+	float radius = DebugParams::Instance().Float(U8("キャラ/壁当たり半径"), 0.4f, 0.1f, 2.0f);
+	float footY  = DebugParams::Instance().Float(U8("壁走りエフェクト/足元へのオフセット"), 0.3f, -2.0f, 2.0f);
+	Math::Vector3 contact = _body.GetPos() - m_wallNormal * radius;
+	contact.y -= footY;
+
+	m_fxTimer += _dt;
+	float interval = 1.0f / rate;
+	while (m_fxTimer >= interval)
+	{
+		m_fxTimer -= interval;
+		EffectManager::Instance().SpawnWallRun(contact, runDir, m_wallNormal);
+	}
 }
 
 bool WallAction::CanStart(const CharaBase& _body) const
@@ -118,6 +148,7 @@ void WallAction::Start(CharaBase& _body)
 {
 	m_isRunning = true;
 	m_runTime = 0.0f;
+	m_fxTimer = 0.0f;
 	m_wallNormal = _body.m_wallNormal;
 
 	// 別の壁に取り付けた時点で、前の壁の禁止は用済み
@@ -168,6 +199,17 @@ void WallAction::WallJump(CharaBase& _body)
 	v.y = up;
 
 	_body.m_velocity = v;
+
+	// 蹴った瞬間だけ火花をまとめて出す(壁を蹴った手応えを見せる)
+	int burst = DebugParams::Instance().Int(U8("壁ジャンプ/火花の数"), 12, 0, 60);
+	float radius = DebugParams::Instance().Float(U8("キャラ/壁当たり半径"), 0.4f, 0.1f, 2.0f);
+	Math::Vector3 contact = _body.GetPos() - m_wallNormal * radius;
+	for (int i = 0; i < burst; ++i)
+	{
+		// 蹴った方向(法線)へ散らす。SpawnWallRunは第2引数の逆へ流すので、
+		// 法線の逆を渡して「壁から外向きに弾ける」動きにする
+		EffectManager::Instance().SpawnWallRun(contact, -m_wallNormal, m_wallNormal);
+	}
 
 	// 蹴った壁は禁止する(同じ壁に張り付き直して無限に登れないように)
 	Stop(_body, true);

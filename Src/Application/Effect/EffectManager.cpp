@@ -42,6 +42,28 @@ void EffectManager::SpawnBoost(const Math::Vector3& _pos, const Math::Vector3& _
 	Add(std::make_shared<BoostEffect>(_pos + jitter, -_accelDir * flow));
 }
 
+void EffectManager::SpawnWallRun(const Math::Vector3& _pos, const Math::Vector3& _runDir,
+	const Math::Vector3& _wallNormal)
+{
+	float flow    = DebugParams::Instance().Float(U8("壁走りエフェクト/後方へ流れる速さ"), 9.0f, 0.0f, 40.0f);
+	float outward = DebugParams::Instance().Float(U8("壁走りエフェクト/壁から離れる速さ"), 2.0f, 0.0f, 20.0f);
+	float fall    = DebugParams::Instance().Float(U8("壁走りエフェクト/落ちる速さ"),       3.0f, 0.0f, 20.0f);
+	float scatter = DebugParams::Instance().Float(U8("壁走りエフェクト/散らばり"),         0.35f, 0.0f, 2.0f);
+
+	// 毎回同じ位置だと1本の線に見えるので、発生ごとに少しずらす(SpawnBoostと同じ手)
+	int seed = (int)(m_spawnCounter++ * 71);
+	float sx = (float)(((seed * 13) % 200) - 100) / 100.0f;
+	float sy = (float)(((seed * 29) % 200) - 100) / 100.0f;
+	float sz = (float)(((seed * 47) % 200) - 100) / 100.0f;
+	Math::Vector3 jitter(sx * scatter, sy * scatter, sz * scatter);
+
+	// 進行方向の逆へ流しつつ、壁から少し浮かせて下へ落とす＝壁を擦った火花
+	Math::Vector3 vel = -_runDir * flow + _wallNormal * outward;
+	vel.y -= fall;
+
+	Add(std::make_shared<BoostEffect>(_pos + jitter, vel));
+}
+
 void EffectManager::Update()
 {
 	// 各エフェクトを更新(dtは各自Applicationから取る)。終わったもの(IsExpired)は
