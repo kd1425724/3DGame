@@ -13,6 +13,7 @@
 #include "../../../Collision/CollisionGrid.h"   // IsWallBetween(落下攻撃の突撃先が壁の裏か)
 
 #include"../../Wire/WireAction.h"
+#include"../../Wall/WallAction.h"
 
 Player::Player()
 {
@@ -37,6 +38,9 @@ void Player::Init()
 
 	//ワイヤー(物理＋見た目を内包。見た目の板ポリ生成はWireActionのctorが行う)
 	m_upWire = std::make_unique<WireAction>();
+
+	// 壁走り／壁ジャンプ(当たり判定はCharaBase::ResolveBumpの結果を読むだけなので追加の負荷は無い)
+	m_upWall = std::make_unique<WallAction>();
 
 	// 照準(画面中心の敵を自動ロックオン＋マーカー描画。マーカー板ポリ生成はTargetingのctorが行う)
 	m_upTargeting = std::make_unique<Targeting>();
@@ -99,6 +103,11 @@ void Player::Update()
 	// 実際の移動はWireAction::UpdateSwingがこのキャラを動かす
 	if (m_upWire->IsAttached())
 	{
+		// ワイヤーへ移ったら壁走りは中断する。
+		// ※ 壁走りは重力を止めている(m_gravityScale=0)ので、中断せずに素通りすると
+		//    重力が止まったままになる。早期returnする経路では必ずCancelを通すこと
+		m_upWall->Cancel(*this);
+
 		// ※ Space/Ctrl単独の上下噴射は 2026/07/20 に廃止(ユーザー指示)。
 		//    上への推進は加速ボタン(右クリック)＋Spaceへ一本化した。UpdateAccelが担当する
 		Math::Vector2 wireMove = KdInputManager::Instance().GetAxisState("Move");
@@ -120,13 +129,33 @@ void Player::Update()
 
 	// 回避ダッシュ(クールダウン消化＋実行中は速度を上書き)。ダッシュ中は他の行動を止める
 	UpdateDodge(dt);
-	if (m_isDodging) { return; }
+	if (m_isDodging)
+	{
+		// 回避へ移ったら壁走りは中断する(重力を戻すため。上のワイヤー分岐と同じ理由)
+		m_upWall->Cancel(*this);
+		return;
+	}
+
+	// 壁走り／壁ジャンプ(自動発動)。空中で壁に沿って十分な速度で触れていれば走り出す。
+	// 中で重力を止め、壁に沿うよう速度を書き換え、Jumpが押されたら壁を蹴る。
+	// ※ 突撃中は発動させない。壁沿いに突撃すると壁走りが横取りしてホーミングが崩れるため
+	//   (StartDiveでも一度Cancelしているが、突撃が続く間ずっと止めておく必要がある)
+	if (m_isDiving)
+	{
+		m_upWall->Cancel(*this);
+	}
+	else
+	{
+		m_upWall->Update(*this, dt);
+	}
 
 	// 落下攻撃(突撃/連続攻撃)中は通常移動・ジャンプを止める。
 	// ※ UpdateMoveは接地中に水平速度を入力値(無入力なら0)へ上書きするため、
 	//   突撃中に走ると継続受付中の流しや突撃の勢いが地面で殺されてしまう
 	// ※ 被弾硬直(m_staggerTimer)中も移動/ジャンプを止め、ノックバックの勢いを残す
-	if (!m_isDiving && m_staggerTimer <= 0.0f)
+	// ※ 壁走り中も止める。UpdateMoveが壁沿いの速度を上書きしてしまうのと、
+	//   Spaceは壁ジャンプが使うのでUpdateJumpと二重に発火させないため
+	if (!m_upWall->IsRunning() && !m_isDiving && m_staggerTimer <= 0.0f)
 	{
 		UpdateMove(dt);
 		UpdateJump(dt);
@@ -705,6 +734,9 @@ void Player::StartDive()
 {
 	if (m_isGrounded) { return; }   // 空中専用
 
+	// 壁を走りながらでも攻撃に移れるように、壁走りは中断する(重力も戻る)
+	m_upWall->Cancel(*this);
+
 	m_isDiving = true;
 	m_comboWindowTimer = 0.0f;
 
@@ -754,6 +786,10 @@ void Player::Respawn()
 	if (m_upWire)
 	{
 		m_upWire->Release();
+	}
+	if (m_upWall)
+	{
+		m_upWall->Cancel(*this);   // 壁走り中にリセットしても重力が止まったままにならないように
 	}
 	m_isDiving = false;
 	m_wpDiveTarget.reset();
@@ -879,6 +915,11 @@ void Player::WatchDebug() const
 	w.Watch(U8("Player/垂直速度"),   m_velocity.y);
 	w.Watch(U8("Player/接地"),       IsGrounded());
 	w.Watch(U8("Player/ワイヤー接続"), m_upWire && m_upWire->IsAttached());
+
+	// 壁走りまわり(発動条件の調整用。壁に触れているのに走り出さない時は
+	// 「壁の接触」がtrueで「壁走り中」がfalseのまま＝速度不足を疑う)
+	w.Watch(U8("Player/壁の接触"), m_isTouchingWall);
+	w.Watch(U8("Player/壁走り中"), m_upWall && m_upWall->IsRunning());
 
 	// 攻撃・突撃まわり
 	w.Watch(U8("Player/突撃中"),          m_isDiving);

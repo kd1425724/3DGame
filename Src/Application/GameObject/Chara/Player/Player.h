@@ -4,6 +4,7 @@
 
 class CameraBase;
 class WireAction;
+class WallAction;
 class Targeting;
 
 //====================================================
@@ -154,6 +155,9 @@ private:
 
 	//ワイヤー(物理＋見た目を内包)
 	std::unique_ptr<WireAction> m_upWire;
+
+	// 壁走り／壁ジャンプ(自動発動。走行中は通常移動とジャンプを止める)
+	std::unique_ptr<WallAction> m_upWall;
 
 	// 照準(画面中心の敵を自動ロックオン＋マーカー描画を内包する部品)
 	std::unique_ptr<Targeting> m_upTargeting;

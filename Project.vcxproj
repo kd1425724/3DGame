@@ -305,6 +305,7 @@
     <ClInclude Include="Src\Application\GameObject\Targeting\Targeting.h" />
     <ClInclude Include="Src\Application\GameObject\Ground\Ground.h" />
     <ClInclude Include="Src\Application\GameObject\Wire\WireAction.h" />
+    <ClInclude Include="Src\Application\GameObject\Wall\WallAction.h" />
     <ClInclude Include="Src\Application\Editor\LevelEditor\LevelEditorManager.h" />
     <ClInclude Include="Src\Application\Editor\LevelEditor\LevelEditorHistory\LevelEditorHistory.h" />
     <ClInclude Include="Src\Application\Editor\LevelEditor\LevelFileIO\LevelFileIO.h" />
@@ -402,6 +403,7 @@
     <ClCompile Include="Src\Application\GameObject\Targeting\Targeting.cpp" />
     <ClCompile Include="Src\Application\GameObject\Ground\Ground.cpp" />
     <ClCompile Include="Src\Application\GameObject\Wire\WireAction.cpp" />
+    <ClCompile Include="Src\Application\GameObject\Wall\WallAction.cpp" />
     <ClCompile Include="Src\Application\Editor\LevelEditor\LevelEditorManager.cpp" />
     <ClCompile Include="Src\Application\Editor\LevelEditor\LevelEditorHistory\LevelEditorHistory.cpp" />
     <ClCompile Include="Src\Application\Editor\LevelEditor\LevelFileIO\LevelFileIO.cpp" />

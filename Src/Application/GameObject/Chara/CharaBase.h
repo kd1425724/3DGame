@@ -16,6 +16,9 @@ public:
 	// 再利用できる部品として CharaBase& を操作する。protectedへアクセスするのでfriendにする
 	friend class WireAction;
 
+	// 壁走り(WallAction)も同様に、このキャラの速度・重力倍率・壁の接触情報を直接扱う部品
+	friend class WallAction;
+
 	CharaBase()				{}
 	virtual ~CharaBase() override {}
 
@@ -122,6 +125,16 @@ protected:
 	// 壁に押し付き続けているか(壁の手応えを"当たった瞬間"だけにするエッジ検出用)。
 	// これが無いと連続攻撃で壁に突っ込み続けたとき毎フレームtraumaが入りシェイクが終わらない
 	bool m_wasHittingWall = false;
+
+	// 直近のResolveBumpで壁(TypeBump)に触れていたか＆その壁の法線(水平・正規化済み)。
+	// 壁走りはこれを見るだけで判定でき、専用の当たり判定を撃たなくて済む
+	// (ResolveBumpは押し出しのために既に法線を計算しているので、記録するだけならタダ)
+	bool m_isTouchingWall = false;
+	Math::Vector3 m_wallNormal = {};
+
+	// 重力の倍率(1.0=通常)。壁走り中に0にして落下を止めるために使う。
+	// GroundCheckが重力を積分するときに掛かる
+	float m_gravityScale = 1.0f;
 
 	// ※ 重力加速度・ジャンプ初速はDebugParams("キャラ/重力"・"キャラ/ジャンプ力")で調整する
 };

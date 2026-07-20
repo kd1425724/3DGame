@@ -35,8 +35,10 @@ void CharaBase::GroundCheck()
 	float deltaTime = Application::Instance().GetDeltaTime();
 
 	// 重力を垂直速度に加える(重力はDebugParamsで調整可能)
+	// m_gravityScale は壁走り中に0にされる(壁に張り付いている間は落ちない)。
+	// 重力を止める側(WallAction)は「意思決定」のUpdateで倍率を書き、ここは解決するだけにしてある
 	float gravity = DebugParams::Instance().Float(U8("キャラ/重力"), 20.0f, 0.0f, 100.0f);
-	m_velocity.y -= gravity * deltaTime;
+	m_velocity.y -= gravity * m_gravityScale * deltaTime;
 
 	// 速度で位置を進める(縦横まとめて)。水平速度は各キャラのUpdateが設定する
 	// ※ Enemyは水平をUpdateで直接動かすためm_velocity.xzは0のまま＝縦だけ動く
@@ -250,6 +252,10 @@ void CharaBase::ResolveBump(Math::Vector3& pos)
 		m_pDebugWire->AddDebugSphere(Math::Vector3(pos.x, centerY, pos.z), radius, Math::Color(0.3f, 0.6f, 1.0f, 1.0f));
 	}
 
+	// 壁の接触状態は毎回ここで取り直す(この解決の時点で壁に触れているか)。
+	// 壁走り(WallAction)はこの結果を見るだけで、自前の当たり判定を撃たない
+	m_isTouchingWall = false;
+
 	// 複数の壁に挟まれても安定するよう数回反復する
 	for (int iter = 0; iter < 3; ++iter)
 	{
@@ -298,6 +304,16 @@ void CharaBase::ResolveBump(Math::Vector3& pos)
 		{
 			Math::Vector3 n = push;
 			n.Normalize();
+
+			// 壁走り用に「今どの壁に触れているか」を記録しておく。
+			// pushは既に水平化(push.y=0)されているので、これがそのまま水平な壁の法線になる。
+			// 最初の反復＝一番深くめり込んでいる壁を採用する(挟まれた時に主となる壁)
+			if (!m_isTouchingWall)
+			{
+				m_isTouchingWall = true;
+				m_wallNormal = n;
+			}
+
 			float into = m_velocity.Dot(n);
 			if (into < 0.0f)
 			{
