@@ -146,7 +146,8 @@ void Player::Update()
 	}
 	else
 	{
-		m_upWall->Update(*this, dt);
+		// 移動入力の向きを渡す。壁を向いて前入力していれば、ずり落ちる代わりによじ登る
+		m_upWall->Update(*this, dt, GetWishDir());
 	}
 
 	// 落下攻撃(突撃/連続攻撃)中は通常移動・ジャンプを止める。
@@ -322,7 +323,14 @@ void Player::ClampSpeed()
 {
 	// 落下は別枠にする。水平の最高速度で落下まで縛ると、高所から落ちた時に
 	// ふわっと減速して不自然になるため(終端速度として別に上限を持たせる)
-	float maxSpeed = DebugParams::Instance().Float(U8("プレイヤー/最高速度"),   45.0f, 5.0f, 200.0f);
+	// 攻撃(突撃/連続攻撃の受付中)は別枠の高い上限を使う。
+	// 移動の上限(45)は「ワイヤーを繋ぐほど際限なく速くなる」のを抑えるための値で、
+	// これを攻撃にも掛けると敵へ突っ込む勢いまで削られて遅くなりすぎる、というユーザー指摘。
+	// 攻撃は自分で狙って出す短い行動なので、上限は緩くてよい
+	bool attacking = m_isDiving || m_comboWindowTimer > 0.0f;
+	float maxSpeed = attacking
+		? DebugParams::Instance().Float(U8("プレイヤー/最高速度(攻撃中)"), 90.0f, 5.0f, 300.0f)
+		: DebugParams::Instance().Float(U8("プレイヤー/最高速度"),         45.0f, 5.0f, 200.0f);
 	float maxFall  = DebugParams::Instance().Float(U8("プレイヤー/最大落下速度"), 60.0f, 5.0f, 200.0f);
 
 	// 落下速度の頭打ち
@@ -361,6 +369,23 @@ Math::Vector3 Player::GetBoostSpawnPos(const Math::Vector3& _dir) const
 	// 体の中心あたりから、加速方向の少し後ろに出す
 	float back = DebugParams::Instance().Float(U8("加速エフェクト/後方オフセット"), 0.5f, 0.0f, 3.0f);
 	return GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f) - _dir * back;
+}
+
+Math::Vector3 Player::GetWishDir() const
+{
+	// ※ Forward/Backwardの定義上、見た目と前後が逆に感じたため入れ替え済み
+	Math::Vector2 moveAxis = KdInputManager::Instance().GetAxisState("Move");
+	Math::Vector3 wishDir = Math::Vector3::Backward * moveAxis.y + Math::Vector3::Right * moveAxis.x;
+	if (wishDir.LengthSquared() <= 0.0f) { return Math::Vector3::Zero; }
+
+	wishDir.Normalize();
+
+	// カメラの水平方向の向きに合わせて移動方向を回転させる(TPS的な移動)
+	if (std::shared_ptr<CameraBase> spCamera = m_wpCamera.lock())
+	{
+		wishDir = Math::Vector3::TransformNormal(wishDir, spCamera->GetRotationYMatrix());
+	}
+	return wishDir;
 }
 
 Math::Vector3 Player::GetAccelDir() const
@@ -432,20 +457,12 @@ bool Player::IsAttackInput() const
 void Player::UpdateMove(float dt)
 {
 	// === 通常移動(velocityベース。接地=キビキビ、空中=勢いを保つ) ===
-	// ※ Forward/Backwardの定義上、見た目と前後が逆に感じたため入れ替え済み
-	Math::Vector2 moveAxis = KdInputManager::Instance().GetAxisState("Move");
-	Math::Vector3 wishDir = Math::Vector3::Backward * moveAxis.y + Math::Vector3::Right * moveAxis.x;
+	Math::Vector3 wishDir = GetWishDir();
 
 	float moveSpeed = DebugParams::Instance().Float(U8("プレイヤー/移動速度"), 5.0f, 0.0f, 20.0f);
 	Math::Vector3 wishVel = Math::Vector3::Zero;
 	if (wishDir.LengthSquared() > 0.0f)
 	{
-		wishDir.Normalize();
-		// カメラの水平方向の向きに合わせて移動方向を回転させる(TPS的な移動)
-		if (std::shared_ptr<CameraBase> spCamera = m_wpCamera.lock())
-		{
-			wishDir = Math::Vector3::TransformNormal(wishDir, spCamera->GetRotationYMatrix());
-		}
 		wishVel = wishDir * moveSpeed;
 	}
 
@@ -920,6 +937,7 @@ void Player::WatchDebug() const
 	// 「壁の接触」がtrueで「壁走り中」がfalseのまま＝速度不足を疑う)
 	w.Watch(U8("Player/壁の接触"), m_isTouchingWall);
 	w.Watch(U8("Player/壁走り中"), m_upWall && m_upWall->IsRunning());
+	w.Watch(U8("Player/よじ登り中"), m_upWall && m_upWall->IsClimbing());
 
 	// 攻撃・突撃まわり
 	w.Watch(U8("Player/突撃中"),          m_isDiving);

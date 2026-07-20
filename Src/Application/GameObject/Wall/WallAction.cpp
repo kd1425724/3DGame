@@ -4,7 +4,7 @@
 #include "../../Debug/DebugParams/DebugParams.h"
 #include "../../Effect/EffectManager.h"
 
-void WallAction::Update(CharaBase& _body, float _dt)
+void WallAction::Update(CharaBase& _body, float _dt, const Math::Vector3& _wishDir)
 {
 	// 再吸着の待ち時間を消化する
 	if (m_cooldown > 0.0f)
@@ -67,8 +67,11 @@ void WallAction::Update(CharaBase& _body, float _dt)
 	}
 	m_wallNormal = m_lastTouchNormal;
 
-	// 走れる時間には上限を設ける(無いと壁に張り付いたまま永久に移動できてしまう)
-	float maxTime = DebugParams::Instance().Float(U8("壁走り/走れる時間"), 1.4f, 0.1f, 5.0f);
+	// 走れる時間には上限を設ける(無いと壁に張り付いたまま永久に移動できてしまう)。
+	// ※ よじ登りもこの時間で打ち切られる。1回の取り付きで登れる高さ =
+	//    「走れる時間 x よじ登る速さ」。2.0 x 8.0 = 16m ≒ 街の家(SCALE2.0で約20m)の
+	//    大部分。もっと登りたければこの2つを上げる
+	float maxTime = DebugParams::Instance().Float(U8("壁走り/走れる時間"), 2.0f, 0.1f, 5.0f);
 	m_runTime += _dt;
 	if (m_runTime > maxTime)
 	{
@@ -90,10 +93,28 @@ void WallAction::Update(CharaBase& _body, float _dt)
 	Math::Vector3 v = _body.m_velocity;
 	v -= m_wallNormal * v.Dot(m_wallNormal);
 
-	// 重力の代わりにゆっくり下降させる(通常の重力はm_gravityScale=0で止めてある)。
-	// 0にすると水平に張り付いたまま飛ぶので、少しずつずり落ちる方が壁を走っている感じが出る
-	float slide = DebugParams::Instance().Float(U8("壁走り/ずり落ちる速さ"), 5.0f, 0.0f, 30.0f);
-	v.y -= slide * _dt;
+	// 壁の方を向いて前入力していれば「よじ登り」に切り替える。
+	// 判定は移動入力の向きと壁の内向き(-法線)の内積＝カメラを壁へ向けてWを押している状態。
+	// ずり落ちの代わりに一定速度で上昇する(走行時間の上限はそのまま効くので登り放題にはならない)
+	float climbDot = DebugParams::Instance().Float(U8("壁走り/よじ登りに必要な向き"), 0.55f, 0.0f, 1.0f);
+	m_isClimbing = false;
+	if (_wishDir.LengthSquared() > 0.0001f)
+	{
+		m_isClimbing = _wishDir.Dot(-m_wallNormal) > climbDot;
+	}
+
+	if (m_isClimbing)
+	{
+		float climbSpeed = DebugParams::Instance().Float(U8("壁走り/よじ登る速さ"), 8.0f, 0.0f, 30.0f);
+		v.y = climbSpeed;
+	}
+	else
+	{
+		// 重力の代わりにゆっくり下降させる(通常の重力はm_gravityScale=0で止めてある)。
+		// 0にすると水平に張り付いたまま飛ぶので、少しずつずり落ちる方が壁を走っている感じが出る
+		float slide = DebugParams::Instance().Float(U8("壁走り/ずり落ちる速さ"), 5.0f, 0.0f, 30.0f);
+		v.y -= slide * _dt;
+	}
 
 	// 壁へ軽く押し付ける。これが無いと法線成分を消した時点で壁から離れていき、
 	// 次のフレームで接触が切れて壁走りが一瞬で終わってしまう。
@@ -113,10 +134,15 @@ void WallAction::SpawnFx(const CharaBase& _body, float _dt)
 	float rate = DebugParams::Instance().Float(U8("壁走りエフェクト/毎秒の粒数"), 45.0f, 0.0f, 150.0f);
 	if (rate <= 0.0f) { return; }
 
-	// 走っている向き＝壁に沿った水平の進行方向。止まっていたら火花も出さない
-	Math::Vector3 runDir(_body.m_velocity.x, 0.0f, _body.m_velocity.z);
-	if (runDir.LengthSquared() < 0.0001f) { return; }
-	runDir.Normalize();
+	// 火花を流す向き＝進んでいる向きの逆(SpawnWallRunが逆向きに流す)。
+	// よじ登り中は水平にはほぼ動かないので、上向きを渡して火花が下へ落ちるようにする
+	Math::Vector3 runDir = Math::Vector3::Up;
+	if (!m_isClimbing)
+	{
+		runDir = Math::Vector3(_body.m_velocity.x, 0.0f, _body.m_velocity.z);
+		if (runDir.LengthSquared() < 0.0001f) { return; }
+		runDir.Normalize();
+	}
 
 	// 発生位置は壁との接点(体の中心から壁へ寄せた所)の、少し足元寄り
 	float radius = DebugParams::Instance().Float(U8("キャラ/壁当たり半径"), 0.4f, 0.1f, 2.0f);
@@ -189,6 +215,7 @@ void WallAction::Start(CharaBase& _body)
 void WallAction::Stop(CharaBase& _body, bool _lockSameWall)
 {
 	m_isRunning = false;
+	m_isClimbing = false;
 	m_runTime = 0.0f;
 
 	// 重力を戻す

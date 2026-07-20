@@ -28,12 +28,17 @@ public:
 	// 壁走りの更新。毎フレーム呼ぶ。
 	//  ・条件が揃えば自動で壁走りを開始し、走行中は_bodyの速度と重力倍率を書き換える
 	//  ・走行中にJumpが押されたら壁ジャンプして走行を終える
+	//  ・_wishDir が壁を向いていれば、ずり落ちる代わりによじ登る
 	// ※ 「意思決定」なので親のUpdate()から呼ぶ。実際の移動・当たり解決は
 	//    PostUpdateのGroundCheckが行う(CLAUDE.mdの Update=意思決定 / PostUpdate=解決 に従う)
-	void Update(CharaBase& _body, float _dt);
+	//  _wishDir ... 移動入力の向き(カメラ基準・水平・正規化済み)。無入力ならゼロ
+	void Update(CharaBase& _body, float _dt, const Math::Vector3& _wishDir);
 
 	// 今壁を走っているか(親が通常移動やジャンプを止める判断に使う)
 	bool IsRunning() const { return m_isRunning; }
+
+	// 今よじ登っているか(壁を向いて前入力している状態)。エフェクトや表示の出し分け用
+	bool IsClimbing() const { return m_isClimbing; }
 
 	// 壁走りを強制終了する(ワイヤー発射・突撃・リスポーンなど、他の行動へ移る時に呼ぶ)
 	void Cancel(CharaBase& _body);
@@ -61,6 +66,9 @@ private:
 
 	// 走行中か
 	bool m_isRunning = false;
+
+	// よじ登り中か(壁を向いて前入力している)。走行中だけ意味を持つ
+	bool m_isClimbing = false;
 
 	// 走り出してからの経過時間(上限を超えたら剥がれる)
 	float m_runTime = 0.0f;
