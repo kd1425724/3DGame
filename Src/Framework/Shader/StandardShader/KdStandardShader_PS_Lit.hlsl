@@ -153,7 +153,18 @@ float4 main(VSOutput In) : SV_Target0
 		// Blinn-Phong NDF
 		float spec = BlinnPhong( g_DL_Dir, vCam, wN, specPower );
 
-		// 光の色 * 反射光の強さ * 材質の反射色 * 透明率 * 適当な調整値
+		// 【2026/07/20 追加】粗さに応じて鏡面反射を弱める。
+		// specPower = pow(2, 11 * smoothness) なので、roughness=1(最も粗い)だと
+		// specPower=1 になり「ハイライトが無限に広がった状態」になる。この実装には
+		// エネルギー正規化が無いため、広がるだけで弱まらず、面全体が1つの巨大な
+		// ハイライトになってしまう。ハーフベクトルはカメラ向きに依存するので、
+		// 結果として「カメラを回すと地面全体の明るさが一斉に変わる」不具合が出ていた
+		// (マテリアル未設定のモデルは既定が roughness=1 なのでモロに影響を受ける。
+		//  地面 Block.gltf がまさにそれ)。
+		// smoothness を掛けることで、粗い面ほど鏡面反射が弱まる物理的に妥当な挙動になる。
+		// つやのある材質(smoothnessが大きい)はこれまでどおりハイライトが出る
+		spec *= smoothness;
+
 		// 光の色 * 反射光の強さ * 材質の反射色 * 透明率 * 適当な調整値
 		outColor += (g_DL_Color * spec) * baseSpecular * baseColor.a * 0.5 * shadow;
 	}
@@ -209,6 +220,7 @@ float4 main(VSOutput In) : SV_Target0
 				// Blinn-Phong NDF
 				float spec = BlinnPhong( -dir, vCam, wN, specPower );
 
+				spec *= smoothness;   // 平行光と同じ理由(上のコメント参照)。粗い面ほど弱める
 				spec *= atte; // 減衰
 				
 				// 光の色 * 反射光の強さ * 材質の反射色 * 透明率 * 適当な調整値
