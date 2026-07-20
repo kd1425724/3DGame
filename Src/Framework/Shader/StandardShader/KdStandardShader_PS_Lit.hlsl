@@ -144,7 +144,8 @@ float4 main(VSOutput In) : SV_Target0
 		lightDiffuse /= 3.1415926535;
 
 		// 光の色 * 材質の拡散色 * 透明率
-		outColor += (g_DL_Color * lightDiffuse) * baseDiffuse * baseColor.a * shadow;
+		// [SHADOWDEBUG] 一時的に影の項を無効化して切り分け中(2026/07/20)。確認後に必ず戻す
+		outColor += (g_DL_Color * lightDiffuse) * baseDiffuse * baseColor.a /* * shadow */;
 	}
 
 	// Specular(反射色)
@@ -154,7 +155,8 @@ float4 main(VSOutput In) : SV_Target0
 		float spec = BlinnPhong( g_DL_Dir, vCam, wN, specPower );
 
 		// 光の色 * 反射光の強さ * 材質の反射色 * 透明率 * 適当な調整値
-		outColor += (g_DL_Color * spec) * baseSpecular * baseColor.a * 0.5 * shadow;
+		// [SHADOWDEBUG] 同上。確認後に必ず戻す
+		outColor += (g_DL_Color * spec) * baseSpecular * baseColor.a * 0.5 /* * shadow */;
 	}
 
 	// 全体の明度：環境光に1が設定されている場合は影響なし
