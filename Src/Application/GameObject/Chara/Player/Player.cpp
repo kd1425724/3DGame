@@ -288,16 +288,23 @@ void Player::UpdateAccel(float dt)
 	}
 
 	bool holding = KdInputManager::Instance().IsHold("Accel");
+	if (holding)
+	{
+		m_accelHoldTime += dt;
+	}
 
-	// 地上で押しっぱなし＝ダッシュ。実際の速度切り替えは UpdateMove が行う
-	m_isSprinting = m_isGrounded && holding;
+	// 地上で押しっぱなし＝ダッシュ。実際の速度切り替えは UpdateMove が行う。
+	// 【単押し判定の時間を待つ理由】押した瞬間から立てると、連打したときに
+	// 通常速度とダッシュ速度のあいだで速度が毎フレーム跳ねて挙動が汚くなる
+	// (接地中は水平速度を入力へ即セットしているので、定数の差がそのまま出る)。
+	// ちょうどこの待ち時間のあいだはステップ(回避)が速度を握っているので、
+	// 「ステップが終わった頃にダッシュへ移る」という狙いどおりの流れにもなる
+	m_isSprinting = m_isGrounded && holding && m_accelHoldTime >= tapTime;
 
 	// 空中の加速は接地中には効かせない。地上で押している間はダッシュが担当なので、
 	// ここで加速度まで足すと二重に効いて地上だけ異常に伸びる
 	if (holding && !m_isGrounded)
 	{
-		m_accelHoldTime += dt;
-
 		// 単押し判定の時間を過ぎたら「長押し＝加速」に確定して、以降は加速し続ける
 		if (m_accelHoldTime >= tapTime)
 		{
@@ -567,10 +574,36 @@ void Player::UpdateJump(float dt)
 
 void Player::UpdateDodge(float dt)
 {
-	// クールダウンを消化
-	if (m_dodgeCooldownTimer > 0.0f)
+	// === ストックの再充填 ===
+	// 「2回までは続けてすぐ出せて、使い切ると少し待ってまた出せる」を作る。
+	// 1回のクールダウンだと、連打した時に出る/出ないが交互になって挙動が読めなかった
+	// (ユーザー指摘「連打した時変な感じになる」)。
+	// ※ 1つずつ戻す。全快させると「待ちきると急に2回分戻る」不連続な感じになるため
+	const int maxCharges = GetMaxDodgeCharges();
+
+	// 実行中にImGuiでストック数を減らされた時の保険
+	if (m_dodgeCharges > maxCharges)
 	{
-		m_dodgeCooldownTimer -= dt;
+		m_dodgeCharges = maxCharges;
+	}
+
+	if (m_dodgeCharges < maxCharges)
+	{
+		m_dodgeRechargeTimer -= dt;
+		if (m_dodgeRechargeTimer <= 0.0f)
+		{
+			++m_dodgeCharges;
+
+			// まだ満タンでなければ、次の1つ分を続けて測り始める
+			if (m_dodgeCharges < maxCharges)
+			{
+				m_dodgeRechargeTimer = DebugParams::Instance().Float(U8("回避/再充填時間"), 0.7f, 0.05f, 5.0f);
+			}
+			else
+			{
+				m_dodgeRechargeTimer = 0.0f;
+			}
+		}
 	}
 
 	// === 回避ダッシュ実行中：水平にフラットに素早く移動(縦は止めて空中でもキレよく) ===
@@ -598,7 +631,7 @@ void Player::UpdateDodge(float dt)
 	//   入口なので、トリガーを移してもここを消してはいけない
 	// ※ 空中で押した時は回避せず、従来どおり空中ステップ／加速(UpdateAccel)に任せる
 	if (m_isDiving) { return; }                                      // 突撃中は回避しない
-	if (m_dodgeCooldownTimer > 0.0f) { return; }                     // クールダウン中
+	if (m_dodgeCharges <= 0) { return; }                             // ストックを使い切っている
 	if (!m_isGrounded) { return; }                                   // 空中は空中ステップ/加速の担当
 	if (!KdInputManager::Instance().IsPress("Accel")) { return; }
 
@@ -621,11 +654,24 @@ void Player::UpdateDodge(float dt)
 	dir.Normalize();
 	m_dodgeDir = dir;
 
-	// 開始：無敵とクールダウンを張り、実行時間だけダッシュする
-	m_isDodging          = true;
-	m_dodgeTimer         = DebugParams::Instance().Float(U8("回避/時間"),         0.18f, 0.05f, 1.0f);
-	m_dodgeCooldownTimer = DebugParams::Instance().Float(U8("回避/クールダウン"), 0.5f,  0.0f,  3.0f);
-	m_invincibleTimer    = DebugParams::Instance().Float(U8("回避/無敵時間"),     0.2f,  0.0f,  1.0f);
+	// 満タンから使い始めた時だけ、再充填の計測を開始する。
+	// 減っている途中(既に計測中)なら測り直さない。測り直すと、2回目を出した瞬間に
+	// 1回目の待ち時間がリセットされて、続けて出すほど戻りが遅くなってしまう
+	if (m_dodgeCharges >= maxCharges)
+	{
+		m_dodgeRechargeTimer = DebugParams::Instance().Float(U8("回避/再充填時間"), 0.7f, 0.05f, 5.0f);
+	}
+	--m_dodgeCharges;
+
+	// 開始：無敵を張り、実行時間だけステップする
+	m_isDodging       = true;
+	m_dodgeTimer      = DebugParams::Instance().Float(U8("回避/時間"),     0.18f, 0.05f, 1.0f);
+	m_invincibleTimer = DebugParams::Instance().Float(U8("回避/無敵時間"), 0.2f,  0.0f,  1.0f);
+}
+
+int Player::GetMaxDodgeCharges() const
+{
+	return DebugParams::Instance().Int(U8("回避/ストック数"), 2, 1, 5);
 }
 
 void Player::UpdateAirFocus()
@@ -865,6 +911,8 @@ void Player::Respawn()
 	m_invincibleTimer = 0.0f;
 	m_isSprinting = false;
 	m_accelPressWasGround = false;
+	m_dodgeCharges = GetMaxDodgeCharges();   // ステップのストックは満タンで再開する
+	m_dodgeRechargeTimer = 0.0f;
 }
 
 void Player::PostUpdate()
@@ -983,10 +1031,11 @@ void Player::WatchDebug() const
 	w.Watch(U8("Player/ワイヤー接続"), m_upWire && m_upWire->IsAttached());
 
 	// 地上ダッシュまわり(右クリック押下でステップ=回避、押しっぱなしでダッシュ)。
-	// ステップが出ない時は「ステップのCD」が残っていないかを見る
-	w.Watch(U8("Player/ダッシュ中"),   m_isSprinting);
-	w.Watch(U8("Player/ステップ中"),   m_isDodging);
-	w.Watch(U8("Player/ステップのCD"), m_dodgeCooldownTimer);
+	// ステップが出ない時は「ステップの残り」が0になっていないかを見る
+	w.Watch(U8("Player/ダッシュ中"),     m_isSprinting);
+	w.Watch(U8("Player/ステップ中"),     m_isDodging);
+	w.Watch(U8("Player/ステップの残り"), m_dodgeCharges);
+	w.Watch(U8("Player/ステップ再充填"), m_dodgeRechargeTimer);
 
 	// 壁走りまわり(発動条件の調整用。壁に触れているのに走り出さない時は
 	// 「壁の接触」がtrueで「壁走り中」がfalseのまま＝速度不足を疑う)
@@ -1002,7 +1051,7 @@ void Player::WatchDebug() const
 	w.Watch(U8("Player/フォーカスゲージ"), m_focusGauge);
 
 	// クールタイム・猶予窓まわり
-	w.Watch(U8("Player/回避クールタイム"),     m_dodgeCooldownTimer);
+	// ※ 回避のクールダウンはストック制に変えたので上の「ステップの残り/再充填」を見る
 	w.Watch(U8("Player/反撃スロー窓"),         m_counterWindowTimer);
 	w.Watch(U8("Player/被弾硬直"),             m_staggerTimer);
 	w.Watch(U8("Player/無敵"),                 IsInvincible());
