@@ -12,6 +12,20 @@ void WallAction::Update(CharaBase& _body, float _dt)
 		m_cooldown -= _dt;
 	}
 
+	// 壁の接触に猶予を持たせる。ResolveBumpは「めり込んでいる時」だけ接触を立て、
+	// 押し出した直後はめり込みが0になるので、壁沿いに動いていると接触が点滅する。
+	// 生のフラグを条件にすると壁走りがほとんど始まらないので、直近で触れていれば
+	// 触れているものとして扱う(接地のコヨーテタイムと同じ)
+	if (_body.m_isTouchingWall)
+	{
+		m_sinceTouch = 0.0f;
+		m_lastTouchNormal = _body.m_wallNormal;
+	}
+	else
+	{
+		m_sinceTouch += _dt;
+	}
+
 	// 接地したら「同じ壁の禁止」は解除する(地面を踏めば同じ壁をもう一度走れる)
 	if (_body.m_isGrounded)
 	{
@@ -34,8 +48,10 @@ void WallAction::Update(CharaBase& _body, float _dt)
 
 	// --- ここから走行中 ---
 
-	// 壁を見失ったら終わり(壁の端まで走り抜けた/角を曲がれなかった)
-	if (!_body.m_isTouchingWall)
+	// 壁を見失ったら終わり(壁の端まで走り抜けた/角を曲がれなかった)。
+	// 猶予つきで見るので、押し出し直後の一瞬の非接触では剥がれない
+	float touchGrace = DebugParams::Instance().Float(U8("壁走り/接触の猶予"), 0.2f, 0.0f, 1.0f);
+	if (m_sinceTouch > touchGrace)
 	{
 		Stop(_body, false);
 		return;
@@ -44,12 +60,12 @@ void WallAction::Update(CharaBase& _body, float _dt)
 	// 壁の法線を追従させる。曲がった壁でも走り続けられるようにするが、
 	// 急に別方向の壁(建物の角)へ乗り換えると挙動が飛ぶので、向きが大きく変わったら剥がす
 	float turnLimit = DebugParams::Instance().Float(U8("壁走り/曲がれる角度の内積"), 0.5f, -1.0f, 1.0f);
-	if (m_wallNormal.Dot(_body.m_wallNormal) < turnLimit)
+	if (m_wallNormal.Dot(m_lastTouchNormal) < turnLimit)
 	{
 		Stop(_body, false);
 		return;
 	}
-	m_wallNormal = _body.m_wallNormal;
+	m_wallNormal = m_lastTouchNormal;
 
 	// 走れる時間には上限を設ける(無いと壁に張り付いたまま永久に移動できてしまう)
 	float maxTime = DebugParams::Instance().Float(U8("壁走り/走れる時間"), 1.4f, 0.1f, 5.0f);
@@ -119,12 +135,14 @@ void WallAction::SpawnFx(const CharaBase& _body, float _dt)
 
 bool WallAction::CanStart(const CharaBase& _body) const
 {
-	// 空中で、壁に触れていて、再吸着の待ちが明けていること
+	// 空中で、壁に触れていて(猶予つき)、再吸着の待ちが明けていること
 	if (_body.m_isGrounded) { return false; }
 	if (m_cooldown > 0.0f) { return false; }
-	if (!_body.m_isTouchingWall) { return false; }
 
-	const Math::Vector3& n = _body.m_wallNormal;
+	float touchGrace = DebugParams::Instance().Float(U8("壁走り/接触の猶予"), 0.2f, 0.0f, 1.0f);
+	if (m_sinceTouch > touchGrace) { return false; }
+
+	const Math::Vector3& n = m_lastTouchNormal;
 
 	// 直前に蹴った壁と同じ向きの壁には取り付けない。
 	// これが無いと1枚の壁で「走る→跳ぶ→また同じ壁」を繰り返して無限に登れてしまう。
@@ -138,7 +156,9 @@ bool WallAction::CanStart(const CharaBase& _body) const
 	Math::Vector3 hv(_body.m_velocity.x, 0.0f, _body.m_velocity.z);
 	Math::Vector3 tangent = hv - n * hv.Dot(n);
 
-	float minSpeed = DebugParams::Instance().Float(U8("壁走り/発動に必要な速さ"), 6.0f, 0.0f, 40.0f);
+	// ※ 2026/07/20 に 6.0 → 3.0 へ緩めた(ユーザー指示「開始判定はもっとゆるくていい」)。
+	//    通常の歩き速度でも壁に沿っていれば掛かるようにする
+	float minSpeed = DebugParams::Instance().Float(U8("壁走り/発動に必要な速さ"), 3.0f, 0.0f, 40.0f);
 	if (tangent.Length() < minSpeed) { return false; }
 
 	return true;
@@ -149,7 +169,7 @@ void WallAction::Start(CharaBase& _body)
 	m_isRunning = true;
 	m_runTime = 0.0f;
 	m_fxTimer = 0.0f;
-	m_wallNormal = _body.m_wallNormal;
+	m_wallNormal = m_lastTouchNormal;
 
 	// 別の壁に取り付けた時点で、前の壁の禁止は用済み
 	m_hasBannedWall = false;
@@ -174,7 +194,7 @@ void WallAction::Stop(CharaBase& _body, bool _lockSameWall)
 	// 重力を戻す
 	_body.m_gravityScale = 1.0f;
 
-	float cooldown = DebugParams::Instance().Float(U8("壁走り/再吸着までの待ち"), 0.2f, 0.0f, 2.0f);
+	float cooldown = DebugParams::Instance().Float(U8("壁走り/再吸着までの待ち"), 0.15f, 0.0f, 2.0f);
 	m_cooldown = cooldown;
 
 	if (_lockSameWall)
