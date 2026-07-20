@@ -665,8 +665,11 @@ void Player::UpdateDive(float dt)
 		{
 			m_comboWindowTimer -= dt;
 
-			// 受付中は減速してほぼ止まって待てるようにする(次を狙う"間")
-			float windowDamp = DebugParams::Instance().Float(U8("連続攻撃/継続中の減速"), 8.0f, 0.0f, 30.0f);
+			// 受付中は減速して次を狙う"間"を作る。
+			// ※ 8.0 は0.5秒の受付窓でほぼ完全に停止する強さ(残り約2%)で、次の突撃が
+			//    毎回ほぼ静止から始まっていた。勢いを繋ぐ方針にしたので 2.0 へ緩めた
+			//    (0.5秒で約37%残る)。“間”が欲しければ上げる／流したければ0にする
+			float windowDamp = DebugParams::Instance().Float(U8("連続攻撃/継続中の減速"), 2.0f, 0.0f, 30.0f);
 			m_velocity *= std::clamp(1.0f - windowDamp * dt, 0.0f, 1.0f);
 
 			// ※ 2026/07/19の入力再設計で「離した瞬間」→「押した瞬間」に変更。
@@ -721,8 +724,11 @@ void Player::UpdateDive(float dt)
 			CameraShake::Instance().AddTrauma(std::clamp(0.2f + 0.05f * m_diveChainCount, 0.0f, 0.7f));
 			EffectManager::Instance().SpawnSlash(aim);   // 斬った位置に斬撃エフェクト
 
-			// 斬った直後は減速する(0=止まる/1=減速なし)
-			float slowRate = DebugParams::Instance().Float(U8("連続攻撃/斬り後の速度残し"), 0.4f, 0.0f, 1.0f);
+			// 斬った直後は減速する(0=止まる/1=減速なし)。
+			// ※ 0.4 は一撃ごとに6割を捨てる設定で、3連鎖すると 0.4^3 = 6% しか残らず
+			//    「攻撃するたびに勢いがリセットされる」原因になっていた。
+			//    勢いを繋ぐ方針にしたので 0.85(=一撃あたり15%減)へ緩めた
+			float slowRate = DebugParams::Instance().Float(U8("連続攻撃/斬り後の速度残し"), 0.85f, 0.0f, 1.0f);
 			m_velocity *= slowRate;
 
 			// 斬った対象を解除し、次の突撃を受け付ける窓を開く(この間にキーを押せば継続突撃)
@@ -732,11 +738,15 @@ void Player::UpdateDive(float dt)
 		}
 
 		to /= dist;
-		// リールで引かれるように、速さを加速でrampしつつ常に対象へまっすぐ向ける
+		// リールで引かれるように、速さを加速でrampしつつ常に対象へまっすぐ向ける。
+		// 上限は「引き寄せ上限速度」と「この攻撃に入った時の速さ」の大きい方にする。
+		// 一律に45で頭打ちにすると、ワイヤーで勢いを付けて突っ込んでも毎回45まで
+		// 落とされて“攻撃のたびにリセット”される(ユーザー指摘 2026/07/20)
+		float cap = (m_diveEntrySpeed > pullMax) ? m_diveEntrySpeed : pullMax;
 		float sp = m_velocity.Length() + pullAccel * dt;
-		if (sp > pullMax)
+		if (sp > cap)
 		{
-			sp = pullMax;
+			sp = cap;
 		}
 		m_velocity = to * sp;
 		return;
@@ -756,6 +766,10 @@ void Player::StartDive()
 
 	m_isDiving = true;
 	m_comboWindowTimer = 0.0f;
+
+	// この攻撃に入った時の速さを覚えておく。チェインが続く間はリセットしないので、
+	// 勢いを付けて始めた連続攻撃は最後まで速いまま繋がる
+	m_diveEntrySpeed = m_velocity.Length();
 
 	// 自動ターゲットがいれば「対象へワイヤーで引き寄せ」、いなければ従来の真下ダイブ
 	std::shared_ptr<KdGameObject> spLock = m_upTargeting->GetTarget();
@@ -942,6 +956,7 @@ void Player::WatchDebug() const
 	// 攻撃・突撃まわり
 	w.Watch(U8("Player/突撃中"),          m_isDiving);
 	w.Watch(U8("Player/チェイン数"),      m_diveChainCount);
+	w.Watch(U8("Player/突撃の持ち込み速度"), m_diveEntrySpeed);   // 突撃の上限がこれ以上に保たれる
 	w.Watch(U8("Player/連続攻撃の受付窓"), m_comboWindowTimer);
 	w.Watch(U8("Player/フォーカスゲージ"), m_focusGauge);
 
