@@ -24,8 +24,6 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 {
 	if (!m_isAttached) { return; }
 
-	m_swingTime += _dt;
-
 	// 手元とアンカーの間に壁(塔など)が入ったら、線が壁を突き抜けるのでワイヤーを外す(貫通させない)。
 	// ただし一瞬のかすりで外れないよう、一定時間(自動リリース猶予)遮蔽が続いた時だけ外す(デバウンス)。
 	// 外した瞬間の速度はそのまま残るので、スイングの勢いで飛んでいける(フリング)
@@ -84,7 +82,7 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 	// ※ 手動リールは 2026/07/19 に廃止したので入力は 0。巻き取りは上の自動ウインチが担当
 	Update(pos, _body.m_velocity, _dt, 0.0f);
 
-	// === 離脱判定と、補助的な半径方向の引き ===
+	// === 補助的な半径方向の引き ===
 	// DebugFlags「ワイヤー/引き寄せモード」で挙動が2種類に分かれる。
 	//   ON (立体機動)   … 上の巻き取りでワイヤーが縮み、張ったまま振り回される
 	//   OFF (Spider-Man)… 巻き取りなし。重力で落ちて振れる純粋な振り子
@@ -92,12 +90,11 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 	{
 		Math::Vector3 toAnchor = m_anchor - pos;
 		float distToAnchor = toAnchor.Length();
-		float approach = 0.0f;   // アンカーへ近づいている速さ(負なら遠ざかっている=追い越した)
 		if (distToAnchor > 0.001f)
 		{
 			toAnchor /= distToAnchor;
 
-			approach = _body.m_velocity.Dot(toAnchor);
+			float approach = _body.m_velocity.Dot(toAnchor);
 
 			// 半径方向への加速。※ 既定を 20 → 0 にした(2026/07/20)。
 			// 半径方向に力を掛けるとアンカーへ一直線に向かってしまい、弧を描かなくなる
@@ -111,71 +108,13 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 			}
 		}
 
-		// === 離脱条件は2つ。役割が違うので両方入れている ===
-		//
-		//  (A) アンカーを追い越した … 立体機動として自然な離脱。
-		//      ビルの角に刺して引かれ、その脇を通り過ぎた瞬間に外れて勢いで飛んでいく形。
-		//      「近づく速度が0以下になった」= もう遠ざかり始めた = 追い越した、で判定する。
-		//      勢いを保ったまま次のワイヤーへ繋がるのでこちらが主役。
-		//
-		//  (B) 近すぎる … 壁への激突防止の安全網。
-		//      正面の壁に水平に刺した場合は(A)の追い越しが起きず、アンカーへ真っ直ぐ
-		//      飛んでいって激突する。その時だけ効かせたいので、距離は小さめが良い。
-		//
-		// ※ 撃った直後は速度の向きが安定しないので、最短時間が経つまで(A)は判定しない
-		float armTimeWinch = DebugParams::Instance().Float(U8("ワイヤー/自動リリース最短時間"), 0.25f, 0.0f, 2.0f);
-
-		// 追い越した(遠ざかり始めた)状態が続いている時間を測る。
-		// 追い越した瞬間に外すと「超えてすぐ切れる」不自然さが出るため、
-		// 猶予のあいだはそのまま引かれ続けてから外す。
-		// 遠ざかりが途切れたら(再び近づいたら)カウントはリセットする
-		if (m_swingTime >= armTimeWinch && approach <= 0.0f)
-		{
-			m_passedTime += _dt;
-		}
-		else
-		{
-			m_passedTime = 0.0f;
-		}
-
-		float passGrace = DebugParams::Instance().Float(U8("ワイヤー/追い越し後の猶予"), 0.35f, 0.0f, 2.0f);
-		bool passedAnchor = DebugFlags::Instance().Get(U8("ワイヤー/追い越しで離す"), true)
-			&& m_passedTime >= passGrace;
-
-		// 0にすれば距離での離脱を無効化できる(追い越しだけで試したい時用)
-		float arriveDist = DebugParams::Instance().Float(U8("ワイヤー/到達で離す距離"), 2.0f, 0.0f, 20.0f);
-		bool tooClose = (arriveDist > 0.0f) && (distToAnchor <= arriveDist);
-
-		// === 離脱を「上を向いてから」に遅らせる ===
-		// (A)の条件が揃っても、まだ下降中に切ると そのまま落ちるだけになって気持ちよくない。
-		// 条件が揃ったら"離脱待ち"にして、上昇に転じてから実際に外す。
-		// 引き寄せは続いているので、アンカーが上にあれば自然に上向きへ転じる。
-		// ※ アンカーが下や真横だと永久に上を向かないので、待ちには上限時間を設ける
-		if (passedAnchor)
-		{
-			m_releasePending = true;
-		}
-
-		if (m_releasePending)
-		{
-			m_releasePendingTime += _dt;
-
-			bool  waitUp  = DebugFlags::Instance().Get(U8("ワイヤー/上を向いてから離す"), true);
-			float maxWait = DebugParams::Instance().Float(U8("ワイヤー/上向き待ちの上限"), 0.6f, 0.0f, 3.0f);
-			bool  rising  = _body.m_velocity.y > 0.0f;
-
-			if (!waitUp || rising || m_releasePendingTime >= maxWait)
-			{
-				Release();
-			}
-		}
-
-		// 激突防止(B)は待たずに即座に外す。待っている間に壁へ突っ込んでは意味がないため
-		if (tooClose)
-		{
-			Release();
-		}
-		// ※ 外れた後も、以降の当たり解決は行う必要があるのでreturnせず下へ抜ける
+		// ※ ここにあった自動離脱を 2026/07/20 に撤去した(ユーザー指示)。
+		//    撤去したのは (A)アンカーの追い越しで離す ＋ それを「上を向いてから」に
+		//    遅らせる待ち、(B)アンカーに近づきすぎたら離す(壁への激突防止の安全網)、の2つ。
+		//    自動で外れる条件は「手元〜アンカーが壁で遮られた時」(UpdateSwing冒頭)だけになり、
+		//    それ以外はプレイヤーが左クリックを離すまで繋がったままになる。
+		//    → (B)を消したので、正面の壁に水平に刺すとアンカーまで引かれて激突する。
+		//      切り離しは自分で行う前提。戻すならこのコミットをrevertする
 	}
 
 	// === 操舵と漕ぎ(進行方向の水平ベクトルを基準にする) ===
@@ -247,34 +186,12 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 	//    噴射の入口が複数あると同時押しで二重に効いてしまい、強さが読めなくなるため。
 	//    調整値「ワイヤー/上下噴射加速」「ワイヤー/上昇の上限速度」も未使用になった
 
-	// === 自動リリース＋離脱ブースト ===
-	// 弧の底を通過して上昇に転じた瞬間(垂直速度が負→正)にワイヤーを外し、
-	// 「進行方向＋上向き」の初速を足す。
-	// 物理的には嘘だが、Spider-Man系の「離した瞬間に伸びる」感触はこれで作られている。
-	// 撃った直後の暴発を避けるため、繋いでから一定時間経つまでは判定しない
-	// ※ 引き寄せモード中は無効。弧の底で離すのは振り子(Spider-Man)前提の挙動で、
-	//    アンカーへ飛んでいく立体機動では「到達で離す」の方が担当になる
-	bool autoRelease = !winchMode && DebugFlags::Instance().Get(U8("ワイヤー/自動リリース"), true);
-	float armTime = DebugParams::Instance().Float(U8("ワイヤー/自動リリース最短時間"), 0.25f, 0.0f, 2.0f);
-	if (autoRelease && m_swingTime >= armTime && m_prevVelY <= 0.0f && _body.m_velocity.y > 0.0f)
-	{
-		Math::Vector3 fwd(_body.m_velocity.x, 0.0f, _body.m_velocity.z);
-		if (fwd.LengthSquared() > 0.0001f)
-		{
-			fwd.Normalize();
-		}
+	// ※ ここにあった「弧の底で自動リリース＋離脱ブースト」も 2026/07/20 に撤去した(同上)。
+	//    振り子(Spider-Man)モード専用＝`!winchMode`の時だけ効く経路だったので、
+	//    既定の引き寄せモードでは元々動いていない。撤去に伴い調整値
+	//    「ワイヤー/自動リリース最短時間」「ワイヤー/離脱ブースト前方」「〜上」も未使用になった
 
-		float boostFwd = DebugParams::Instance().Float(U8("ワイヤー/離脱ブースト前方"), 6.0f, 0.0f, 40.0f);
-		float boostUp  = DebugParams::Instance().Float(U8("ワイヤー/離脱ブースト上"),   5.0f, 0.0f, 40.0f);
-		_body.m_velocity += fwd * boostFwd;
-		_body.m_velocity.y += boostUp;
-
-		Release();
-	}
-
-	m_prevVelY = _body.m_velocity.y;
-
-	// 地面に潜らないよう押し上げる(ワイヤー中もすり抜け防止)。
+// 地面に潜らないよう押し上げる(ワイヤー中もすり抜け防止)。
 	// ※ ワイヤー中は原則「着地しない」= 地面スレスレを飛べるようにする。
 	//    着地扱いにすると地面に触れるたび止まって勢いが死に、低空を飛べないため。
 	//    ただしアンカーを地面そのものに刺した場合は別で、そこへ引かれて降りていくのが
@@ -381,11 +298,6 @@ bool WireAction::Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, fl
 		m_maxLength = m_length;   // 撃った瞬間の長さをリールアウトの上限にする
 		m_isAttached = true;
 		m_occludedTime = 0.0f;    // 遮蔽デバウンスをリセット
-		m_swingTime = 0.0f;       // 自動リリースの最短時間を測り直す
-		m_passedTime = 0.0f;      // 追い越しの猶予も測り直す
-		m_releasePending = false; // 離脱待ちを解除
-		m_releasePendingTime = 0.0f;
-		m_prevVelY = 0.0f;        // 底の通過判定をリセット(前回のスイングを引きずらない)
 	}
 
 	// TODO: 上の①〜④を実装する
@@ -396,11 +308,6 @@ void WireAction::Release()
 {
 	m_isAttached = false;
 	m_occludedTime = 0.0f;   // 遮蔽デバウンスをリセット
-	m_swingTime = 0.0f;
-	m_passedTime = 0.0f;
-	m_releasePending = false;
-	m_releasePendingTime = 0.0f;
-	m_prevVelY = 0.0f;
 }
 
 bool WireAction::IsAttached() const
