@@ -36,6 +36,9 @@ public:
 	// 走りだけ、実際の速さに合わせて再生速度を変える
 	float SelectAnimationSpeed() const override;
 
+	// 向き直る速さ(度/秒)。実機で詰めたいのでDebugParamsから読む
+	float SelectTurnSpeed() const override;
+
 	// 種別タグ：シーン内からPlayerを探すときの判定に使う(dynamic_pointer_castの代わり)
 	ObjectTag GetObjectTag() override { return ObjectTag::Player; }
 

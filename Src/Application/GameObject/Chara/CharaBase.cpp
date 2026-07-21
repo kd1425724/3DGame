@@ -37,6 +37,52 @@ void CharaBase::GenerateDepthMapFromLight()
 	KdShaderManager::Instance().m_StandardShader.DrawModel(m_modelWork, GetDrawMatrix());
 }
 
+void CharaBase::UpdateFacing(float _deltaTime)
+{
+	Math::Vector3 dir = SelectFacingDir();
+
+	// 止まっている(ほぼ動いていない)ときは今の向きを保つ。
+	// ここで0ベクトルからatan2を取ると角度が0°に飛び、停止するたび正面へ向き直ってしまう
+	dir.y = 0.0f;
+	if (dir.LengthSquared() < 0.0001f) { return; }
+
+	dir.Normalize();
+
+	// CreateRotationY(θ)は +Z を (sinθ, 0, cosθ) へ移すので、+Z を向かせる角度は atan2(x, z)。
+	// m_rot は度で持っているので度へ直す
+	float targetDeg = DirectX::XMConvertToDegrees(std::atan2(dir.x, dir.z));
+
+	Math::Vector3 rot = GetRot();
+
+	// 今の角度との差を -180〜180 に畳んでから寄せる。
+	// 畳まないと 350°→10° のときに遠回り(-340°)して一周してしまう
+	float diff = targetDeg - rot.y;
+	while (diff > 180.0f)
+	{
+		diff -= 360.0f;
+	}
+	while (diff < -180.0f)
+	{
+		diff += 360.0f;
+	}
+
+	// 1フレームで回れる上限まで詰める(瞬間で向きが変わるとカクつくのでなめらかに)
+	float maxStep = SelectTurnSpeed() * _deltaTime;
+	rot.y += std::clamp(diff, -maxStep, maxStep);
+
+	// 角度が際限なく増減しないよう 0〜360 に収める
+	if (rot.y >= 360.0f)
+	{
+		rot.y -= 360.0f;
+	}
+	if (rot.y < 0.0f)
+	{
+		rot.y += 360.0f;
+	}
+
+	SetRot(rot);
+}
+
 void CharaBase::UpdateAnimation()
 {
 	if (!m_modelWork.IsEnable()) { return; }

@@ -118,6 +118,19 @@ protected:
 	// 再生中のアニメ名(デバッグ表示から読む)
 	const std::string& GetCurrentAnimName() const { return m_currentAnimName; }
 
+	// SelectFacingDir()が返した向きへ、体をなめらかに回す(Y軸のみ)。
+	// ※ 向きは「速度が確定したあとの結果」なのでアニメと同じくPostUpdateの最後で呼ぶ。
+	//    呼ぶかどうかは派生クラスが決める(既定では誰も呼ばないのでEnemy等の挙動は不変)
+	void UpdateFacing(float _deltaTime);
+
+	// 向くべき方向(世界座標)。長さが0に近ければ「向きを変えない」の意味になる。
+	// 既定は水平方向の速度＝進んでいる方向を向く。
+	// 判断は派生クラスの責務で、CharaBaseは「回す仕組み」だけを持つ(SelectAnimationと同じ分け方)
+	virtual Math::Vector3 SelectFacingDir() const { return Math::Vector3(m_velocity.x, 0.0f, m_velocity.z); }
+
+	// 1秒あたり何度まで回れるか。小さいほどぬるっと向き直る
+	virtual float SelectTurnSpeed() const { return 720.0f; }
+
 	// 体の半分の高さ(pos=体の中心 から足元までの距離)。
 	// 当たり判定(接地/天井/壁)が「足元」「頭」を求めるのに使う共通の基準。
 	// ※ 以前は GetScale().y*0.5 を直接使っており「モデル＝1辺1mの立方体」前提だった。

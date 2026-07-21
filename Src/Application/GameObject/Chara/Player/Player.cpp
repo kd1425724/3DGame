@@ -1005,6 +1005,12 @@ void Player::PostUpdate()
 		m_landingAnimTimer -= Application::Instance().GetDeltaTime();
 	}
 
+	// 体を進行方向へ向ける(2026/07/21 追加)。
+	// 向きは「速度が確定したあとの結果」なのでアニメと同じ位置で呼ぶ。
+	// ※ プレイヤーの当たり判定はGetPos()から組むray/sphereで、m_pColliderを登録していないため
+	//    m_rot(=m_mWorld)を回しても当たりには影響しない。カメラもGetPos()しか見ていない
+	UpdateFacing(Application::Instance().GetDeltaTime());
+
 	// アニメーションを進める(2026/07/20 追加)。
 	// 接地・速度・突撃などの状態が全て確定したあとで呼ぶので、PostUpdateの最後に置く
 	UpdateAnimation();
@@ -1061,6 +1067,11 @@ float Player::SelectAnimationSpeed() const
 
 	// 上下に振り切れると不自然なので倍率を制限する
 	return std::clamp(GetHorizontalSpeed() / baseSpeed, 0.5f, 2.5f);
+}
+
+float Player::SelectTurnSpeed() const
+{
+	return DebugParams::Instance().Float(U8("プレイヤー/向き直る速さ"), 720.0f, 90.0f, 2880.0f);
 }
 
 void Player::DrawUnLit()
