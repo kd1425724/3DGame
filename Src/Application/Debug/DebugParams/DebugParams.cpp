@@ -187,6 +187,35 @@ bool DebugParams::Save(const std::string& filename)
 		json["bools"][name] = b;
 	}
 
+	// 【重要】読み込んだが、このセッションでまだ一度も参照されていない値も書き戻す。
+	//
+	// パラメータは Float()/Int()/Vector3Param()/Bool() が最初に呼ばれた時点で登録される
+	// (遅延登録)。つまり「そのセッションで一度も通らなかったコード」のパラメータは
+	// m_registry にも m_floats にも入らず、m_pending* に残ったままになる。
+	// ここを書き出さないと、そのままSaveした瞬間にJSONから消える。
+	//
+	// 2026/07/21に実際に事故った：ワイヤーを一度も使わず・フォグを無効にした状態でSaveしたら、
+	// 「ワイヤー/…」14個や「環境/フォグ濃度」など計60個のキーが消えた
+	// (フォグは if (fogEnable) の中で登録しているので、無効にすると登録されない)。
+	//
+	// ※ 登録時に m_pending* からは erase されるので、上のループとキーは重複しない
+	for (const auto& [name, v] : m_pendingFloats)
+	{
+		json["floats"][name] = v;
+	}
+	for (const auto& [name, v] : m_pendingInts)
+	{
+		json["ints"][name] = v;
+	}
+	for (const auto& [name, v] : m_pendingVectors)
+	{
+		json["vectors"][name] = { v.x, v.y, v.z };
+	}
+	for (const auto& [name, v] : m_pendingBools)
+	{
+		json["bools"][name] = v;
+	}
+
 	return JsonManager::Instance().Write(filename, json);
 }
 
