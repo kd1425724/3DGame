@@ -37,9 +37,11 @@ void Player::Init()
 	m_bodyHeight = 1.899f;
 	m_modelOriginIsFeet = true;
 
-	// このモデルの正面は +Z(Scifi_girlは -Z だった)。
-	// 根拠: Blender上の正面が -Y で、glTF書き出しで Z = -(Blender Y) になるため
-	m_modelForwardIsMinusZ = false;
+	// このモデルの正面は -Z(Scifi_girlと同じ)。
+	// ※ 当初「Blenderの正面が-Yだから glTFでは+Z」と推論して false にしたが、
+	//    実機で見たら後ろ向きに走っていたので true が正しい。軸変換の推論は当てにならず、
+	//    結局この値は実機で見て決めるしかない(モデルを差し替えるたびに確認すること)
+	m_modelForwardIsMinusZ = true;
 
 	// 色はbase_color.jpgのテクスチャで付くので、色の乗算は白(=素の色)にする
 	m_color = Math::Color(1.0f, 1.0f, 1.0f, 1.0f);
