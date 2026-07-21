@@ -825,12 +825,21 @@ bool KdStandardShader::Init()
 	m_cb2_Material.Create();
 	m_cb3_Bone.Create();
 
-	// 【2026/07/20】シャドウマップの解像度を 1024 → 2048 に上げた。
-	// 1テクセルの大きさ = 影エリア ÷ 解像度 なので、解像度を倍にすると影のギザギザが半分になる。
-	// (影エリア200のとき 20cm → 10cm)。代償はVRAM(R32_FLOATで4MB→16MB)と影パスの塗り面積。
-	// ビューポートは下で ds->GetWidth() を使うので、ここを変えれば自動で追従する
+	// シャドウマップの解像度。1テクセルの大きさ = 影エリア ÷ 解像度。
+	// ビューポートは下で ds->GetWidth() を使うので、ここを変えれば自動で追従する。
+	//
+	// 【変更履歴】
+	//  2026/07/20  1024 → 2048 に上げた。影のギザギザが半分になり見違えた
+	//  2026/07/21  2048 → 1024 に戻した(ユーザー判断)。VRAMを取り戻すため
+	//
+	// 【VRAMは解像度² × 4byte × 2枚】テクスチャが2枚あることに注意:
+	//   ・レンダーターゲット … R32_FLOAT (4byte/texel)
+	//   ・深度ステンシル     … CreateDepthStencilの既定 R24G8_TYPELESS (4byte/texel)
+	//   1024 → 4MB + 4MB = 8MB / 2048 → 16MB + 16MB = 32MB
+	//   ※ 以前ここに「R32_FLOATで4MB→16MB」とだけ書いていたためRT1枚ぶんと誤読され、
+	//      解説資料に「VRAM 4MB→16MB」と誤って転記された。総量は倍かかる
 	std::shared_ptr<KdTexture> ds = std::make_shared<KdTexture>();
-	ds->CreateDepthStencil(2048, 2048);
+	ds->CreateDepthStencil(1024, 1024);
 	D3D11_VIEWPORT vp = {
 		0.0f, 0.0f,
 		static_cast<float>(ds->GetWidth()),
@@ -838,7 +847,7 @@ bool KdStandardShader::Init()
 		0.0f, 1.0f };
 
 	// ※ 上の深度ステンシルと必ず同じ解像度にすること
-	m_depthMapFromLightRTPack.CreateRenderTarget(2048, 2048, true, DXGI_FORMAT_R32_FLOAT);
+	m_depthMapFromLightRTPack.CreateRenderTarget(1024, 1024, true, DXGI_FORMAT_R32_FLOAT);
 	m_depthMapFromLightRTPack.ClearTexture(kRedColor);
 
 	SetDissolveTexture(*KdAssets::Instance().m_textures.GetData("Asset/Textures/System/WhiteNoise.png"));
