@@ -28,9 +28,26 @@
 						"NORMAL":1,
 						"TEXCOORD_0":2
 					},
-					"indices":3
+					"indices":3,
+					"material":0
 				}
 			]
+		}
+	],
+	"materials":[
+		{
+			"name":"BlockDefault",
+			"doubleSided":false,
+			"pbrMetallicRoughness":{
+				"baseColorFactor":[
+					1,
+					1,
+					1,
+					1
+				],
+				"metallicFactor":0,
+				"roughnessFactor":1
+			}
 		}
 	],
 	"accessors":[
