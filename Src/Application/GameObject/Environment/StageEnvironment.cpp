@@ -20,12 +20,28 @@ void StageEnvironment::Apply()
 	KdAmbientController& amb = KdShaderManager::Instance().WorkAmbientController();
 
 	// --- 平行光(向き・色) : SetDirLightが内部で向きを正規化する ---
+	// ※ OFFのときは色をゼロにする(KdAmbientControllerに平行光のON/OFFが無いため)。
+	//    太陽光の拡散・鏡面がすべて消え、環境光だけで見た絵になる=影の付き方を切り分けられる。
+	//    向きは切っても渡し続ける。KdShaderManager::WriteCBShadowArea が
+	//    XMMatrixLookAtLH(camPos - 向き x 高さ, camPos, up) で影のビュー行列を作るため、
+	//    ゼロベクトルを渡すと視点と注視点が一致してLookAtが破綻する(影が壊れる)
 	Math::Vector3 lightDir = DebugParams::Instance().Vector3Param(U8("環境/平行光の向き"), Math::Vector3(-0.5f, -1.0f, -0.5f));
 	Math::Vector3 lightCol = DebugParams::Instance().Vector3Param(U8("環境/平行光の色"),   Math::Vector3(2.2f, 2.1f, 1.9f));
+	if (!DebugFlags::Instance().Get(U8("環境/平行光"), true))
+	{
+		lightCol = Math::Vector3::Zero;
+	}
 	amb.SetDirLight(lightDir, lightCol);
 
 	// --- 環境光(全体の下地の明るさ。暗いほど陰影・フォグ・発光が際立つ) ---
+	// ※ OFFのときはRGBだけをゼロにする。影の中が真っ黒になり、影の形がはっきり見える。
+	//    第4成分(w)は1.0のまま触らないこと。KdStandardShader_PS_UnLit.hlsl が w を
+	//    「全体の明度」として使っており、ここを0にするとUnLit描画まで消えてしまう
 	Math::Vector3 ambCol = DebugParams::Instance().Vector3Param(U8("環境/環境光の色"), Math::Vector3(0.35f, 0.38f, 0.45f));
+	if (!DebugFlags::Instance().Get(U8("環境/環境光"), true))
+	{
+		ambCol = Math::Vector3::Zero;
+	}
 	amb.SetAmbientLight(Math::Vector4(ambCol.x, ambCol.y, ambCol.z, 1.0f));
 
 	// --- 距離フォグ(遠くを霞ませて奥行き=疾走感を出す) ---
