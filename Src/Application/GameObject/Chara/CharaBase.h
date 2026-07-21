@@ -151,6 +151,12 @@ protected:
 	// 既定false=原点が中心のモデル(Block等)。実寸のキャラモデルだけtrueにする
 	bool m_modelOriginIsFeet = false;
 
+	// モデルの正面が -Z を向いているか。UpdateFacingが向きを計算するときの符号に効く。
+	// ※ どちらになるかはBlenderのエクスポート設定次第で、モデルごとに違う。
+	//    実測: Scifi_girl = -Z(true) / GogglesChara = +Z(false)
+	//    間違えると「進行方向のちょうど逆」を向くので、モデル差し替え時は必ず確認すること
+	bool m_modelForwardIsMinusZ = true;
+
 	// アニメーション再生機と、いま流しているアニメ名。
 	// 名前を覚えておくのは、同じアニメのときにSetAnimationを呼び直さないため
 	// (呼ぶたび再生時間が0に戻るので、毎フレーム呼ぶと先頭で固まって見える)

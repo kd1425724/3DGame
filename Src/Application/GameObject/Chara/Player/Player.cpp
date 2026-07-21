@@ -25,16 +25,23 @@ Player::~Player()
 
 void Player::Init()
 {
-	// スキンメッシュのキャラ(変形ボーン77本・アニメ13本を内包)
-	SetAsset("Asset/Models/Character/Scifi_girl/Scifi_girl.gltf");
+	// スキンメッシュのキャラ(自作リグ22ボーン)。
+	// ※ 2026/07/21 時点でアニメは「01 idle」「03 run」の2本だけで、中身はどちらも同じ
+	//    ダッシュのモーション。他の名前は見つからないが、UpdateAnimationが
+	//    「見つからなければ前のアニメを流し続ける」ので止まらない(暫定の見た目確認用)
+	SetAsset("Asset/Models/Character/GogglesChara/GogglesChara.gltf");
 
 	// 当たり判定と描画位置をモデルの実寸に合わせる(2026/07/20)。
-	// glTFの頂点はY=0.0009〜1.946＝原点が足元・身長1.946m。
+	// glTFの頂点実測でY=0〜1.8989＝原点が足元・身長1.899m。
 	// これを設定しないと「1辺1mの立方体」前提のままになり、足元が半身ぶん浮く
-	m_bodyHeight = 1.946f;
+	m_bodyHeight = 1.899f;
 	m_modelOriginIsFeet = true;
 
-	// モデルは頂点カラーで色が付いているので、色の乗算は白(=素の色)にする
+	// このモデルの正面は +Z(Scifi_girlは -Z だった)。
+	// 根拠: Blender上の正面が -Y で、glTF書き出しで Z = -(Blender Y) になるため
+	m_modelForwardIsMinusZ = false;
+
+	// 色はbase_color.jpgのテクスチャで付くので、色の乗算は白(=素の色)にする
 	m_color = Math::Color(1.0f, 1.0f, 1.0f, 1.0f);
 
 	SetScale(Math::Vector3(1.0f, 1.0f, 1.0f));
