@@ -1005,7 +1005,12 @@ void Player::PostUpdate()
 	// 着地モーションがほぼ見えないため、瞬間にタイマーを立ててその間だけ再生する
 	if (IsGrounded() && !m_wasGroundedForAnim)
 	{
-		m_landingAnimTimer = DebugParams::Instance().Float(U8("アニメ/着地モーションの長さ"), 0.25f, 0.0f, 1.0f);
+		// クリップの実長(ローリングは52フレーム=約1.73秒)を入れておく。
+		// 再生倍率で割るのは、速く再生するとそのぶん早く終わるため。
+		// 割らないと、倍率を変えるたびにこの長さを手で直すことになる
+		float len   = DebugParams::Instance().Float(U8("アニメ/着地モーションの長さ"), 1.73f, 0.0f, 3.0f);
+		float scale = GetAnimSpeedScale(U8("アニメ/着地の再生速度"));
+		m_landingAnimTimer = (scale > 0.0f) ? (len / scale) : len;
 	}
 	m_wasGroundedForAnim = IsGrounded();
 
@@ -1067,15 +1072,29 @@ std::string Player::SelectAnimation() const
 
 float Player::SelectAnimationSpeed() const
 {
-	// 走り以外は等速。走りだけ、実際の水平速度に比例させて再生を速める。
-	// 歩き(5.0)もダッシュ(11.0)も同じ速度で流すと足が地面を滑って見えるため
-	if (m_currentAnimName != "03 run") { return 1.0f; }
+	// 走りは実際の水平速度に比例させて再生を速める。
+	// 歩き(5.0)もダッシュ(11.0)も同じ速度で流すと足が地面を滑って見えるため。
+	// それ以外は状態ごとの倍率をそのまま使う(全部DebugParamsで実行中に調整できる)
+	if (m_currentAnimName == "03 run")
+	{
+		float baseSpeed = DebugParams::Instance().Float(U8("アニメ/走りの基準速度"), 5.0f, 1.0f, 20.0f);
+		if (baseSpeed <= 0.0f) { return 1.0f; }
 
-	float baseSpeed = DebugParams::Instance().Float(U8("アニメ/走りの基準速度"), 5.0f, 1.0f, 20.0f);
-	if (baseSpeed <= 0.0f) { return 1.0f; }
+		// 上下に振り切れると不自然なので倍率を制限し、そのうえで全体の倍率を掛ける
+		float ratio = std::clamp(GetHorizontalSpeed() / baseSpeed, 0.5f, 2.5f);
+		return ratio * GetAnimSpeedScale(U8("アニメ/走りの再生速度"));
+	}
 
-	// 上下に振り切れると不自然なので倍率を制限する
-	return std::clamp(GetHorizontalSpeed() / baseSpeed, 0.5f, 2.5f);
+	if (m_currentAnimName == "01 idle")           { return GetAnimSpeedScale(U8("アニメ/待機の再生速度")); }
+	if (m_currentAnimName == "08 fall (air)")     { return GetAnimSpeedScale(U8("アニメ/落下の再生速度")); }
+	if (m_currentAnimName == "10 fall (landing)") { return GetAnimSpeedScale(U8("アニメ/着地の再生速度")); }
+
+	return 1.0f;
+}
+
+float Player::GetAnimSpeedScale(const char* _key) const
+{
+	return DebugParams::Instance().Float(_key, 1.0f, 0.1f, 4.0f);
 }
 
 float Player::SelectTurnSpeed() const
