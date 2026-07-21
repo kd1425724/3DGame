@@ -94,41 +94,49 @@ void StageEnvironment::Apply()
 
 	KdAmbientController& amb = KdShaderManager::Instance().WorkAmbientController();
 
+	// ※ 以下の既定値は初期配布フレームワークの素の値に揃えてある(2026/07/21)。
+	//    出どころは KdShaderManager.h の cbLight / cbFog の構造体初期化子と、
+	//    KdAmbientController::Init() の SetDirLightShadowArea({25,25}, 30)。
+	//    JSONが無い環境でも初期配布と同じ見た目で立ち上がるようにするため
+
 	// --- 平行光(向き・色) : SetDirLightが内部で向きを正規化する ---
-	Math::Vector3 lightDir = DebugParams::Instance().Vector3Param(U8("環境/平行光の向き"), Math::Vector3(-0.5f, -1.0f, -0.5f));
-	Math::Vector3 lightCol = DebugParams::Instance().Vector3Param(U8("環境/平行光の色"),   Math::Vector3(2.2f, 2.1f, 1.9f));
+	Math::Vector3 lightDir = DebugParams::Instance().Vector3Param(U8("環境/平行光の向き"), Math::Vector3(1.0f, -1.0f, 1.0f));
+	Math::Vector3 lightCol = DebugParams::Instance().Vector3Param(U8("環境/平行光の色"),   Math::Vector3(2.25f, 2.25f, 2.25f));
 	amb.SetDirLight(lightDir, lightCol);
 
 	// --- 環境光(全体の下地の明るさ。暗いほど陰影・フォグ・発光が際立つ) ---
-	Math::Vector3 ambCol = DebugParams::Instance().Vector3Param(U8("環境/環境光の色"), Math::Vector3(0.35f, 0.38f, 0.45f));
+	Math::Vector3 ambCol = DebugParams::Instance().Vector3Param(U8("環境/環境光の色"), Math::Vector3(0.3f, 0.3f, 0.3f));
 	amb.SetAmbientLight(Math::Vector4(ambCol.x, ambCol.y, ambCol.z, 1.0f));
 
 	// --- 距離フォグ(遠くを霞ませて奥行き=疾走感を出す) ---
-	bool fogEnable = DebugFlags::Instance().Get(U8("環境/フォグ"), true);
+	// ※ 既定を false にしてある。初期配布では cbFog の DistanceFogEnable が 0(無効)で、
+	//    フォグは一度も有効化されていなかったため
+	bool fogEnable = DebugFlags::Instance().Get(U8("環境/フォグ"), false);
 	amb.SetFogEnable(fogEnable, false);
 	if (fogEnable)
 	{
-		Math::Vector3 fogCol = DebugParams::Instance().Vector3Param(U8("環境/フォグ色"), Math::Vector3(0.5f, 0.6f, 0.75f));
-		// 濃度は「カリング距離(既定260)で建物が霧に溶けきる」ことを狙って決める。
+		Math::Vector3 fogCol = DebugParams::Instance().Vector3Param(U8("環境/フォグ色"), Math::Vector3(1.0f, 1.0f, 1.0f));
 		// フォグの式は f = 1/exp(距離 x 濃度) で、fが1なら素の色・0なら完全にフォグ色(KdStandardShader_PS_Lit.hlsl)。
+		// 参考(かつて疾走感の演出に使っていたときの目安)：
 		//   0.010 → 50m:61%残る / 150m:22% / 260m:7%
-		// 街を2倍に広げる前の 0.02 は 80m 以遠が一律の霧になり、建物の輪郭が青くにじんでいた。
-		// 濃くするほど手前から霞み、薄くするとカリング距離での建物の出現(ポップイン)が見えてくる
-		float fogDensity = DebugParams::Instance().Float(U8("環境/フォグ濃度"), 0.010f, 0.0f, 0.2f);
+		//   濃くするほど手前から霞み、薄くするとカリング距離での建物の出現(ポップイン)が見えてくる
+		float fogDensity = DebugParams::Instance().Float(U8("環境/フォグ濃度"), 0.001f, 0.0f, 0.2f);
 		amb.SetDistanceFog(fogCol, fogDensity);
 	}
 
 	// --- 影の生成エリア(カメラ位置を中心とした箱。横=エリア / 奥行き=高さ×2) ---
-	// ※ 影はこの箱の中だけに出る。1024x1024の深度に広範囲を詰めるほど1体あたりの影は粗くなる。
+	// ※ 影はこの箱の中だけに出る。深度マップに広範囲を詰めるほど1体あたりの影は粗くなる。
 	// ※ 高さ(=深度の奥行き)はエリアに自動連動させる。エリア(横)だけ広げると箱の隅が深度範囲から
 	//    はみ出して地面に境目の線が出るため、高さをエリアに比例させて確保する。
 	//    → 基本は「環境/影エリア」1つだけ調整すればよい(境目が出にくい)
-	// エリアは「街の建物の高さ」ではなく「どこまで先の影を出したいか」で決める。
-	// 街を2倍(最大29.3m)に広げた後は 40 = カメラ中心±20m しか影が出ず、通りの先が影無しになっていた。
-	// 100 にすると±50mまで影が出る。代償は影の精度(1024x1024の深度を広い範囲に伸ばすため
-	// 40のとき約4cm/テクセル → 100では約10cm/テクセル)
-	float shadowArea  = DebugParams::Instance().Float(U8("環境/影エリア"),    100.0f, 5.0f, 200.0f);
-	float heightRatio = DebugParams::Instance().Float(U8("環境/影の高さ比率"), 0.75f, 0.3f,   2.0f);
+	//
+	// 既定 エリア25 / 比率1.2(=高さ30) は初期配布の SetDirLightShadowArea({25,25}, 30) と同値。
+	// エリア25は建物1棟(最大29.3m)より小さいので、街ではカメラのごく近くにしか影が出ない。
+	// 街向けに広げるときの目安(以前この値で調整していたときの記録)：
+	//   40 = カメラ中心±20m / 100 = ±50m。代償は影の精度
+	//   (1024x1024の深度を広い範囲へ伸ばすため 40で約4cm/テクセル → 100で約10cm/テクセル)
+	float shadowArea  = DebugParams::Instance().Float(U8("環境/影エリア"),    25.0f, 5.0f, 200.0f);
+	float heightRatio = DebugParams::Instance().Float(U8("環境/影の高さ比率"), 1.2f, 0.3f,   2.0f);
 	float shadowHeight = shadowArea * heightRatio;
 	if (shadowHeight < 25.0f)
 	{

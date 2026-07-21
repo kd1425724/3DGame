@@ -45,6 +45,9 @@ void FocusPostFx::Update()
 
 	// ===== Bloom強調(高輝度しきい値。低いほど広い範囲が光る) =====
 	// エフェクトやemissive素材の発光を、スロー中だけ強める演出
+	// ※ ネオンの夜のときは 0.6 / 0.35 まで下げて明るい面を広く滲ませていたが、
+	//    2026/07/21に光と影を初期配布の値へ戻した際、この既定値に揃え直した
+	//    (平行光2.25の白と低いしきい値が組むと画面が強く白飛びするため)
 	float brightNormal = DebugParams::Instance().Float(U8("スロー演出/発光しきい値(通常)"),   1.2f, 0.1f, 3.0f);
 	float brightSlow   = DebugParams::Instance().Float(U8("スロー演出/発光しきい値(スロー)"), 0.75f, 0.1f, 3.0f);
 	float threshold = brightNormal + (brightSlow - brightNormal) * m_blend;
