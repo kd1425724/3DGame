@@ -12,12 +12,35 @@ void CharaBase::SetAsset(const std::string& assetName)
 
 Math::Matrix CharaBase::GetDrawMatrix() const
 {
-	// 原点が中心のモデル(Block等)はそのまま描く
-	if (!m_modelOriginIsFeet) { return m_mWorld; }
+	// 原点が足元のモデル(GogglesCharaは頂点のYが0〜1.899)は、そのまま描くと
+	// 足が pos の高さに来て半身ぶん浮く。半身下げて体の中心を pos に合わせる。
+	// 原点が中心のモデル(Block等)は下げない
+	float half = m_modelOriginIsFeet ? GetBodyHalfHeight() : 0.0f;
 
-	// 原点が足元のモデル(Scifi_girlは頂点のYが0〜1.946)は、そのまま描くと
-	// 足が pos の高さに来て半身ぶん浮く。半身下げて体の中心を pos に合わせる
-	return m_mWorld * Math::Matrix::CreateTranslation(0.0f, -GetBodyHalfHeight(), 0.0f);
+	return Math::Matrix::CreateTranslation(0.0f, -half, 0.0f)
+		* Math::Matrix::CreateRotationZ(DirectX::XMConvertToRadians(m_tilt.y))
+		* Math::Matrix::CreateRotationX(DirectX::XMConvertToRadians(m_tilt.x))
+		* m_mWorld;
+}
+
+void CharaBase::UpdateTilt(float _deltaTime)
+{
+	//目標の傾きを受け取る
+	//派生クラスが今どれだけ傾くべくか返してくれる
+	Math::Vector2 target = SelectTilt();
+
+	//上限をかける
+	//かけないと、アンカーが真横や真下にあるとキャラが逆さまになる
+	float maxDeg = DebugParams::Instance().Float(U8("傾き/最大角度"), 45.0f, 0, 89.0f);
+	target.x = std::clamp(target.x, -maxDeg, maxDeg);
+	//yはzとして扱う
+	target.y = std::clamp(target.y, -maxDeg, maxDeg);
+
+	//現在値を目標に寄せる
+	float k = DebugParams::Instance().Float(U8("傾き/追従速度"), 8.0f, 1.0f, 60.0f);
+	float t = std::clamp(k * _deltaTime, 0.0f, 1.0f);
+	//ターゲットに少しずつ寄せる
+	m_tilt = Math::Vector2::Lerp(m_tilt, target, t);
 }
 
 void CharaBase::DrawLit()

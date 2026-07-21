@@ -1025,6 +1025,11 @@ void Player::PostUpdate()
 	//    m_rot(=m_mWorld)を回しても当たりには影響しない。カメラもGetPos()しか見ていない
 	UpdateFacing(Application::Instance().GetDeltaTime());
 
+	//体を傾ける（ワイヤーで振られている感じを出す）
+	//向きが決まった後によぶ
+	//傾きはローカル軸で効くので、先にヨーが確定している必要がある
+	UpdateTilt(Application::Instance().GetDeltaTime());
+
 	// アニメーションを進める(2026/07/20 追加)。
 	// 接地・速度・突撃などの状態が全て確定したあとで呼ぶので、PostUpdateの最後に置く
 	UpdateAnimation();
@@ -1223,6 +1228,35 @@ void Player::DrawDebugRanges()
 	{
 		m_pDebugWire->AddDebugLine(pos, m_upWire->GetAnchor(), Math::Color(0.4f, 0.6f, 1.0f, 1.0f));
 	}
+}
+
+Math::Vector2 Player::SelectTilt() const
+{
+	float pitchGain = DebugParams::Instance().Float(U8("傾き/ワイヤー時のピッチ係数"), 1.0f, -2.0f, 2.0f);
+	float rollGain = DebugParams::Instance().Float(U8("傾き/ワイヤー時のロール係数"), 1.0f, -2.0f, 2.0f);
+	float leanGain = DebugParams::Instance().Float(U8("傾き/前傾の強さ"), 0.8f, -3.0f, 3.0f);
+
+	// ワイヤー中：体の「上」をアンカーへ向ける(ぶら下がって振られている姿勢)
+	if (m_upWire && m_upWire->IsAttached())
+	{
+		//アンカーの向きを求める
+		Math::Vector3 toAnchor = m_upWire->GetAnchor() - GetPos();
+		toAnchor.Normalize();
+
+		//キャラのローカル空間へ移す
+		//Y回転を打ち消す
+		Math::Matrix invYaw = Math::Matrix::CreateRotationY(-DirectX::XMConvertToRadians(GetRot().y));
+		Math::Vector3 local = Math::Vector3::TransformNormal(toAnchor, invYaw);
+
+		//真上からのズレを、前後と左右に分ける
+		float pitch = DirectX::XMConvertToDegrees(std::atan2(local.z, local.y));
+		float roll = DirectX::XMConvertToDegrees(std::atan2(local.x, local.y));
+
+		return Math::Vector2(pitch * pitchGain, roll * rollGain);
+	}
+
+	// 地上・落下：水平速度に比例して前傾するだけ
+	return Math::Vector2(GetHorizontalSpeed() * leanGain, 0.0f);
 }
 
 void Player::NotifyCounter()

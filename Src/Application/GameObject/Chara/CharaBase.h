@@ -141,6 +141,12 @@ protected:
 	// ※ 影(GenerateDepthMapFromLight)も必ずこれで描くこと。片方だけだと影がずれる
 	Math::Matrix GetDrawMatrix() const;
 
+	//滑らかに目標へ寄せる
+	void UpdateTilt(float _deltaTime);
+
+	//判断は派生クラスに任せる
+	virtual Math::Vector2 SelectTilt()const { return {}; }
+
 	// 表示用モデルワーク
 	KdModelWork m_modelWork;
 
@@ -195,4 +201,7 @@ protected:
 	float m_gravityScale = 1.0f;
 
 	// ※ 重力加速度・ジャンプ初速はDebugParams("キャラ/重力"・"キャラ/ジャンプ力")で調整する
+
+	//キャラクターの体の角度を調整する
+	Math::Vector2 m_tilt = {};
 };

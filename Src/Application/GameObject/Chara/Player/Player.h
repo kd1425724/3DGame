@@ -118,6 +118,9 @@ private:
 	// 現在のターゲット線などを m_pDebugWire に積んで可視化する(DrawDebugから呼ぶ)
 	void DrawDebugRanges();
 
+	Math::Vector2 SelectTilt()const override;
+
+
 	// ※ 移動速度はDebugParams("プレイヤー/移動速度")で調整する
 
 	// 移動方向の基準にするカメラ
