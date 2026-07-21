@@ -48,9 +48,11 @@ void CharaBase::UpdateFacing(float _deltaTime)
 
 	dir.Normalize();
 
-	// CreateRotationY(θ)は +Z を (sinθ, 0, cosθ) へ移すので、+Z を向かせる角度は atan2(x, z)。
+	// CreateRotationY(θ)は +Z を (sinθ, 0, cosθ) へ移すので、+Z を dir へ向ける角度は atan2(x, z)。
+	// ただし**このモデルの正面は -Z**（実機で全方向が反転していたので確認できた）。
+	// 正面が -Z なら「-Z を dir へ向ける」＝「+Z を -dir へ向ける」なので符号を反転させる。
 	// m_rot は度で持っているので度へ直す
-	float targetDeg = DirectX::XMConvertToDegrees(std::atan2(dir.x, dir.z));
+	float targetDeg = DirectX::XMConvertToDegrees(std::atan2(-dir.x, -dir.z));
 
 	Math::Vector3 rot = GetRot();
 
