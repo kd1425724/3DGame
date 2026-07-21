@@ -143,4 +143,13 @@ void StageEnvironment::Apply()
 		shadowHeight = 25.0f;
 	}   // 小さいエリアでも塔より高い所から照らすための下限
 	amb.SetDirLightShadowArea(Math::Vector2(shadowArea, shadowArea), shadowHeight);
+
+	// --- 影の解像度 ---
+	// 1テクセルの実サイズ = 影エリア ÷ 解像度。影の細かさはこの2つで決まるので、
+	// 影エリアとセットで実行中に振れるようにしてある。
+	// 値が変わった時だけ深度マップを作り直す(SetShadowMapSize側で判定)。
+	// ※ ここはUpdateフェーズ＝描画前なので、深度マップがバインド中に作り直すことはない
+	// VRAM: 解像度^2 x 4byte x 2枚 → 1024で8MB / 2048で32MB / 4096で128MB
+	int shadowRes = DebugParams::Instance().Int(U8("環境/影の解像度"), 1024, 256, 4096);
+	KdShaderManager::Instance().m_StandardShader.SetShadowMapSize(shadowRes);
 }

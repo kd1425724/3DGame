@@ -3,6 +3,27 @@
 #include "KdStandardShader.h"
 
 //================================================================================
+// 【Framework変更履歴】2026/07/22  シャドウマップ解像度を実行時に変更できるようにした
+//================================================================================
+// ■ 何を入れたか
+//   SetShadowMapSize(int) / GetShadowMapSize() を追加。Init()内の解像度直書きを
+//   SetShadowMapSize(1024) の呼び出しへ置き換えた。既存の描画処理は変えていない。
+//
+// ■ なぜFrameworkを触ったか
+//   影の細かさは「影エリア ÷ 解像度」で決まるが、解像度だけがコード直書きで、
+//   変えるたびにリビルドが必要だった。影エリア(DebugParams)と組み合わせて
+//   詰めるには、両方を実行中に振れる必要がある。
+//
+// ■ 消したコード
+//   Init()内にあった未使用の ds(捨てられる深度ステンシル)と vp(渡されないビューポート)を
+//   削除した。消した内容と理由は Init() 内にコメントで残してある。
+//
+// ■ 元に戻す方法
+//   Init() の SetShadowMapSize(1024) を元の CreateRenderTarget 直書きへ戻し、
+//   SetShadowMapSize/GetShadowMapSize と m_shadowMapSize を消せばよい。
+//   Application側は StageEnvironment::Apply() の該当行を消す。
+//
+//================================================================================
 // 【Framework変更履歴】2026/07/19  Tracy(フレームプロファイラ)の計測点を追加
 //================================================================================
 // ■ 何を入れたか
@@ -825,35 +846,60 @@ bool KdStandardShader::Init()
 	m_cb2_Material.Create();
 	m_cb3_Bone.Create();
 
-	// シャドウマップの解像度。1テクセルの大きさ = 影エリア ÷ 解像度。
-	// ビューポートは下で ds->GetWidth() を使うので、ここを変えれば自動で追従する。
-	//
-	// 【変更履歴】
-	//  2026/07/20  1024 → 2048 に上げた。影のギザギザが半分になり見違えた
-	//  2026/07/21  2048 → 1024 に戻した(ユーザー判断)。VRAMを取り戻すため
-	//
-	// 【VRAMは解像度² × 4byte × 2枚】テクスチャが2枚あることに注意:
-	//   ・レンダーターゲット … R32_FLOAT (4byte/texel)
-	//   ・深度ステンシル     … CreateDepthStencilの既定 R24G8_TYPELESS (4byte/texel)
-	//   1024 → 4MB + 4MB = 8MB / 2048 → 16MB + 16MB = 32MB
-	//   ※ 以前ここに「R32_FLOATで4MB→16MB」とだけ書いていたためRT1枚ぶんと誤読され、
-	//      解説資料に「VRAM 4MB→16MB」と誤って転記された。総量は倍かかる
-	std::shared_ptr<KdTexture> ds = std::make_shared<KdTexture>();
-	ds->CreateDepthStencil(1024, 1024);
-	D3D11_VIEWPORT vp = {
-		0.0f, 0.0f,
-		static_cast<float>(ds->GetWidth()),
-		static_cast<float>(ds->GetHeight()),
-		0.0f, 1.0f };
+	// シャドウマップの初期解像度。実行中は SetShadowMapSize() で変更できる
+	// (Application側の DebugParams「環境/影の解像度」から呼んでいる)
+	SetShadowMapSize(1024);
 
-	// ※ 上の深度ステンシルと必ず同じ解像度にすること
-	m_depthMapFromLightRTPack.CreateRenderTarget(1024, 1024, true, DXGI_FORMAT_R32_FLOAT);
-	m_depthMapFromLightRTPack.ClearTexture(kRedColor);
+	// ※【2026/07/22 削除】ここには以前、使われていないコードが2つあった。
+	//    復元できるよう、消した内容と理由を残しておく。
+	//
+	//      std::shared_ptr<KdTexture> ds = std::make_shared<KdTexture>();
+	//      ds->CreateDepthStencil(1024, 1024);
+	//      D3D11_VIEWPORT vp = { 0.0f, 0.0f,
+	//          static_cast<float>(ds->GetWidth()),
+	//          static_cast<float>(ds->GetHeight()), 0.0f, 1.0f };
+	//
+	//    ・ds  … 深度ステンシルは CreateRenderTarget(needDSV=true) が内部で作るので、
+	//            この ds はどこにも渡されず、4MBを確保して即捨てていた
+	//    ・vp  … CreateRenderTarget へ渡していない(第5引数は既定のnullptr)ため未使用。
+	//            nullptrを渡すと KdRenderTargetPack::SetViewPort が
+	//            レンダーターゲットの寸法からビューポートを自動計算するので、これで正しく動く
 
 	SetDissolveTexture(*KdAssets::Instance().m_textures.GetData("Asset/Textures/System/WhiteNoise.png"));
 
 
 	return true;
+}
+
+// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
+// シャドウマップの解像度を変更する(追加)
+// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
+void KdStandardShader::SetShadowMapSize(int _size)
+{
+	// 2の累乗へ丸めたうえで範囲を制限する(256〜4096)。
+	// 端数の解像度でも動くが、VRAMと帯域を無駄にするので揃える
+	if (_size < 256) { _size = 256; }
+	if (_size > 4096) { _size = 4096; }
+
+	int pow2 = 256;
+	while (pow2 * 2 <= _size)
+	{
+		pow2 *= 2;
+	}
+	_size = pow2;
+
+	// 変わっていなければ何もしない(毎フレーム呼ばれても作り直さない)
+	if (_size == m_shadowMapSize) { return; }
+
+	m_shadowMapSize = _size;
+
+	// CreateRenderTarget は毎回 shared_ptr を作り直すので、呼び直せば安全に置き換わる
+	// (古いテクスチャは参照が切れて解放される)。
+	// 第5引数のビューポートは渡さない ── nullptrだと SetViewPort が
+	// レンダーターゲットの寸法から自動計算してくれるため、解像度に自動で追従する。
+	// needDSV=true なので、深度ステンシルも同じ解像度で内部生成される
+	m_depthMapFromLightRTPack.CreateRenderTarget(_size, _size, true, DXGI_FORMAT_R32_FLOAT);
+	m_depthMapFromLightRTPack.ClearTexture(kRedColor);
 }
 
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////

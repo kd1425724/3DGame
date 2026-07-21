@@ -203,6 +203,15 @@ public:
 
 	std::shared_ptr<KdTexture>& GetDepthTex() { return m_depthMapFromLightRTPack.m_RTTexture; }
 
+	// ===== 追加(シャドウマップ解像度の実行時変更) =====
+	// 影の深度マップを作り直して解像度を変える。値が変わった時だけ実際に作り直す。
+	// 1テクセルの実サイズ = 影エリア ÷ 解像度 なので、影の細かさはこの2つで決まる。
+	// VRAMは 解像度^2 x 4byte x 2枚(レンダーターゲット R32_FLOAT ＋ 深度ステンシル R24G8)。
+	//   1024 -> 8MB / 2048 -> 32MB / 4096 -> 128MB
+	// ※ 描画中(深度マップがバインドされている間)に呼ばないこと。Updateフェーズから呼ぶ
+	void SetShadowMapSize(int _size);
+	int  GetShadowMapSize() const { return m_shadowMapSize; }
+
 private:
 
 	// マテリアルのセット
@@ -285,6 +294,9 @@ private:
 
 	KdRenderTargetPack	m_depthMapFromLightRTPack;
 	KdRenderTargetChanger m_depthMapFromLightRTChanger;
+
+	// 現在のシャドウマップ解像度(SetShadowMapSizeで変更。Initで初期値をセットする)
+	int			m_shadowMapSize = 0;
 
 	bool		m_dirtyCBObj = false;						// 定数バッファのオブジェクトに変更があったかどうか
 };
