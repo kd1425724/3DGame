@@ -393,6 +393,9 @@
     <ClInclude Include="Src\Application\GameObject\Environment\StageEnvironment.h">
       <Filter>Src\Application\GameObject\Environment</Filter>
     </ClInclude>
+    <ClInclude Include="Src\Application\GameObject\Environment\SkySphere.h">
+      <Filter>Src\Application\GameObject\Environment</Filter>
+    </ClInclude>
     <ClInclude Include="Src\Application\GameObject\Environment\FocusPostFx.h">
       <Filter>Src\Application\GameObject\Environment</Filter>
     </ClInclude>
@@ -666,6 +669,9 @@
       <Filter>Src\Application\GameObject\EnemySpawner</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Environment\StageEnvironment.cpp">
+      <Filter>Src\Application\GameObject\Environment</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\GameObject\Environment\SkySphere.cpp">
       <Filter>Src\Application\GameObject\Environment</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Environment\FocusPostFx.cpp">

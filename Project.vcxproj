@@ -290,6 +290,7 @@
     <ClInclude Include="Src\Application\GameObject\EnemySpawner\EnemySpawner.h" />
     <ClInclude Include="Src\Application\GameObject\Environment\StageEnvironment.h" />
     <ClInclude Include="Src\Application\GameObject\Environment\FocusPostFx.h" />
+    <ClInclude Include="Src\Application\GameObject\Environment\SkySphere.h" />
     <ClInclude Include="Src\Application\Effect\EffectManager.h" />
     <ClInclude Include="Src\Application\Effect\EffectBase.h" />
     <ClInclude Include="Src\Application\Effect\BoostEffect\BoostEffect.h" />
@@ -389,6 +390,7 @@
     <ClCompile Include="Src\Application\GameObject\EnemySpawner\EnemySpawner.cpp" />
     <ClCompile Include="Src\Application\GameObject\Environment\StageEnvironment.cpp" />
     <ClCompile Include="Src\Application\GameObject\Environment\FocusPostFx.cpp" />
+    <ClCompile Include="Src\Application\GameObject\Environment\SkySphere.cpp" />
     <ClCompile Include="Src\Application\Effect\EffectManager.cpp" />
     <ClCompile Include="Src\Application\Effect\BoostEffect\BoostEffect.cpp" />
     <ClCompile Include="Src\Application\Effect\SlashEffect\SlashEffect.cpp" />

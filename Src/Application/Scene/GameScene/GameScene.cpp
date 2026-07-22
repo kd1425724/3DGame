@@ -8,6 +8,7 @@
 #include "../../GameObject/Camera/TPSCamera/TPSCamera.h"
 #include "../../GameObject/Environment/StageEnvironment.h"
 #include "../../GameObject/Environment/FocusPostFx.h"
+#include "../../GameObject/Environment/SkySphere.h"
 #include "../../GameObject/UI/GameHud/GameHud.h"
 #include "../../GameObject/StageProp/InstancedPropRenderer.h"
 #include "../../Collision/CollisionGrid.h"
@@ -28,6 +29,12 @@ void GameScene::Event()
 
 void GameScene::Init()
 {
+	// 背景の天球(空)。カメラに追従してUnLitで描くだけの見た目オブジェクト。
+	// 一番最初に追加して、他のオブジェクトがこの上に重なる(=背景になる)ようにする
+	std::shared_ptr<SkySphere> spSky = std::make_shared<SkySphere>();
+	spSky->Init();
+	AddObject(spSky);
+
 	// ステージの空気感(平行光/環境光/距離フォグ/影エリア)を毎フレーム適用する環境オブジェクト。
 	// 見た目のみでロジックを持たない。値はDebugParams「環境/…」で実行中に調整する
 	std::shared_ptr<StageEnvironment> spEnv = std::make_shared<StageEnvironment>();
