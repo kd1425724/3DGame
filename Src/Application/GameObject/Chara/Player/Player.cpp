@@ -322,7 +322,7 @@ void Player::UpdateAccel(float dt)
 			float maxSpd = DebugParams::Instance().Float(U8("加速/上限速度"),   35.0f, 0.0f, 120.0f);
 
 			Math::Vector3 dir = GetAccelDir();
-			if (dir.LengthSquared() > 0.0001f && m_velocity.Length() < maxSpd)
+			if (dir.LengthSquared() > MathAPI::kSmallNumber && m_velocity.Length() < maxSpd)
 			{
 				m_velocity += dir * (acc * dt);
 			}
@@ -341,7 +341,7 @@ void Player::UpdateAccel(float dt)
 		{
 			float step = DebugParams::Instance().Float(U8("加速/空中ステップの速さ"), 18.0f, 0.0f, 60.0f);
 			Math::Vector3 dir = GetAccelDir();
-			if (dir.LengthSquared() > 0.0001f)
+			if (dir.LengthSquared() > MathAPI::kSmallNumber)
 			{
 				m_velocity += dir * step;
 

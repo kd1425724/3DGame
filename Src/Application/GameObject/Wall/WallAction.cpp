@@ -98,7 +98,7 @@ void WallAction::Update(CharaBase& _body, float _dt, const Math::Vector3& _wishD
 	// ずり落ちの代わりに一定速度で上昇する(走行時間の上限はそのまま効くので登り放題にはならない)
 	float climbDot = DebugParams::Instance().Float(U8("壁走り/よじ登りに必要な向き"), 0.55f, 0.0f, 1.0f);
 	m_isClimbing = false;
-	if (_wishDir.LengthSquared() > 0.0001f)
+	if (_wishDir.LengthSquared() > MathAPI::kSmallNumber)
 	{
 		m_isClimbing = _wishDir.Dot(-m_wallNormal) > climbDot;
 	}
