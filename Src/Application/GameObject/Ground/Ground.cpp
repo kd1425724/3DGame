@@ -4,21 +4,24 @@
 
 void Ground::Init()
 {
-	SetAsset("Asset/Models/Test/Block/Block.gltf");
+	// 石畳の地面。モデルが最初から実寸(332 x 1.2 x 297m)で、UVも「1タイル=4m」で
+	// 展開済みなので、ここでスケールを掛けない(SetScaleは1.0のまま)。
+	// ※ 単位立方体をSetScaleで引き伸ばすと、UV1単位が覆う世界の広さも一緒に伸びて
+	//    テクスチャが332mに引き伸ばされる。タイリングさせるにはモデル側で作るのが正解
+	// ※ マスタは BlenderData/Ground/StonePavement/(make_ground.pyで再生成できる)
+	SetAsset("Asset/Models/Environment/Ground/StonePavement.gltf");
 
-	// 地面らしく大きく・薄く潰す
-	// ※ 影生成エリアは既定で25x25(KdAmbientController::Init参照)とそこまで広くなく、
-	//    カメラ位置を中心に追従する仕組みなので、大きすぎると影が生成されなくなる。
+	// 【地面の大きさについて】モデル側の実寸で決まる(ここでは変えない)。
+	// ※ 影生成エリアはカメラ位置に追従する箱なので、地面の大きさとは独立。
 	// ※ 2026/07/20に街を拡張(1軒をSCALE=2.0で大型化＋通りを3本に)。
 	//    生成ツール(BlenderData/_tools/gen_town2.py)が出した街の範囲は
-	//    X -150.0〜150.0 / Z -92.0〜132.5(145棟・最大の高さ28.2m)。
-	//    余白込みで X:332 / Z:297 とする。
+	//    X -150.0〜150.0 / Z -92.0〜132.5(145棟・最大の高さ28.2m)。余白込みで X:332 / Z:297。
 	//    ※ 2026/07/20に「家の壁面揃え」へ変更した際、中心揃えで無駄になっていた奥行きの
 	//       半分ぶんが詰まったのでX方向は以前(410)より狭くなった
 	//    天面は y=+0.6(=1.2/2)で、Level.jsonの建物は原点が接地面なので pos.y=0.6 で乗る。
-	//    ステージを広げる時はここを大きくする(合わせてカリング距離/影/フォグの調整も要検討)
+	//    ステージを広げる時は make_ground.py の SIZE_X/SIZE_Z を変えて作り直す
+	//    (合わせてカリング距離/影/フォグの調整も要検討)
 	//    ※ 旧: 38棟の小規模な街で X:64 / Z:130 だった
-	SetScale(Math::Vector3(332.0f, 1.2f, 297.0f));
 
 	//当てられる側の処理＝＝＝＝＝＝＝＝＝＝
 	//当たり判定をつけたいから実体化
@@ -58,15 +61,25 @@ void Ground::DrawLit()
 
 void Ground::DrawDebug()
 {
-	// 当たり判定(モデル=1辺1の立方体をスケールした地面)を箱で可視化する
+	// 当たり判定(モデル形状=地面の箱)を可視化する
 	// ※ KdModelCollisionはAddDebugWire未対応(no-op)で枠が出ないため、ここで箱を描いて代用
-	if (KdGameObject::s_showColliderDebug)
+	// ※ 以前は「1辺1の立方体をSetScaleで拡大」していたので半径0.5決め打ちでよかったが、
+	//    実寸モデル(332 x 1.2 x 297)へ変えたのでモデルの境界から半径を求める。
+	//    決め打ちのままだと緑の枠が0.5m角の点になって見えなくなる
+	if (KdGameObject::s_showColliderDebug && m_spModelWork)
 	{
 		if (!m_pDebugWire)
 		{
 			m_pDebugWire = std::make_unique<KdDebugWireFrame>();
 		}
-		m_pDebugWire->AddDebugBox(m_mWorld, Math::Vector3(0.5f, 0.5f, 0.5f), Math::Vector3::Zero, true, kGreenColor);
+
+		if (const std::shared_ptr<KdMesh> spMesh = m_spModelWork->GetMesh(0))
+		{
+			const DirectX::BoundingBox& bb = spMesh->GetBoundingBox();
+			m_pDebugWire->AddDebugBox(m_mWorld,
+				Math::Vector3(bb.Extents.x, bb.Extents.y, bb.Extents.z),
+				Math::Vector3(bb.Center.x, bb.Center.y, bb.Center.z), true, kGreenColor);
+		}
 	}
 
 	KdGameObject::DrawDebug();
