@@ -120,6 +120,9 @@ private:
 
 	Math::Vector2 SelectTilt()const override;
 
+	// 左腕をワイヤーのアンカーへ向ける(ワイヤー接続中のみ)
+	bool SelectArmAimTarget(Math::Vector3& _outTarget)const override;
+
 
 	// ※ 移動速度はDebugParams("プレイヤー/移動速度")で調整する
 

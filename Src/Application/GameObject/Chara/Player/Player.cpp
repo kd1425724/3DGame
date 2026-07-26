@@ -1034,6 +1034,9 @@ void Player::PostUpdate()
 	// 接地・速度・突撃などの状態が全て確定したあとで呼ぶので、PostUpdateの最後に置く
 	UpdateAnimation();
 
+	//腕の位置再計算
+	UpdateArmAim(Application::Instance().GetDeltaTime());
+
 	// デバッグ用：状態値をDebugWatchへ(このフレームの最終状態を出す。PostUpdateは毎フレーム必ず走る)
 	WatchDebug();
 }
@@ -1119,8 +1122,18 @@ void Player::DrawWire()
 {
 	if (!m_upWire) { return; }
 
-	// ワイヤーの手元(発射位置に近い高さ)。端点だけ決め、線の描画はWireActionに任せる
+	// ワイヤーの手元。左手のボーンから出す(腕をアンカーへ向けているので手もアンカー側を向く)。
+	// 端点だけ決め、線の描画はWireActionに任せる。
+	// ※ 【見た目だけ】ワイヤーの物理(振り子の支点・長さの拘束)はGetPos()基準のままにしてある。
+	//    支点を手に移すと、腕が動くたびに支点が揺れてスイングの挙動そのものが変わってしまう
+	// ※ ボーンが無いモデルに差し替えても、従来の胴体中心へフォールバックする
 	Math::Vector3 from = GetPos() + Math::Vector3(0.0f, 0.25f, 0.0f);
+
+	Math::Vector3 handPos = {};
+	if (GetBoneWorldPos("mixamorig:LeftHand", handPos))
+	{
+		from = handPos;
+	}
 
 	// スイング中：アンカーへ線を引く
 	if (m_upWire->IsAttached())
@@ -1257,6 +1270,50 @@ Math::Vector2 Player::SelectTilt() const
 
 	// 地上・落下：水平速度に比例して前傾するだけ
 	return Math::Vector2(GetHorizontalSpeed() * leanGain, 0.0f);
+}
+
+bool Player::SelectArmAimTarget(Math::Vector3& _outTarget) const
+{
+	// 【優先順位】ワイヤー接続 > 突撃 > 照準。
+	// 上ほど「実際に体が繋がっている」状態で、腕の向きが機能に直結するため。
+	// ワイヤー中にEを押してターゲットを取ることはありえるが、その時はアンカー側を優先する
+	// (実際に引っ張られている先を指すほうが自然で、線の根元=手との整合も保てる)
+
+	// ワイヤーで繋がっている間は左腕をアンカーへ向ける。
+	// 判定条件はSelectTiltと同じなので、体の傾きと腕が同じタイミングで入り、同じタイミングで抜ける
+	if (m_upWire && m_upWire->IsAttached())
+	{
+		_outTarget = m_upWire->GetAnchor();
+		return true;
+	}
+
+	// 突撃(グラップル)中は引き寄せている対象へ向ける。
+	// ※ オフセット+0.5はDrawWireが突撃線の終点に使っている値と同じ。
+	//    揃えないと「線の終点」と「腕の狙う先」がずれる
+	if (m_isDiving)
+	{
+		if (std::shared_ptr<KdGameObject> spTarget = m_wpDiveTarget.lock())
+		{
+			_outTarget = spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f);
+			return true;
+		}
+	}
+
+	// 照準中(E押しでターゲットをロックしている間)は、その敵へ腕を向ける。
+	// ※ 入力(Focus)を直接見ないのは、Targeting::Updateが「カメラを渡さなければ解除」という作りで
+	//    押していない間は自動でnullptrになるため。入力を二重に判定すると、連続攻撃の受付中
+	//    (Eを離してもロックが続く仕様)で食い違う
+	if (m_upTargeting)
+	{
+		if (std::shared_ptr<KdGameObject> spTarget = m_upTargeting->GetTarget())
+		{
+			_outTarget = spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f);
+			return true;
+		}
+	}
+
+	// それ以外は腕をアニメーションに任せる
+	return false;
 }
 
 void Player::NotifyCounter()

@@ -141,11 +141,26 @@ protected:
 	// ※ 影(GenerateDepthMapFromLight)も必ずこれで描くこと。片方だけだと影がずれる
 	Math::Matrix GetDrawMatrix() const;
 
+	// 指定したボーンのワールド座標を返す。そのボーンが無ければfalse(呼び出し側で従来の位置へ戻せる)。
+	// ※ m_worldTransformはモデル原点基準なので、GetDrawMatrix()を掛けて初めてワールドになる
+	bool GetBoneWorldPos(std::string_view _name, Math::Vector3& _outPos) const;
+
 	//滑らかに目標へ寄せる
 	void UpdateTilt(float _deltaTime);
 
 	//判断は派生クラスに任せる
 	virtual Math::Vector2 SelectTilt()const { return {}; }
+
+	//腕の位置再計算
+	void UpdateArmAim(float _deltaTime);
+
+	// 腕をどこへ向けるかの判断は派生クラスの責務(SelectAnimation/SelectTiltと同じ分け方)。
+	// trueを返したときだけ_outTarget(ワールド座標)を狙う。
+	// ※ Vector3を返す形にしないのは「狙わない」を表現できないため。
+	//    (0,0,0)は正当なワールド座標なので番兵に使えない
+	// 既定はfalse=狙わないので、基底に置いてもEnemyなどの挙動は変わらない
+	// ※ 既定実装では引数を使わないため、C4100(未参照パラメーター/このプロジェクトは/W4)を避けて名前を省いてある
+	virtual bool SelectArmAimTarget(Math::Vector3& /* _outTarget */) const { return false; }
 
 	// 表示用モデルワーク
 	KdModelWork m_modelWork;
@@ -159,7 +174,9 @@ protected:
 
 	// モデルの正面が -Z を向いているか。UpdateFacingが向きを計算するときの符号に効く。
 	// ※ どちらになるかはBlenderのエクスポート設定次第で、モデルごとに違う。
-	//    実測: Scifi_girl = -Z(true) / GogglesChara = +Z(false)
+	//    実測: Scifi_girl = -Z(true) / GogglesChara = -Z(true)
+	//    ※ 2026/07/26訂正: 以前ここに「GogglesChara = +Z(false)」と書いていたが誤り。
+	//      Player.cpp が実際に設定しているのは true で、実機でも正しい向きを向いている
 	//    間違えると「進行方向のちょうど逆」を向くので、モデル差し替え時は必ず確認すること
 	bool m_modelForwardIsMinusZ = true;
 
@@ -204,4 +221,11 @@ protected:
 
 	//キャラクターの体の角度を調整する
 	Math::Vector2 m_tilt = {};
+
+	// 腕をアンカーへ向ける度合い(0=アニメそのまま / 1=完全に狙う)と、直近の狙う点。
+	// ワイヤーを撃った瞬間・切った瞬間に腕が飛ぶのを防ぐため、0↔1をなめらかに行き来させる。
+	// ※ 狙う点を保持するのは、離した後の減衰中も「最後に狙っていた場所」を向いたまま
+	//    アニメへ戻すため。保持しないと減衰中にワールド原点(0,0,0)へ振られる
+	float m_armAimWeight = 0.0f;
+	Math::Vector3 m_armAimTarget = {};
 };

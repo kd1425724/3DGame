@@ -3,6 +3,7 @@
 #include "../../main.h"
 #include "../../Scene/SceneManager.h"
 #include "../../Debug/DebugParams/DebugParams.h"
+#include "../../Debug/DebugFlags/DebugFlags.h"
 #include "../../Collision/CollisionGrid.h"   // 静的コリジョンのbroadphase(近傍の建物だけ問い合わせる)
 
 void CharaBase::SetAsset(const std::string& assetName)
@@ -41,6 +42,91 @@ void CharaBase::UpdateTilt(float _deltaTime)
 	float t = std::clamp(k * _deltaTime, 0.0f, 1.0f);
 	//ターゲットに少しずつ寄せる
 	m_tilt = Math::Vector2::Lerp(m_tilt, target, t);
+}
+
+void CharaBase::UpdateArmAim(float _deltaTime)
+{
+	// DebugFlagsでオフにしたときも、いきなりアニメへ戻さず重みを0へ落として自然に抜ける。
+	// (早期リターンにすると切り替えた瞬間に腕が飛び、比較用のオンオフとして使えない)
+	bool enabled = DebugFlags::Instance().Get(U8("腕/アンカーへ向ける"), true);
+
+	// 狙う点は派生クラスが決める。狙っている間だけ目標を更新し、
+	// 離した後は「最後に狙っていた点」を向いたまま重みだけ0へ落としてアニメへ戻す
+	Math::Vector3 aimTarget = {};
+	bool wantAim = enabled && SelectArmAimTarget(aimTarget);
+	if (wantAim)
+	{
+		m_armAimTarget = aimTarget;
+	}
+
+	// 重みを目標へ寄せる(UpdateTiltと同じ寄せ方)
+	float k = DebugParams::Instance().Float(U8("腕/追従速度"), 8.0f, 1.0f, 60.0f);
+	float t = std::clamp(k * _deltaTime, 0.0f, 1.0f);
+	m_armAimWeight = std::lerp(m_armAimWeight, wantAim ? 1.0f : 0.0f, t);
+
+	// ほぼ0なら何もしない=アニメそのまま。
+	// CalcNodeMatricesも走らないので、狙っていないキャラ・時間帯には負荷がかからない
+	if (m_armAimWeight < 0.001f) { return; }
+
+	// 回転量の上限。無いと、アンカーが真後ろや真下にあるとき肩が反対側へ折れて破綻する
+	float maxRad = DirectX::XMConvertToRadians(
+		DebugParams::Instance().Float(U8("腕/最大角度"), 120.0f, 0.0f, 180.0f));
+
+	// 狙いの強さ。1.0で完全に狙い、下げるほどアニメのポーズを残す(見た目の好み用)
+	float strength = DebugParams::Instance().Float(U8("腕/向ける強さ"), 1.0f, 0.0f, 1.0f);
+
+	m_modelWork.CalcNodeMatrices();
+
+	//型 : KdModelWork::Node
+	for (auto& node : m_modelWork.WorkNodes())
+	{
+		//左腕じゃなかったら
+		if (node.m_name != "mixamorig:LeftArm") { continue; }
+		
+		//腕のワールド行列
+		Math::Matrix worldMat = node.m_worldTransform * GetDrawMatrix();
+		//腕のワールド位置
+		Math::Vector3 worldPos = worldMat.Translation();
+		//狙う方向
+		Math::Vector3 dW = (m_armAimTarget - worldPos);
+		dW.Normalize();
+		//逆行列
+		Math::Matrix worldInvMat = worldMat.Invert();
+		
+		Math::Vector3 dL = Math::Vector3::TransformNormal(dW, worldInvMat);
+		dL.Normalize();
+		Math::Vector3 a = { 0, 1, 0 };
+
+		Math::Vector3 axis = a.Cross(dL);
+		if (axis.LengthSquared() < 0.0001f) { break; }
+
+		axis.Normalize();
+		float angle = std::acos(std::clamp(a.Dot(dL), -1.0f, 1.0f));
+
+		// 【順序に意味がある】上限を先に掛けてから重みを掛ける。
+		// 逆にするとフェード中の小さい角度に上限がかかり、上限が「最終ポーズの制限」として働かない
+		angle = std::min(angle, maxRad);
+
+		// 重みぶんだけ回す。0でアニメそのまま、1で完全に狙う
+		angle *= m_armAimWeight * strength;
+
+		Math::Matrix R = Math::Matrix::CreateFromAxisAngle(axis, angle);
+		
+		node.m_localTransform = R * node.m_localTransform;
+		
+		break;
+	}
+
+	m_modelWork.CalcNodeMatrices();
+}
+
+bool CharaBase::GetBoneWorldPos(std::string_view _name, Math::Vector3& _outPos) const
+{
+	const KdModelWork::Node* node = m_modelWork.FindNode(_name);
+	if (!node) { return false; }
+
+	_outPos = (node->m_worldTransform * GetDrawMatrix()).Translation();
+	return true;
 }
 
 void CharaBase::DrawLit()
