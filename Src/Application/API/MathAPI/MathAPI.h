@@ -241,6 +241,18 @@ namespace MathAPI
 	// float版
 	float ApproachByLerp(float _current, float _target, float _rate);
 
+	// _fromDir を _toDir へ向ける回転行列を作る(最短の回り方＝2つの外積を軸にした回転)。
+	// ボーンの軸を狙う方向へ向けるのに使う。どちらの引数も単位ベクトルであること
+	//  ・_maxRad … 回転量の上限(ラジアン)。無いと関節が反対側へ折れて破綻する
+	//  ・_weight … 効き具合(0〜1)。0でほぼ無回転=アニメのポーズそのまま
+	// 2つの向きが平行で回転軸が決まらないときは false を返す(呼ぶ側で「回さない」にする)
+	// ※ Unity の Quaternion.FromToRotation。上限と重みは本作の都合で足した引数
+	//
+	// 【罠】上限と重みを掛ける順序に意味がある。上限を先に掛けてから重みを掛けること。
+	//   逆にするとフェード中の小さい角度に上限がかかり、上限が「最終ポーズの制限」として働かない
+	bool FromToRotation(const Math::Vector3& _fromDir, const Math::Vector3& _toDir,
+		Math::Matrix& _outRot, float _maxRad, float _weight);
+
 	// 現在向いている角度(Y軸、度：0~360を想定)を、目標方向(ワールド座標系)へ
 	// 最大_maxAngleSpeedDeg度/回まで回転させた新しい角度を返す(敵がプレイヤー方向を向く等に使用)
 	// ※ 中身は DirToYawDeg + MoveTowardsAngleDeg。CharaBase::UpdateFacing と同じ計算になった

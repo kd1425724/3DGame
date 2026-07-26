@@ -12,6 +12,26 @@ namespace MathAPI
 		return _current + (_target - _current) * _rate;
 	}
 
+	bool FromToRotation(const Math::Vector3& _fromDir, const Math::Vector3& _toDir,
+		Math::Matrix& _outRot, float _maxRad, float _weight)
+	{
+		// 回転軸＝2つの向きに垂直なベクトル。平行だと長さ0になり軸が決まらないので打ち切る
+		// (ガードを外すとゼロ除算でNaNが出て、ボーン行列を通ってメッシュ全体が消える)
+		Math::Vector3 axis = _fromDir.Cross(_toDir);
+		if (!TryNormalize(axis)) { return false; }
+
+		// なす角。誤差でacosの定義域(-1〜1)から外れてNaNにならないようクランプする
+		// (こちらもガードを外すとメッシュが消える)
+		float angle = std::acos(std::clamp(_fromDir.Dot(_toDir), -1.0f, 1.0f));
+
+		// 【順序に意味がある】上限を先に掛けてから重みを掛ける
+		angle = std::min(angle, _maxRad);
+		angle *= _weight;
+
+		_outRot = Math::Matrix::CreateFromAxisAngle(axis, angle);
+		return true;
+	}
+
 	float RotateToDirection(float _nowAngleDeg, const Math::Vector3& _toDir, float _maxAngleSpeedDeg)
 	{
 		// 【2026/07/27 実装を差し替えた】

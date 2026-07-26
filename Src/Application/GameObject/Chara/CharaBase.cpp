@@ -93,24 +93,17 @@ void CharaBase::UpdateArmAim(float _deltaTime)
 		
 		Math::Vector3 dL = Math::Vector3::TransformNormal(dW, worldInvMat);
 		dL.Normalize();
-		Math::Vector3 a = { 0, 1, 0 };
 
-		Math::Vector3 axis = a.Cross(dL);
-		if (!MathAPI::TryNormalize(axis)) { break; }
+		// この骨の軸はローカル+Y(glTFで子=肘への平行移動が(0, 0.1907, 0)だったので実測済み)。
+		// その軸を狙う方向へ向ける回転を作る。重みは0でアニメそのまま、1で完全に狙う
+		Math::Vector3 boneAxis = { 0, 1, 0 };
+		Math::Matrix R;
+		if (!MathAPI::FromToRotation(boneAxis, dL, R, maxRad, m_armAimWeight * strength)) { break; }
 
-		float angle = std::acos(std::clamp(a.Dot(dL), -1.0f, 1.0f));
-
-		// 【順序に意味がある】上限を先に掛けてから重みを掛ける。
-		// 逆にするとフェード中の小さい角度に上限がかかり、上限が「最終ポーズの制限」として働かない
-		angle = std::min(angle, maxRad);
-
-		// 重みぶんだけ回す。0でアニメそのまま、1で完全に狙う
-		angle *= m_armAimWeight * strength;
-
-		Math::Matrix R = Math::Matrix::CreateFromAxisAngle(axis, angle);
-		
+		// 【罠】前から掛けて初めて「骨の原点まわりで子を回す」＝関節を曲げる意味になる。
+		// 逆に掛けると腕が体から外れて飛ぶ(行ベクトル規約なので左が先)
 		node.m_localTransform = R * node.m_localTransform;
-		
+
 		break;
 	}
 
