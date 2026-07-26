@@ -379,11 +379,7 @@ void Player::ClampSpeed()
 	}
 
 	// 全体の速さを上限で抑える。向きは変えず大きさだけ縮める
-	float sp = m_velocity.Length();
-	if (sp > maxSpeed)
-	{
-		m_velocity *= (maxSpeed / sp);
-	}
+	m_velocity = MathAPI::ClampMagnitude(m_velocity, maxSpeed);
 }
 
 void Player::SpawnBoostFx(const Math::Vector3& _dir, float _dt)

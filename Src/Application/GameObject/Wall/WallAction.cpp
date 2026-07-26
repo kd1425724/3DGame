@@ -91,8 +91,7 @@ void WallAction::Update(CharaBase& _body, float _dt, const Math::Vector3& _wishD
 	// --- 壁に沿った移動 ---
 	// 壁の法線成分(壁へ突っ込む/離れる速度)を取り除き、壁面に沿った成分だけ残す。
 	// これで壁に当たっても勢いが死なず、壁沿いに走り続けられる
-	Math::Vector3 v = _body.m_velocity;
-	v -= m_wallNormal * v.Dot(m_wallNormal);
+	Math::Vector3 v = MathAPI::ProjectOnPlane(_body.m_velocity, m_wallNormal);
 
 	// 壁の方を向いて前入力していれば「よじ登り」に切り替える。
 	// 判定は移動入力の向きと壁の内向き(-法線)の内積＝カメラを壁へ向けてWを押している状態。
@@ -180,7 +179,7 @@ bool WallAction::CanStart(const CharaBase& _body) const
 	// 壁に正面から当たっただけ(=沿う成分が無い)では発動させない。
 	// 「走っている勢いを壁に預ける」動きなので、止まっていたら張り付かないのが正しい
 	Math::Vector3 hv = MathAPI::FlattenY(_body.m_velocity);
-	Math::Vector3 tangent = hv - n * hv.Dot(n);
+	Math::Vector3 tangent = MathAPI::ProjectOnPlane(hv, n);
 
 	// ※ 2026/07/20 に 6.0 → 3.0 へ緩めた(ユーザー指示「開始判定はもっとゆるくていい」)。
 	//    通常の歩き速度でも壁に沿っていれば掛かるようにする
@@ -240,7 +239,7 @@ void WallAction::WallJump(CharaBase& _body)
 	float keep = DebugParams::Instance().Float(U8("壁ジャンプ/勢いの持ち越し"),  0.6f, 0.0f,  2.0f);
 
 	Math::Vector3 hv = MathAPI::FlattenY(_body.m_velocity);
-	Math::Vector3 tangent = hv - m_wallNormal * hv.Dot(m_wallNormal);
+	Math::Vector3 tangent = MathAPI::ProjectOnPlane(hv, m_wallNormal);
 
 	Math::Vector3 v = m_wallNormal * kick + tangent * keep;
 	v.y = up;

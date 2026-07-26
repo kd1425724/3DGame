@@ -134,7 +134,7 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 		Math::Vector3 radial = MathAPI::FlattenY(pos - m_anchor);
 		if (MathAPI::TryNormalize(radial))
 		{
-			tdir -= radial * tdir.Dot(radial);
+			tdir = MathAPI::ProjectOnPlane(tdir, radial);
 			if (!MathAPI::TryNormalize(tdir))
 			{
 				tdir = Math::Vector3::Zero;
@@ -346,11 +346,10 @@ void WireAction::Update(Math::Vector3& _pos, Math::Vector3& _vel, float _dt, flo
 	{
 		_pos = m_anchor + dir * m_length;
 
-		float radialSpeed = _vel.Dot(dir);
-		if (radialSpeed > 0)
-		{
-			_vel -= dir * radialSpeed;
-		}
+		// 外向き(dir方向)の成分だけ打ち消す。内側へ寄る動きは残す=不等式拘束。
+		// ※ ClipVelocityは「面へ入っていく成分」を消す関数なので、法線として -dir を渡す。
+		//    アンカーから外向きのdirに対し、外へ出ようとする動きが「面へ入っていく」側になる
+		_vel = MathAPI::ClipVelocity(_vel, -dir);
 
 		// 【2026/07/19 既定値を 5 → 0 に変更】
 		// 拘束中ずっとアンカー方向へ加速し続けていたため、「前や上へ行きたいのに

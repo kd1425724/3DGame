@@ -508,11 +508,8 @@ void CharaBase::ResolveBump(Math::Vector3& pos)
 				m_wallNormal = n;
 			}
 
-			float into = m_velocity.Dot(n);
-			if (into < 0.0f)
-			{
-				m_velocity -= n * into;
-			}
+			// 壁へ入っていく成分だけ消す(離れる方向の勢いは残すので壁沿いの滑りは死なない)
+			m_velocity = MathAPI::ClipVelocity(m_velocity, n);
 		}
 	}
 }

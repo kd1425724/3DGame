@@ -95,6 +95,42 @@ namespace MathAPI
 	}
 
 	//------------------------------------------------
+	// 面に対する分解
+	//------------------------------------------------
+
+	// _vから「_planeNormal方向の成分」を取り除いて、面に沿った成分だけにする
+	// (壁に沿って滑らせる／ワイヤーの接線成分だけ残す、等)
+	// ※ Unity の Vector3.ProjectOnPlane。数学用語では「ベクトル棄却(rejection)」
+	// ※ _planeNormal は単位ベクトルであること。長さが1でないと除去量がずれる
+	inline Math::Vector3 ProjectOnPlane(const Math::Vector3& _v, const Math::Vector3& _planeNormal)
+	{
+		return _v - _planeNormal * _v.Dot(_planeNormal);
+	}
+
+	// _velocityのうち「面へ向かって入っていく成分」だけを取り除く。
+	// 面から離れていく分はそのまま残すので、壁を擦りながら離れる動きが死なない
+	// ＝ ProjectOnPlane との違いは「片側だけ」削ること
+	// ※ Quake/Source系エンジンの PM_ClipVelocity と同じ考え方
+	inline Math::Vector3 ClipVelocity(const Math::Vector3& _velocity, const Math::Vector3& _planeNormal)
+	{
+		const float into = _velocity.Dot(_planeNormal);
+		if (into >= 0.0f) { return _velocity; }
+
+		return _velocity - _planeNormal * into;
+	}
+
+	// ベクトルの長さに上限をかける(向きは変えない)
+	// ※ Unity の Vector3.ClampMagnitude
+	inline Math::Vector3 ClampMagnitude(const Math::Vector3& _v, float _maxLength)
+	{
+		const float len = _v.Length();
+		if (len <= _maxLength) { return _v; }
+		if (len <= 0.0f) { return _v; }
+
+		return _v * (_maxLength / len);
+	}
+
+	//------------------------------------------------
 	// 目標値への追従(フレームレート非依存)
 	//------------------------------------------------
 
