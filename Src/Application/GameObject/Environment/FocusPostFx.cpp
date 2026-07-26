@@ -3,6 +3,7 @@
 #include "../../main.h"
 #include "../../Debug/DebugParams/DebugParams.h"
 #include "../../Debug/DebugFlags/DebugFlags.h"
+#include "../../API/MathAPI/MathAPI.h"   // 目標値への追従(InterpTo)
 
 void FocusPostFx::Update()
 {
@@ -18,12 +19,7 @@ void FocusPostFx::Update()
 	// 実時間で目標へ滑らかに寄せる(スロー中でも演出の遷移は現実の速度で進む)
 	float dt     = Application::Instance().GetRealDeltaTime();
 	float follow = DebugParams::Instance().Float(U8("スロー演出/追従速度"), 8.0f, 0.5f, 30.0f);
-	float t = follow * dt;
-	if (t > 1.0f)
-	{
-		t = 1.0f;
-	}
-	m_blend += (target - m_blend) * t;
+	m_blend = MathAPI::InterpTo(m_blend, target, dt, follow);
 
 	// ===== 被写界深度(DoF) =====
 	// near/far … ビュー深度(ワールド単位)を 0..1 に写す範囲

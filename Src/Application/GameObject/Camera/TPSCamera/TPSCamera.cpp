@@ -79,9 +79,8 @@ void TPSCamera::PostUpdate()
 	m_prevTargetPos = targetPos;
 
 	// === A: 追従スムージング(注視点をLerpで遅れて寄せる=振り子軌道の急な揺れを吸収) ===
-	float followK = DebugParams::Instance().Float(U8("カメラ/追従スムーズ"), 12.0f, 1.0f, 60.0f);
-	float followT = std::clamp(followK * dt, 0.0f, 1.0f);   // 値が大きいほど追従が速い(=スムージング弱)
-	m_smoothFollowPos = Math::Vector3::Lerp(m_smoothFollowPos, targetPos, followT);
+	float followK = DebugParams::Instance().Float(U8("カメラ/追従スムーズ"), 12.0f, 1.0f, 60.0f);   // 値が大きいほど追従が速い(=スムージング弱)
+	m_smoothFollowPos = MathAPI::InterpTo(m_smoothFollowPos, targetPos, dt, followK);
 
 	// === B: 回転スムージング(視点角度を最短経路でLerp=ロックオンのスナップやマウス急変を和らげる) ===
 	float rotK = DebugParams::Instance().Float(U8("カメラ/回転スムーズ"), 20.0f, 1.0f, 60.0f);
@@ -109,7 +108,7 @@ void TPSCamera::PostUpdate()
 	float pullMax      = DebugParams::Instance().Float(U8("カメラ/速度引き上限"), 3.0f, 0.0f, 15.0f);
 	float pullTarget   = std::clamp(targetSpeed * pullPerSpeed, 0.0f, pullMax);
 	// 引き量も急に変えると酔うので、追従と同じレートで滑らかに寄せる
-	m_smoothPullback  += (pullTarget - m_smoothPullback) * followT;
+	m_smoothPullback = MathAPI::InterpTo(m_smoothPullback, pullTarget, dt, followK);
 
 	// === F: 速度に応じてFOVを少し広げる(疾走感) ===
 	// 広げすぎると酔うので上限つき＋追従と同レートで平滑化。FOV自体はDebugParamsで無効化(量0)も可
@@ -117,7 +116,7 @@ void TPSCamera::PostUpdate()
 	float fovPerSpeed = DebugParams::Instance().Float(U8("カメラ/速度FOV量"),    0.4f,  0.0f,  3.0f);
 	float fovMaxAdd   = DebugParams::Instance().Float(U8("カメラ/速度FOV上限"), 12.0f,  0.0f, 40.0f);
 	float fovTarget   = fovBase + std::clamp(targetSpeed * fovPerSpeed, 0.0f, fovMaxAdd);
-	m_smoothFov      += (fovTarget - m_smoothFov) * followT;
+	m_smoothFov = MathAPI::InterpTo(m_smoothFov, fovTarget, dt, followK);
 	if (m_spCamera)
 	{
 		m_spCamera->SetProjectionMatrix(m_smoothFov);

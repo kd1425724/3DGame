@@ -95,10 +95,40 @@ namespace MathAPI
 	}
 
 	//------------------------------------------------
+	// 目標値への追従(フレームレート非依存)
+	//------------------------------------------------
+
+	// 現在値を目標へ「毎秒_speedの勢いで」近づける。dtを掛けてからクランプするので
+	// フレームレートが変わっても追従の速さがほぼ変わらない。_speedが大きいほど速く追いつく
+	// ※ Unreal の FMath::FInterpTo / VInterpTo。式まで同じ
+	// ※ クランプが必須。dtが大きい(処理落ち)ときに1.0を超えると目標を通り越して振動する
+	inline float InterpTo(float _current, float _target, float _deltaTime, float _speed)
+	{
+		const float t = std::clamp(_deltaTime * _speed, 0.0f, 1.0f);
+		return _current + (_target - _current) * t;
+	}
+
+	inline Math::Vector2 InterpTo(const Math::Vector2& _current, const Math::Vector2& _target,
+		float _deltaTime, float _speed)
+	{
+		const float t = std::clamp(_deltaTime * _speed, 0.0f, 1.0f);
+		return Math::Vector2::Lerp(_current, _target, t);
+	}
+
+	inline Math::Vector3 InterpTo(const Math::Vector3& _current, const Math::Vector3& _target,
+		float _deltaTime, float _speed)
+	{
+		const float t = std::clamp(_deltaTime * _speed, 0.0f, 1.0f);
+		return Math::Vector3::Lerp(_current, _target, t);
+	}
+
+	//------------------------------------------------
 	// 補間・回転
 	//------------------------------------------------
 
 	// 現在値を_targetの方向へ_rate(0~1)の割合で近づける(Lerpによる定数減衰接近)
+	// ※ 割合を自分で用意する版。毎フレーム呼ぶなら dt を織り込む InterpTo のほうを使う
+	//   (_rate を固定値にするとフレームレートで追従の速さが変わってしまうため)
 	Math::Vector3 ApproachByLerp(const Math::Vector3& _current, const Math::Vector3& _target, float _rate);
 
 	// float版

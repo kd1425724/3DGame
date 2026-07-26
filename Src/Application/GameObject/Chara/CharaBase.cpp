@@ -38,11 +38,9 @@ void CharaBase::UpdateTilt(float _deltaTime)
 	//yはzとして扱う
 	target.y = std::clamp(target.y, -maxDeg, maxDeg);
 
-	//現在値を目標に寄せる
+	//現在値を目標に寄せる(ターゲットに少しずつ寄せる)
 	float k = DebugParams::Instance().Float(U8("傾き/追従速度"), 8.0f, 1.0f, 60.0f);
-	float t = std::clamp(k * _deltaTime, 0.0f, 1.0f);
-	//ターゲットに少しずつ寄せる
-	m_tilt = Math::Vector2::Lerp(m_tilt, target, t);
+	m_tilt = MathAPI::InterpTo(m_tilt, target, _deltaTime, k);
 }
 
 void CharaBase::UpdateArmAim(float _deltaTime)
@@ -62,8 +60,7 @@ void CharaBase::UpdateArmAim(float _deltaTime)
 
 	// 重みを目標へ寄せる(UpdateTiltと同じ寄せ方)
 	float k = DebugParams::Instance().Float(U8("腕/追従速度"), 8.0f, 1.0f, 60.0f);
-	float t = std::clamp(k * _deltaTime, 0.0f, 1.0f);
-	m_armAimWeight = std::lerp(m_armAimWeight, wantAim ? 1.0f : 0.0f, t);
+	m_armAimWeight = MathAPI::InterpTo(m_armAimWeight, wantAim ? 1.0f : 0.0f, _deltaTime, k);
 
 	// ほぼ0なら何もしない=アニメそのまま。
 	// CalcNodeMatricesも走らないので、狙っていないキャラ・時間帯には負荷がかからない
