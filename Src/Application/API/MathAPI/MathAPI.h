@@ -95,6 +95,77 @@ namespace MathAPI
 	}
 
 	//------------------------------------------------
+	// 角度(度)の扱い
+	//------------------------------------------------
+	// 角度は「350°と10°は20°しか離れていない」ので、素直に引き算すると遠回りする。
+	// ここの関数は全部それを畳んでから計算する
+
+	// 角度を 0〜360 の範囲に収める
+	// ※ Unreal の FRotator::ClampAxis
+	inline float ClampAngleDeg(float _deg)
+	{
+		float a = std::fmod(_deg, 360.0f);
+		if (a < 0.0f)
+		{
+			a += 360.0f;
+		}
+
+		return a;
+	}
+
+	// _fromDeg から _toDeg への「最短の符号付き差」を -180〜180 で返す
+	// ※ Unity の Mathf.DeltaAngle
+	inline float DeltaAngleDeg(float _fromDeg, float _toDeg)
+	{
+		// fmodで一周ぶんを落とすと結果は -360〜360 に入るので、あとは1回ずつ寄せれば足りる
+		float d = std::fmod(_toDeg - _fromDeg, 360.0f);
+		if (d > 180.0f)
+		{
+			d -= 360.0f;
+		}
+		if (d < -180.0f)
+		{
+			d += 360.0f;
+		}
+
+		return d;
+	}
+
+	// 角度を最短方向に補間する
+	// ※ Unity の Mathf.LerpAngle
+	inline float LerpAngleDeg(float _fromDeg, float _toDeg, float _t)
+	{
+		return _fromDeg + DeltaAngleDeg(_fromDeg, _toDeg) * _t;
+	}
+
+	// 角度を最短方向へ、1回あたり _maxDeltaDeg までしか動かさずに寄せる
+	// ※ Unity の Mathf.MoveTowardsAngle
+	inline float MoveTowardsAngleDeg(float _currentDeg, float _targetDeg, float _maxDeltaDeg)
+	{
+		// 負の上限を渡されると std::clamp が未定義動作(lo > hi)になるので潰しておく
+		const float maxDelta = std::max(_maxDeltaDeg, 0.0f);
+
+		return _currentDeg + std::clamp(DeltaAngleDeg(_currentDeg, _targetDeg), -maxDelta, maxDelta);
+	}
+
+	// 角度の InterpTo 版(最短方向・フレームレート非依存)
+	inline float InterpAngleTo(float _currentDeg, float _targetDeg, float _deltaTime, float _speed)
+	{
+		return LerpAngleDeg(_currentDeg, _targetDeg, std::clamp(_deltaTime * _speed, 0.0f, 1.0f));
+	}
+
+	// 水平の向きベクトルから、Y軸回転の角度(度)を求める(公式名は無いので独自)
+	// ・CreateRotationY(θ)は +Z を (sinθ, 0, cosθ) へ移すので、+Z を _dir へ向ける角度は atan2(x, z)
+	// ・正面が -Z のモデルは「-Z を _dir へ向ける」＝「+Z を -_dir へ向ける」ので符号を反転させる
+	// ※ ゼロベクトルを渡すと 0°(真正面)が返る。呼ぶ側で長さを確かめること
+	inline float DirToYawDeg(const Math::Vector3& _dir, bool _forwardIsMinusZ = false)
+	{
+		const float s = _forwardIsMinusZ ? -1.0f : 1.0f;
+
+		return DirectX::XMConvertToDegrees(std::atan2(s * _dir.x, s * _dir.z));
+	}
+
+	//------------------------------------------------
 	// 面に対する分解
 	//------------------------------------------------
 
@@ -172,7 +243,7 @@ namespace MathAPI
 
 	// 現在向いている角度(Y軸、度：0~360を想定)を、目標方向(ワールド座標系)へ
 	// 最大_maxAngleSpeedDeg度/回まで回転させた新しい角度を返す(敵がプレイヤー方向を向く等に使用)
-	// ・内積でなす角(cos)を求め、それをそのまま回転量として使う
-	// ・外積のY成分の符号で、右回り/左回りどちらに回すべきかを判定する
+	// ※ 中身は DirToYawDeg + MoveTowardsAngleDeg。CharaBase::UpdateFacing と同じ計算になった
+	//    (以前は「内積でなす角・外積のY成分で回転方向」という別実装だった。理由は .cpp のコメント)
 	float RotateToDirection(float _nowAngleDeg, const Math::Vector3& _toDir, float _maxAngleSpeedDeg);
 }

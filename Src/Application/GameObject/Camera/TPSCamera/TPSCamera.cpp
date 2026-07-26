@@ -49,7 +49,7 @@ void TPSCamera::PostUpdate()
 
 			// カメラの回転は m_rot ではなく m_DegAng で管理されている(GetRotationMatrix参照)
 			// ※ ヨー(左右)のみロックオン対象方向に固定し、ピッチ(上下)はマウス操作のまま残す
-			m_DegAng.y = DirectX::XMConvertToDegrees(atan2f(dir.x, dir.z));
+			m_DegAng.y = MathAPI::DirToYawDeg(dir);
 		}
 	}
 
@@ -83,25 +83,11 @@ void TPSCamera::PostUpdate()
 	m_smoothFollowPos = MathAPI::InterpTo(m_smoothFollowPos, targetPos, dt, followK);
 
 	// === B: 回転スムージング(視点角度を最短経路でLerp=ロックオンのスナップやマウス急変を和らげる) ===
+	// ※ InterpAngleTo が角度差を[-180,180]に畳むので、ヨーが720度等に累積してもクルッと回らない
 	float rotK = DebugParams::Instance().Float(U8("カメラ/回転スムーズ"), 20.0f, 1.0f, 60.0f);
-	float rotT = std::clamp(rotK * dt, 0.0f, 1.0f);
-	auto lerpAngle = [](float cur, float tgt, float t)
-	{
-		// 角度差を[-180,180]に畳んで最短方向に補間する(ヨーが720度等に累積してもクルッと回らない)
-		float d = tgt - cur;
-		while (d > 180.0f)
-		{
-			d -= 360.0f;
-		}
-		while (d < -180.0f)
-		{
-			d += 360.0f;
-		}
-		return cur + d * t;
-	};
-	m_smoothDegAng.x = lerpAngle(m_smoothDegAng.x, m_DegAng.x, rotT);
-	m_smoothDegAng.y = lerpAngle(m_smoothDegAng.y, m_DegAng.y, rotT);
-	m_smoothDegAng.z = lerpAngle(m_smoothDegAng.z, m_DegAng.z, rotT);
+	m_smoothDegAng.x = MathAPI::InterpAngleTo(m_smoothDegAng.x, m_DegAng.x, dt, rotK);
+	m_smoothDegAng.y = MathAPI::InterpAngleTo(m_smoothDegAng.y, m_DegAng.y, dt, rotK);
+	m_smoothDegAng.z = MathAPI::InterpAngleTo(m_smoothDegAng.z, m_DegAng.z, dt, rotK);
 
 	// === C: 速度に応じてカメラを後ろへ引く(情報量を減らして酔い軽減。FOVは一定に保つ) ===
 	float pullPerSpeed = DebugParams::Instance().Float(U8("カメラ/速度引き量"), 0.06f, 0.0f, 1.0f);

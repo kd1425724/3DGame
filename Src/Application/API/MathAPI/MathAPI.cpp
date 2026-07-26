@@ -14,53 +14,24 @@ namespace MathAPI
 
 	float RotateToDirection(float _nowAngleDeg, const Math::Vector3& _toDir, float _maxAngleSpeedDeg)
 	{
-		// 現在向いている方向ベクトルを、現在の角度から求める
-		Math::Matrix nowRotMat = Math::Matrix::CreateRotationY(DirectX::XMConvertToRadians(_nowAngleDeg));
-		Math::Vector3 nowDir = Math::Vector3::TransformNormal(Math::Vector3(0, 0, 1), nowRotMat);
+		// 【2026/07/27 実装を差し替えた】
+		// 旧実装は「①現在角から向きベクトルを作る ②内積をacosに通してなす角を出す
+		// ③外積のY成分の符号で左右を決める」という手順だった。CharaBase::UpdateFacing が
+		// 「atan2で目標角を出し、差を最短方向へ畳んで詰める」という別のやり方で同じことを
+		// していたため、後者に寄せて1本にまとめた。旧実装は git 履歴に残っている。
+		//
+		// 旧実装には2つの弱点があった:
+		//  ・acos に渡していたのが「3Dの内積」だったので、y成分を持つベクトルを渡すと
+		//    水平の角度差より大きい値が出る(現在の呼び出し元=Enemyは水平ベクトルを渡すので影響なし)
+		//  ・0.1度未満を切り捨てるデッドゾーンがあり、わずかな向きのズレが永久に残っていた
 
-		// 内積：ベクトルA * ベクトルB * COS(なす角) = COS(なす角)(お互い単位ベクトルのため)
-		float dot = nowDir.Dot(_toDir);
+		// 水平成分だけを見る(Y軸回転なので上下の傾きは関係ない)
+		const Math::Vector3 dir = GetSafeNormalXZ(_toDir);
+		if (dir == Math::Vector3::Zero) { return _nowAngleDeg; }
 
-		// 誤差でacosの定義域(-1~1)から外れてNaNにならないようにクランプ
-		dot = std::clamp(dot, -1.0f, 1.0f);
+		const float targetDeg = DirToYawDeg(dir);
 
-		// COSをACOSで計算すると角度(ラジアン)になる
-		float angle = DirectX::XMConvertToDegrees(acos(dot));
-
-		float newAngleDeg = _nowAngleDeg;
-
-		// 求めた角度が少しでもあるなら回転させる
-		if (angle >= 0.1f)
-		{
-			// 1回の回転量に上限を設ける
-			if (angle > _maxAngleSpeedDeg)
-			{
-				angle = _maxAngleSpeedDeg;
-			}
-
-			// 外積：2つのベクトルに対し垂直なベクトルを算出。Y成分の符号で回転方向を判定する
-			Math::Vector3 cross = nowDir.Cross(_toDir);
-
-			if (cross.y > 0)
-			{
-				// 外積が上を向いている
-				newAngleDeg += angle;
-				if (newAngleDeg > 360.0f)
-				{
-					newAngleDeg -= 360.0f;
-				}
-			}
-			else
-			{
-				// 外積が下を向いている
-				newAngleDeg -= angle;
-				if (newAngleDeg < 0.0f)
-				{
-					newAngleDeg += 360.0f;
-				}
-			}
-		}
-
-		return newAngleDeg;
+		// 最短方向へ、1回の上限まで詰めてから 0〜360 に収める
+		return ClampAngleDeg(MoveTowardsAngleDeg(_nowAngleDeg, targetDeg, _maxAngleSpeedDeg));
 	}
 }

@@ -152,39 +152,16 @@ void CharaBase::UpdateFacing(float _deltaTime)
 	dir = MathAPI::FlattenY(dir);
 	if (!MathAPI::TryNormalize(dir)) { return; }
 
-	// CreateRotationY(θ)は +Z を (sinθ, 0, cosθ) へ移すので、+Z を dir へ向ける角度は atan2(x, z)。
-	// 正面が -Z のモデルは「-Z を dir へ向ける」＝「+Z を -dir へ向ける」なので符号を反転させる。
-	// m_rot は度で持っているので度へ直す
-	float s = m_modelForwardIsMinusZ ? -1.0f : 1.0f;
-	float targetDeg = DirectX::XMConvertToDegrees(std::atan2(s * dir.x, s * dir.z));
+	// m_rot は度で持っているので、向きベクトルを度の角度へ直す
+	float targetDeg = MathAPI::DirToYawDeg(dir, m_modelForwardIsMinusZ);
 
 	Math::Vector3 rot = GetRot();
 
-	// 今の角度との差を -180〜180 に畳んでから寄せる。
-	// 畳まないと 350°→10° のときに遠回り(-340°)して一周してしまう
-	float diff = targetDeg - rot.y;
-	while (diff > 180.0f)
-	{
-		diff -= 360.0f;
-	}
-	while (diff < -180.0f)
-	{
-		diff += 360.0f;
-	}
-
-	// 1フレームで回れる上限まで詰める(瞬間で向きが変わるとカクつくのでなめらかに)
+	// 1フレームで回れる上限まで詰める(瞬間で向きが変わるとカクつくのでなめらかに)。
+	// MoveTowardsAngleDeg が差を -180〜180 に畳むので、350°→10° で遠回りしない。
+	// そのあと 0〜360 に収めて角度が際限なく増減するのを防ぐ
 	float maxStep = SelectTurnSpeed() * _deltaTime;
-	rot.y += std::clamp(diff, -maxStep, maxStep);
-
-	// 角度が際限なく増減しないよう 0〜360 に収める
-	if (rot.y >= 360.0f)
-	{
-		rot.y -= 360.0f;
-	}
-	if (rot.y < 0.0f)
-	{
-		rot.y += 360.0f;
-	}
+	rot.y = MathAPI::ClampAngleDeg(MathAPI::MoveTowardsAngleDeg(rot.y, targetDeg, maxStep));
 
 	SetRot(rot);
 }
