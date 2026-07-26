@@ -5,6 +5,7 @@
 #include "../../Debug/DebugParams/DebugParams.h"
 #include "../../Debug/DebugFlags/DebugFlags.h"   // 遮蔽チェックのON/OFF
 #include "../../Collision/CollisionGrid.h"       // IsWallBetween(敵が建物の陰にいるか)
+#include "../../API/MathAPI/MathAPI.h"           // 安全な正規化
 
 // 板ポリ(KdSquarePolygon)はPch経由で見える。unique_ptr(前方宣言)の生成/破棄を
 // ここ(完全な型が見える.cpp)で行うため、ctor/dtorを定義する
@@ -34,8 +35,7 @@ void Targeting::Update(const std::shared_ptr<CameraBase>& _spCamera, float _dt)
 	// カメラの発射方向(ピッチ込み)。ワイヤー発射と同じ「フルの向き」
 	Math::Vector3 camPos = _spCamera->GetPos();
 	Math::Vector3 camFwd = Math::Vector3::TransformNormal(Math::Vector3::Backward, _spCamera->GetRotationMatrix());
-	if (camFwd.LengthSquared() < 0.0001f) { return; }
-	camFwd.Normalize();
+	if (!MathAPI::TryNormalize(camFwd)) { return; }
 
 	// 画面中心からの許容角度。これより外の敵は対象にしない
 	float limitDeg = DebugParams::Instance().Float(U8("照準/有効角度"), 40.0f, 5.0f, 90.0f);
@@ -48,8 +48,7 @@ void Targeting::Update(const std::shared_ptr<CameraBase>& _spCamera, float _dt)
 	{
 		if (!spEnemy) { continue; }
 		Math::Vector3 to = spEnemy->GetPos() - camPos;
-		if (to.LengthSquared() < 0.0001f) { continue; }
-		to.Normalize();
+		if (!MathAPI::TryNormalize(to)) { continue; }
 		float d = to.Dot(camFwd);
 		if (d <= minDot) { continue; }   // 中心から外れすぎ
 		m_candidates.emplace_back(d, spEnemy);

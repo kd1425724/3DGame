@@ -5,6 +5,7 @@
 #include "../../Debug/DebugParams/DebugParams.h"
 #include "../../Debug/DebugFlags/DebugFlags.h"
 #include "../../Collision/CollisionGrid.h"   // 静的コリジョンのbroadphase(近傍の建物だけ問い合わせる)
+#include "../../API/MathAPI/MathAPI.h"       // 安全な正規化・水平化などの共通計算
 
 void CharaBase::SetAsset(const std::string& assetName)
 {
@@ -98,9 +99,8 @@ void CharaBase::UpdateArmAim(float _deltaTime)
 		Math::Vector3 a = { 0, 1, 0 };
 
 		Math::Vector3 axis = a.Cross(dL);
-		if (axis.LengthSquared() < 0.0001f) { break; }
+		if (!MathAPI::TryNormalize(axis)) { break; }
 
-		axis.Normalize();
 		float angle = std::acos(std::clamp(a.Dot(dL), -1.0f, 1.0f));
 
 		// 【順序に意味がある】上限を先に掛けてから重みを掛ける。
@@ -152,10 +152,8 @@ void CharaBase::UpdateFacing(float _deltaTime)
 
 	// 止まっている(ほぼ動いていない)ときは今の向きを保つ。
 	// ここで0ベクトルからatan2を取ると角度が0°に飛び、停止するたび正面へ向き直ってしまう
-	dir.y = 0.0f;
-	if (dir.LengthSquared() < 0.0001f) { return; }
-
-	dir.Normalize();
+	dir = MathAPI::FlattenY(dir);
+	if (!MathAPI::TryNormalize(dir)) { return; }
 
 	// CreateRotationY(θ)は +Z を (sinθ, 0, cosθ) へ移すので、+Z を dir へ向ける角度は atan2(x, z)。
 	// 正面が -Z のモデルは「-Z を dir へ向ける」＝「+Z を -dir へ向ける」なので符号を反転させる。
@@ -497,15 +495,13 @@ void CharaBase::ResolveBump(Math::Vector3& pos)
 		if (maxOverlap <= 0.0f) { break; }
 
 		// 水平方向だけ押し出す(縦の乗り上げ・着地はResolveGroundに任せる)
-		push.y = 0.0f;
+		push = MathAPI::FlattenY(push);
 		pos += push;
 
 		// 壁へ向かう速度成分を消して、壁に沿って滑るようにする
-		if (push.LengthSquared() > 0.0f)
+		Math::Vector3 n = push;
+		if (MathAPI::TryNormalize(n))
 		{
-			Math::Vector3 n = push;
-			n.Normalize();
-
 			// 壁走り用に「今どの壁に触れているか」を記録しておく。
 			// pushは既に水平化(push.y=0)されているので、これがそのまま水平な壁の法線になる。
 			// 最初の反復＝一番深くめり込んでいる壁を採用する(挟まれた時に主となる壁)
@@ -533,7 +529,7 @@ void CharaBase::ResolveBumpSweep(const Math::Vector3& fromPos, Math::Vector3& po
 	float radius = DebugParams::Instance().Float(U8("キャラ/壁当たり半径"), 0.4f, 0.1f, 2.0f);
 
 	// 水平移動量だけを見る(縦の乗り降り・着地はResolveGroundが担当)
-	Math::Vector3 delta(pos.x - fromPos.x, 0.0f, pos.z - fromPos.z);
+	Math::Vector3 delta = MathAPI::FlattenY(pos - fromPos);
 	float dist = delta.Length();
 
 	// 半径以下の移動ならトンネリングは起きない(体の球が必ず壁と重なる)。

@@ -3,6 +3,7 @@
 #include "../Chara/CharaBase.h"
 #include "../../Debug/DebugParams/DebugParams.h"
 #include "../../Effect/EffectManager.h"
+#include "../../API/MathAPI/MathAPI.h"   // 安全な正規化・水平化
 
 void WallAction::Update(CharaBase& _body, float _dt, const Math::Vector3& _wishDir)
 {
@@ -139,9 +140,8 @@ void WallAction::SpawnFx(const CharaBase& _body, float _dt)
 	Math::Vector3 runDir = Math::Vector3::Up;
 	if (!m_isClimbing)
 	{
-		runDir = Math::Vector3(_body.m_velocity.x, 0.0f, _body.m_velocity.z);
-		if (runDir.LengthSquared() < 0.0001f) { return; }
-		runDir.Normalize();
+		runDir = MathAPI::FlattenY(_body.m_velocity);
+		if (!MathAPI::TryNormalize(runDir)) { return; }
 	}
 
 	// 発生位置は壁との接点(体の中心から壁へ寄せた所)の、少し足元寄り
@@ -179,7 +179,7 @@ bool WallAction::CanStart(const CharaBase& _body) const
 	// 壁に沿った水平の速さが十分にあること。
 	// 壁に正面から当たっただけ(=沿う成分が無い)では発動させない。
 	// 「走っている勢いを壁に預ける」動きなので、止まっていたら張り付かないのが正しい
-	Math::Vector3 hv(_body.m_velocity.x, 0.0f, _body.m_velocity.z);
+	Math::Vector3 hv = MathAPI::FlattenY(_body.m_velocity);
 	Math::Vector3 tangent = hv - n * hv.Dot(n);
 
 	// ※ 2026/07/20 に 6.0 → 3.0 へ緩めた(ユーザー指示「開始判定はもっとゆるくていい」)。
@@ -239,7 +239,7 @@ void WallAction::WallJump(CharaBase& _body)
 	float up   = DebugParams::Instance().Float(U8("壁ジャンプ/上向きの強さ"),   11.0f, 0.0f, 50.0f);
 	float keep = DebugParams::Instance().Float(U8("壁ジャンプ/勢いの持ち越し"),  0.6f, 0.0f,  2.0f);
 
-	Math::Vector3 hv(_body.m_velocity.x, 0.0f, _body.m_velocity.z);
+	Math::Vector3 hv = MathAPI::FlattenY(_body.m_velocity);
 	Math::Vector3 tangent = hv - m_wallNormal * hv.Dot(m_wallNormal);
 
 	Math::Vector3 v = m_wallNormal * kick + tangent * keep;

@@ -58,10 +58,9 @@ void Enemy::Update()
 	Math::Vector3 targetPos = spTarget->GetPos();
 
 	// 対象への水平方向と距離
-	Math::Vector3 toTarget = targetPos - pos;
-	toTarget.y = 0.0f;
+	Math::Vector3 toTarget = MathAPI::FlattenY(targetPos - pos);
 	float distXZ = toTarget.Length();
-	Math::Vector3 dirToTarget = (distXZ > 0.0001f) ? (toTarget / distXZ) : Math::Vector3::Backward;
+	Math::Vector3 dirToTarget = MathAPI::GetSafeNormal(toTarget, Math::Vector3::Backward);
 
 	// 対象の方を向く小関数(突進中は向きを固定したいので状態側で使い分ける)
 	auto faceTarget = [&]()

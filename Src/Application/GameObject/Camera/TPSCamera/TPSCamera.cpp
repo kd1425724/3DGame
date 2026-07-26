@@ -5,6 +5,7 @@
 #include "../../../Collision/CollisionGrid.h"
 #include "../../../Debug/DebugParams/DebugParams.h"
 #include "../CameraShake.h"
+#include "../../../API/MathAPI/MathAPI.h"   // 安全な正規化・追従補間・角度の最短補間
 
 void TPSCamera::Init()
 {
@@ -44,8 +45,7 @@ void TPSCamera::PostUpdate()
 			Math::Vector3 targetPos = spLockOnTarget->GetPos();
 			targetPos.y += 0.75f;
 
-			Math::Vector3 dir = targetPos - GetPos();
-			dir.Normalize();
+			Math::Vector3 dir = MathAPI::GetSafeNormal(targetPos - GetPos());
 
 			// カメラの回転は m_rot ではなく m_DegAng で管理されている(GetRotationMatrix参照)
 			// ※ ヨー(左右)のみロックオン対象方向に固定し、ピッチ(上下)はマウス操作のまま残す

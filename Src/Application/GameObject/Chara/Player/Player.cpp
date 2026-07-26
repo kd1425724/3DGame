@@ -11,6 +11,7 @@
 #include "../../../Effect/EffectManager.h"
 #include "../../Targeting/Targeting.h"
 #include "../../../Collision/CollisionGrid.h"   // IsWallBetween(落下攻撃の突撃先が壁の裏か)
+#include "../../../API/MathAPI/MathAPI.h"       // 安全な正規化・水平化
 
 #include"../../Wire/WireAction.h"
 #include"../../Wall/WallAction.h"
@@ -127,10 +128,9 @@ void Player::Update()
 		// 前後の漕ぎでもエフェクトを出す(吹かしていることが分かるように)
 		if (wireMove.y != 0.0f)
 		{
-			Math::Vector3 horiz(m_velocity.x, 0.0f, m_velocity.z);
-			if (horiz.LengthSquared() > 0.0001f)
+			Math::Vector3 horiz = MathAPI::FlattenY(m_velocity);
+			if (MathAPI::TryNormalize(horiz))
 			{
-				horiz.Normalize();
 				SpawnBoostFx(horiz * wireMove.y, dt);
 			}
 		}
@@ -247,14 +247,7 @@ void Player::UpdateWireInput()
 			// ② 手元→照準点 の向き(これをワイヤーの発射方向にする)
 			dir = aimPoint - from;
 		}
-		if (dir.LengthSquared() > 0.0001f)
-		{
-			dir.Normalize();
-		}
-		else
-		{
-			dir = Math::Vector3::Backward;
-		}
+		dir = MathAPI::GetSafeNormal(dir, Math::Vector3::Backward);
 
 		// 撃った瞬間、今の速度(m_velocity)はそのまま引き継ぐ
 		// (走りながら撃てば横の勢いが乗る。速度は基底CharaBaseの共通m_velocity)
@@ -395,7 +388,7 @@ void Player::ClampSpeed()
 
 void Player::SpawnBoostFx(const Math::Vector3& _dir, float _dt)
 {
-	if (_dir.LengthSquared() < 0.0001f) { return; }
+	if (_dir.LengthSquared() <= MathAPI::kSmallNumber) { return; }
 
 	// 毎フレーム出すとフレームレートで密度が変わるので、時間あたりの個数で制御する
 	float rate = DebugParams::Instance().Float(U8("加速エフェクト/毎秒の粒数"), 30.0f, 0.0f, 120.0f);
@@ -422,9 +415,7 @@ Math::Vector3 Player::GetWishDir() const
 	// ※ Forward/Backwardの定義上、見た目と前後が逆に感じたため入れ替え済み
 	Math::Vector2 moveAxis = KdInputManager::Instance().GetAxisState("Move");
 	Math::Vector3 wishDir = Math::Vector3::Backward * moveAxis.y + Math::Vector3::Right * moveAxis.x;
-	if (wishDir.LengthSquared() <= 0.0f) { return Math::Vector3::Zero; }
-
-	wishDir.Normalize();
+	if (!MathAPI::TryNormalize(wishDir)) { return Math::Vector3::Zero; }
 
 	// カメラの水平方向の向きに合わせて移動方向を回転させる(TPS的な移動)
 	if (std::shared_ptr<CameraBase> spCamera = m_wpCamera.lock())
@@ -441,7 +432,7 @@ Math::Vector3 Player::GetAccelDir() const
 	Math::Vector2 axis = KdInputManager::Instance().GetAxisState("Move");
 	Math::Vector3 dir = Math::Vector3::Zero;
 
-	if (axis.LengthSquared() > 0.0001f)
+	if (axis.LengthSquared() > MathAPI::kSmallNumber)
 	{
 		// ※ Forward/Backwardの定義上、見た目と前後が逆に感じたため入れ替えてある(UpdateMoveと同じ)
 		Math::Vector3 wish = Math::Vector3::Backward * axis.y + Math::Vector3::Right * axis.x;
@@ -457,19 +448,17 @@ Math::Vector3 Player::GetAccelDir() const
 	else
 	{
 		// 無入力なら今の進行方向(水平)。止まっていればカメラ前方
-		Math::Vector3 horiz(m_velocity.x, 0.0f, m_velocity.z);
-		if (horiz.LengthSquared() > 0.0001f)
+		Math::Vector3 horiz = MathAPI::FlattenY(m_velocity);
+		if (MathAPI::TryNormalize(horiz))
 		{
-			horiz.Normalize();
 			dir = horiz;
 		}
 		else if (std::shared_ptr<CameraBase> spCamera = m_wpCamera.lock())
 		{
-			Math::Vector3 fwd = Math::Vector3::TransformNormal(Math::Vector3::Backward, spCamera->GetRotationMatrix());
-			fwd.y = 0.0f;
-			if (fwd.LengthSquared() > 0.0001f)
+			Math::Vector3 fwd = MathAPI::FlattenY(
+				Math::Vector3::TransformNormal(Math::Vector3::Backward, spCamera->GetRotationMatrix()));
+			if (MathAPI::TryNormalize(fwd))
 			{
-				fwd.Normalize();
 				dir = fwd;
 			}
 		}
@@ -480,10 +469,7 @@ Math::Vector3 Player::GetAccelDir() const
 	{
 		float upRate = DebugParams::Instance().Float(U8("加速/Jump併用の上向き割合"), 0.8f, 0.0f, 2.0f);
 		dir.y += upRate;
-		if (dir.LengthSquared() > 0.0001f)
-		{
-			dir.Normalize();
-		}
+		MathAPI::TryNormalize(dir);
 	}
 
 	return dir;
@@ -530,7 +516,7 @@ void Player::UpdateMove(float dt)
 		// ・横入力なら進行方向を曲げられる(速度は落ちない=速いフリングにブレーキがかからない)
 		float airAccel = DebugParams::Instance().Float(U8("プレイヤー/空中制御"), 10.0f, 0.0f, 100.0f);
 
-		Math::Vector3 horiz(m_velocity.x, 0.0f, m_velocity.z);
+		Math::Vector3 horiz = MathAPI::FlattenY(m_velocity);
 		float speedInWishDir = horiz.Dot(wishDir);      // 今の速度のうち入力方向を向いている分
 		float addSpeed = moveSpeed - speedInWishDir;     // moveSpeedまであとどれだけ足せるか
 		if (addSpeed > 0.0f)
@@ -669,7 +655,7 @@ void Player::UpdateDodge(float dt)
 	// 方向：移動入力があればその向き(カメラ基準)、無ければカメラ前方(水平)
 	Math::Vector2 moveAxis = KdInputManager::Instance().GetAxisState("Move");
 	Math::Vector3 dir = Math::Vector3::Backward * moveAxis.y + Math::Vector3::Right * moveAxis.x;
-	if (dir.LengthSquared() < 0.0001f)
+	if (dir.LengthSquared() <= MathAPI::kSmallNumber)
 	{
 		dir = Math::Vector3::Backward;
 	}   // 入力なし→前方へ
@@ -677,12 +663,7 @@ void Player::UpdateDodge(float dt)
 	{
 		dir = Math::Vector3::TransformNormal(dir, spCam->GetRotationYMatrix());
 	}
-	dir.y = 0.0f;
-	if (dir.LengthSquared() < 0.0001f)
-	{
-		dir = Math::Vector3::Backward;
-	}
-	dir.Normalize();
+	dir = MathAPI::GetSafeNormalXZ(dir, Math::Vector3::Backward);
 	m_dodgeDir = dir;
 
 	--m_dodgeCharges;
@@ -1328,16 +1309,7 @@ void Player::ApplyKnockback(const Math::Vector3& _dir, float _power)
 	// 回避中(無敵)は弾かれない。※呼び出し側(Enemy)も無敵時は反撃へ回すので通常来ないが保険
 	if (IsInvincible()) { return; }
 
-	Math::Vector3 dir = _dir;
-	dir.y = 0.0f;
-	if (dir.LengthSquared() > 0.0001f)
-	{
-		dir.Normalize();
-	}
-	else
-	{
-		dir = Math::Vector3::Backward;
-	}
+	Math::Vector3 dir = MathAPI::GetSafeNormalXZ(_dir, Math::Vector3::Backward);
 
 	// 水平に吐き飛ばして勢いを崩す。HPは無いのでダメージ自体は無い。
 	// 上向きには基本飛ばさない(浮かせると空中で慣性が保たれ、崖から遠くまで吹き飛ぶため既定0)

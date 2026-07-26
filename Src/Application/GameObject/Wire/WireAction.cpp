@@ -5,6 +5,7 @@
 #include "../../Debug/DebugFlags/DebugFlags.h"  // 漕ぎ(ポンプ)のON/OFF
 #include "../Chara/CharaBase.h"                 // スイングで動かすキャラ(速度・位置・当たり解決)
 #include "../../Collision/CollisionGrid.h"      // IsWallBetween(手元〜アンカー間の遮蔽判定)
+#include "../../API/MathAPI/MathAPI.h"          // 安全な正規化・水平化
 
 // 見た目の板ポリ(KdSquarePolygon)はPch経由で見える。unique_ptr(前方宣言)の生成/破棄を
 // ここ(完全な型が見える.cpp)で行うため、ctor/dtorを定義する
@@ -121,29 +122,20 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 	// 進行方向(水平)と、それに直交する右向きを作る。
 	// 半径方向(アンカーから外向き)の成分は距離拘束で打ち消されるだけなので、
 	// 接線成分だけに力を入れる = 弧に沿ってのみ加速・旋回する
-	Math::Vector3 horiz(_body.m_velocity.x, 0.0f, _body.m_velocity.z);
-	float sp = horiz.Length();
-	if (sp > 0.0001f)
+	Math::Vector3 horiz = MathAPI::FlattenY(_body.m_velocity);
+	Math::Vector3 tdir;                                        // 進行方向(水平)
+	float sp = 0.0f;                                           // その速さ(漕ぎの上限判定に使う)
+	if (MathAPI::ToDirectionAndLength(horiz, tdir, sp))
 	{
-		Math::Vector3 tdir = horiz / sp;                       // 進行方向(水平)
 		Math::Vector3 side = Math::Vector3::Up.Cross(tdir);    // 進行方向の右手側
-		if (side.LengthSquared() > 0.0001f)
-		{
-			side.Normalize();
-		}
+		MathAPI::TryNormalize(side);
 
 		// アンカーから外向きの水平成分を落として、接線方向だけ残す
-		Math::Vector3 radial = pos - m_anchor;
-		radial.y = 0.0f;
-		if (radial.LengthSquared() > 0.0001f)
+		Math::Vector3 radial = MathAPI::FlattenY(pos - m_anchor);
+		if (MathAPI::TryNormalize(radial))
 		{
-			radial.Normalize();
 			tdir -= radial * tdir.Dot(radial);
-			if (tdir.LengthSquared() > 0.0001f)
-			{
-				tdir.Normalize();
-			}
-			else
+			if (!MathAPI::TryNormalize(tdir))
 			{
 				tdir = Math::Vector3::Zero;
 			}
@@ -337,10 +329,9 @@ void WireAction::Update(Math::Vector3& _pos, Math::Vector3& _vel, float _dt, flo
 	// ② アンカーから自分へのベクトル toPos = _pos - m_anchor と、その長さ dist を求める
 	//    ・dist がほぼ0なら向きが定義できないので早期return
 	//    ・dir = toPos / dist (アンカーから外向きの単位ベクトル)
-	Math::Vector3 toPos = _pos - m_anchor;
-	float dist = toPos.Length();
-	if (dist < 0.00001f) { return; }
-	Math::Vector3 dir = toPos / dist;
+	Math::Vector3 dir;
+	float dist = 0.0f;
+	if (!MathAPI::ToDirectionAndLength(_pos - m_anchor, dir, dist)) { return; }
 
 	// ③ 距離拘束: dist が m_length より大きい(=ワイヤーを伸ばしすぎ)ときだけ:
 	//    (a) 位置を円周(球面)上へ戻す:  _pos = m_anchor + dir * m_length

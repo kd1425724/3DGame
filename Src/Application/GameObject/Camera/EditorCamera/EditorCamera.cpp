@@ -1,6 +1,7 @@
 ﻿#include "EditorCamera.h"
 
 #include "../../../main.h"
+#include "../../../API/MathAPI/MathAPI.h"   // 安全な正規化
 
 void EditorCamera::Init()
 {
@@ -70,9 +71,8 @@ void EditorCamera::PostUpdate()
 			move -= Math::Vector3::Up;
 		}
 
-		if (move.LengthSquared() > 0.0f)
+		if (MathAPI::TryNormalize(move))
 		{
-			move.Normalize();
 			pos += move * speed * Application::Instance().GetDeltaTime();
 		}
 	}
