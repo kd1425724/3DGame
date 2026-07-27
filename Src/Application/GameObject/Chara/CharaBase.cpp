@@ -47,7 +47,11 @@ void CharaBase::UpdateArmAim(float _deltaTime)
 {
 	// DebugFlagsでオフにしたときも、いきなりアニメへ戻さず重みを0へ落として自然に抜ける。
 	// (早期リターンにすると切り替えた瞬間に腕が飛び、比較用のオンオフとして使えない)
-	bool enabled = DebugFlags::Instance().Get(U8("腕/アンカーへ向ける"), true);
+	//
+	// 【2026/07/27 既定をfalseへ】ワイヤー中の姿勢を手付けクリップ("20 odm fly")で作ったので、
+	// 手続き的に腕を上書きするとそのポーズが壊れる。機能自体は残してあるので、
+	// DebugFlagsのチェックを入れれば従来どおりアンカーへ腕を向ける動作に戻せる
+	bool enabled = DebugFlags::Instance().Get(U8("腕/アンカーへ向ける"), false);
 
 	// 狙う点は派生クラスが決める。狙っている間だけ目標を更新し、
 	// 離した後は「最後に狙っていた点」を向いたまま重みだけ0へ落としてアニメへ戻す
@@ -100,7 +104,12 @@ void CharaBase::UpdateLegFlow(float _deltaTime)
 {
 	// DebugFlagsでオフにしたときも、いきなりアニメへ戻さず重みを0へ落として自然に抜ける
 	// (UpdateArmAimと同じ抜け方。切り替えた瞬間に脚が飛ぶと比較用のオンオフとして使えない)
-	bool enabled = DebugFlags::Instance().Get(U8("脚/慣性でなびかせる"), true);
+	//
+	// 【2026/07/27 既定をfalseへ】手付けクリップ("20 odm fly")が脚の形を決めるので、
+	// 手続き的な上書きは切る。左右の腿で捻りが別々に決まって脚が交差する不具合も
+	// 未解決のままなので、その回避も兼ねている(原因＝最短回転が軸まわりの捻りを指定しないこと)。
+	// 機能は残してあるのでDebugFlagsで戻せる
+	bool enabled = DebugFlags::Instance().Get(U8("脚/慣性でなびかせる"), false);
 	bool wantFlow = enabled && SelectLegFlow();
 
 	float follow = DebugParams::Instance().Float(U8("脚/追従速度"), 12.0f, 1.0f, 60.0f);

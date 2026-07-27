@@ -1036,8 +1036,13 @@ std::string Player::SelectAnimation() const
 		return "11 hurt (air)";
 	}
 
-	// ワイヤーでぶら下がっている間／突撃中。専用が無いので落下で代用
-	if (m_upWire && m_upWire->IsAttached()) { return "08 fall (air)"; }
+	// ワイヤーでぶら下がっている間は、立体機動の滑空ポーズ(手付けの保持ポーズ)。
+	// ※ 参考: ネギ夫氏「立体機動ポーズ集」pixiv id:38998125(ご自由にお使い下さい)を見ながら手付け
+	// ※ 体の前傾はこのクリップに焼き込んでいない。ゲーム側のUpdateTiltが
+	//    アンカー方向に応じて動的に傾けるので、二重に倒れないようクリップは直立で作ってある
+	if (m_upWire && m_upWire->IsAttached()) { return "20 odm fly"; }
+
+	// 突撃中。専用が無いので落下で代用
 	if (m_isDiving) { return "08 fall (air)"; }
 
 	// 壁走り・よじ登り。走りで代用
