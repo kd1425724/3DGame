@@ -165,15 +165,55 @@ void WireAction::UpdateSwingAll(CharaBase& _body, float _dt, const Math::Vector2
 	}
 
 	// 距離拘束を解く(球の外へは出られない。内側は自由＝紐であって棒ではない)。
-	// 2本以上のときは「片方へ射影→もう片方へ射影」を数回まわして両方を満たす点へ寄せる。
-	// (2つの球の交わりは円になる。1本なら1回で厳密解なので、従来と完全に同じ結果になる)
 	// ※ 手動リールは 2026/07/19 に廃止したので入力は 0。巻き取りは上の自動ウインチが担当
-	const int iterations = (n >= 2) ? 4 : 1;
-	for (int it = 0; it < iterations; ++it)
+	const bool mergeSphere = DebugFlags::Instance().Get(U8("ワイヤー/2本を1つの球にする"), true);
+
+	if (n >= 2 && mergeSphere)
 	{
-		for (int i = 0; i < n; ++i)
+		// 【2本を1つの球にまとめる】
+		// 2つの球をそのまま解くと、両方張ったとき位置が「2つの球面が交わる円」の上に乗る。
+		// 円の上では自由度が1しかなく(その円の面内でしか振れない)、1本のときの
+		// 「球面を自由に滑る」感触が失われる。左右に刺すと左右方向へ振れなくなるのがこれ。
+		//
+		// そこで2つのアンカーの中点を支点にした球1つに置き換える。自由度が2に戻り、
+		// 1本と同じ振り子の感触になる。解が消える心配も無い(球1つなら常に解がある)。
+		//
+		// 半径は「両方の球に必ず収まる最大の球」にする:
+		//     半径 = min(左の長さ, 右の長さ) - アンカー間距離 / 2
+		// 中点から半径ぶん離れても、各アンカーからの距離は元の長さを超えない。
+		// アンカーが近い(同じ壁)ときは1本とほぼ同じ半径になり、
+		// 離れている(通りの左右)ほど小さくなる = 2本で張ると引き締まる
+		Math::Vector3 pivot = (live[0]->m_anchor + live[1]->m_anchor) * 0.5f;
+		float anchorDist = (live[0]->m_anchor - live[1]->m_anchor).Length();
+		float radius = std::min(live[0]->m_length, live[1]->m_length) - anchorDist * 0.5f;
+
+		float minLen = DebugParams::Instance().Float(U8("ワイヤー/最短の長さ"), 3.0f, 0.5f, 30.0f);
+		if (radius < minLen)
 		{
-			live[i]->Update(pos, _body.m_velocity, _dt, 0.0f);
+			radius = minLen;
+		}
+
+		// 1本ぶんの拘束と同じ計算(球の外なら球面へ戻し、外向きの速度成分だけ消す)
+		Math::Vector3 toPos = pos - pivot;
+		float dist = 0.0f;
+		Math::Vector3 dir;
+		if (MathAPI::ToDirectionAndLength(toPos, dir, dist) && dist > radius)
+		{
+			pos = pivot + dir * radius;
+			_body.m_velocity = MathAPI::ClipVelocity(_body.m_velocity, -dir);
+		}
+	}
+	else
+	{
+		// 1本ずつ解く。2本のときは「片方へ射影→もう片方へ射影」を数回まわして
+		// 両方を満たす点へ寄せる(2つの球の交わりは円になる)
+		const int iterations = (n >= 2) ? 4 : 1;
+		for (int it = 0; it < iterations; ++it)
+		{
+			for (int i = 0; i < n; ++i)
+			{
+				live[i]->Update(pos, _body.m_velocity, _dt, 0.0f);
+			}
 		}
 	}
 
