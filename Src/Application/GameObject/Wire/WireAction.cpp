@@ -139,23 +139,37 @@ void WireAction::UpdateSwingAll(CharaBase& _body, float _dt, const Math::Vector2
 	//
 	// 半径は「決めた瞬間のプレイヤーと支点の距離」。こうすれば掛けた瞬間に
 	// 位置がちょうど球面上に乗るので、引き込まれない(瞬間移動しない)
-	if (merged && !live[0]->m_hasMerged)
+	if (merged)
 	{
-		live[0]->m_mergedPivot  = (live[0]->m_anchor + live[1]->m_anchor) * 0.5f;
-		live[0]->m_mergedRadius = (pos - live[0]->m_mergedPivot).Length();
-		live[0]->m_hasMerged    = true;
-	}
-	if (!merged)
-	{
-		// 2本でなくなったら次に揃ったとき作り直す
+		if (!live[0]->m_hasMerged)
+		{
+			live[0]->m_mergedPivot  = (live[0]->m_anchor + live[1]->m_anchor) * 0.5f;
+			live[0]->m_mergedRadius = (pos - live[0]->m_mergedPivot).Length();
+			live[0]->m_hasMerged    = true;
+		}
+
+		// 【片方が切れたときに飛ばないための処理】
+		// 合体中の球は個々のワイヤー長を尊重しないので、プレイヤーは片方のアンカーから
+		// 元の長さより遠くへ行ける。そのまま片方が切れると、残ったワイヤーの球の"外"に
+		// いる状態で単独の拘束に切り替わり、内側へ引き込まれて瞬間移動する。
+		//
+		// 合体中は毎フレーム、両方の長さを実距離そのものに合わせ続ける。こうすれば
+		// どちらが切れても残った球は必ずプレイヤーを通るので、補間なしで段差がゼロになる。
+		// ※ ここで m_maxLength に丸めてはいけない(丸めると実距離より短くなり、それが
+		//    まさに瞬間移動の原因だった)。伸びたぶんは巻き取りの上限も一緒に広げる
 		for (int i = 0; i < n; ++i)
 		{
-			// 合体をやめた瞬間に個別の球へ切り替わると、長さが合わずに跳ねる。
-			// 残ったワイヤーの長さを今の実距離に合わせ直して段差を消す
-			if (live[i]->m_hasMerged)
-			{
-				live[i]->m_length = std::min((pos - live[i]->m_anchor).Length(), live[i]->m_maxLength);
-			}
+			live[i]->m_length = (pos - live[i]->m_anchor).Length();
+			live[i]->m_maxLength = std::max(live[i]->m_maxLength, live[i]->m_length);
+		}
+	}
+	else
+	{
+		// 2本でなくなったら次に揃ったとき作り直す。
+		// ※ 合体状態は live[0] だけが持つので、それが切れた側だった場合に備えて
+		//    条件を付けずに全部落とす(条件を付けていたら消し漏れて不具合になった)
+		for (int i = 0; i < n; ++i)
+		{
 			live[i]->m_hasMerged = false;
 		}
 	}
@@ -174,11 +188,7 @@ void WireAction::UpdateSwingAll(CharaBase& _body, float _dt, const Math::Vector2
 				live[0]->m_mergedRadius = minLen;
 			}
 
-			// 見た目の線の長さも縮めておく(拘束には使わないが、次に1本へ戻ったとき用)
-			for (int i = 0; i < n; ++i)
-			{
-				live[i]->m_length = std::min((pos - live[i]->m_anchor).Length(), live[i]->m_maxLength);
-			}
+			// ※ 個々のワイヤー長は上の合体処理で毎フレーム実距離へ合わせている(ここでは触らない)
 		}
 		else
 		{
