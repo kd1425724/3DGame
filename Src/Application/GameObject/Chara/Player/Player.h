@@ -228,6 +228,10 @@ private:
 	// 全ワイヤーを外す(リスポーンや状態リセット用)
 	void ReleaseAllWires();
 
+	// ワイヤーの射出口(腰の左右)のワールド位置。_index 0=左 / 1=右。
+	// 立体機動装置は腰に付いているので、見た目の線はここから出す
+	Math::Vector3 GetWireMuzzlePos(int _index) const;
+
 	// 壁走り／壁ジャンプ(自動発動。走行中は通常移動とジャンプを止める)
 	std::unique_ptr<WallAction> m_upWall;
 

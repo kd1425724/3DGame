@@ -1141,29 +1141,43 @@ void Player::ReleaseAllWires()
 	}
 }
 
-void Player::DrawWire()
+Math::Vector3 Player::GetWireMuzzlePos(int _index) const
 {
-	// ワイヤーの手元。左手のボーンから出す(腕をアンカーへ向けているので手もアンカー側を向く)。
-	// 端点だけ決め、線の描画はWireActionに任せる。
-	// ※ 【見た目だけ】ワイヤーの物理(振り子の支点・長さの拘束)はGetPos()基準のままにしてある。
-	//    支点を手に移すと、腕が動くたびに支点が揺れてスイングの挙動そのものが変わってしまう
-	// ※ ボーンが無いモデルに差し替えても、従来の胴体中心へフォールバックする
-	Math::Vector3 from = GetPos() + Math::Vector3(0.0f, 0.25f, 0.0f);
+	// 立体機動装置の射出口は腰の左右。腰のボーンから、体のローカルな左右へずらして求める。
+	// ※ ボーンのワールド行列にはキャラの位置・向き・傾きが入っているので、
+	//    体が傾けば射出口も一緒に傾く(ワールド軸でずらすと体を捻ったときにズレる)
+	// ※ ボーンが無いモデルに差し替えても、従来どおり胴体中心へフォールバックする
+	float side = DebugParams::Instance().Float(U8("ワイヤー/射出口の左右幅"), 0.18f, 0.0f, 1.0f);
+	float back = DebugParams::Instance().Float(U8("ワイヤー/射出口の後ろへの寄せ"), 0.10f, -0.5f, 0.5f);
 
-	Math::Vector3 handPos = {};
-	if (GetBoneWorldPos("mixamorig:LeftHand", handPos))
+	// 添字0=左(+X) / 1=右(-X)
+	float sign = (_index == 0) ? 1.0f : -1.0f;
+
+	const KdModelWork::Node* hips = m_modelWork.FindNode("mixamorig:Hips");
+	if (hips)
 	{
-		from = handPos;
+		Math::Matrix hipsMat = GetBoneWorldMatrix(*hips);
+
+		// 腰ボーンのローカル軸で左右・後ろへずらす。glTFのMixamoリグは骨の軸が+Yなので、
+		// 左右はRight(X)、体の後ろはBackward(Z)にあたる
+		Math::Vector3 offset = Math::Vector3(sign * side, 0.0f, back);
+		return Math::Vector3::Transform(offset, hipsMat);
 	}
 
-	// スイング中：繋がっている本数ぶんアンカーへ線を引く
+	return GetPos() + Math::Vector3(0.0f, 0.25f, 0.0f);
+}
+
+void Player::DrawWire()
+{
+	// スイング中：繋がっている本数ぶん、それぞれの射出口からアンカーへ線を引く
 	if (IsAnyWireAttached())
 	{
-		for (const std::unique_ptr<WireAction>& w : m_upWires)
+		for (int i = 0; i < kWireCount; ++i)
 		{
+			const std::unique_ptr<WireAction>& w = m_upWires[i];
 			if (!w || !w->IsAttached()) { continue; }
 
-			w->Draw(from, w->GetAnchor());
+			w->Draw(GetWireMuzzlePos(i), w->GetAnchor());
 		}
 		return;
 	}
@@ -1173,7 +1187,7 @@ void Player::DrawWire()
 	{
 		if (std::shared_ptr<KdGameObject> spTarget = m_wpDiveTarget.lock())
 		{
-			m_upWires[0]->Draw(from, spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f));
+			m_upWires[0]->Draw(GetWireMuzzlePos(0), spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f));
 		}
 	}
 }
