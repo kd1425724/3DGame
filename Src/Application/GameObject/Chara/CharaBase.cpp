@@ -73,6 +73,9 @@ void CharaBase::UpdateArmAim(float _deltaTime)
 	// 狙いの強さ。1.0で完全に狙い、下げるほどアニメのポーズを残す(見た目の好み用)
 	float strength = DebugParams::Instance().Float(U8("腕/向ける強さ"), 1.0f, 0.0f, 1.0f);
 
+	// この骨の軸はローカル+Y(glTFで子=肘への平行移動が(0, 0.1907, 0)だったので実測済み)
+	const Math::Vector3 boneAxis = { 0.0f, 1.0f, 0.0f };
+
 	m_modelWork.CalcNodeMatrices();
 
 	//型 : KdModelWork::Node
@@ -80,29 +83,12 @@ void CharaBase::UpdateArmAim(float _deltaTime)
 	{
 		//左腕じゃなかったら
 		if (node.m_name != "mixamorig:LeftArm") { continue; }
-		
-		//腕のワールド行列
-		Math::Matrix worldMat = node.m_worldTransform * GetDrawMatrix();
-		//腕のワールド位置
-		Math::Vector3 worldPos = worldMat.Translation();
-		//狙う方向
-		Math::Vector3 dW = (m_armAimTarget - worldPos);
-		dW.Normalize();
-		//逆行列
-		Math::Matrix worldInvMat = worldMat.Invert();
-		
-		Math::Vector3 dL = Math::Vector3::TransformNormal(dW, worldInvMat);
-		dL.Normalize();
 
-		// この骨の軸はローカル+Y(glTFで子=肘への平行移動が(0, 0.1907, 0)だったので実測済み)。
-		// その軸を狙う方向へ向ける回転を作る。重みは0でアニメそのまま、1で完全に狙う
-		Math::Vector3 boneAxis = { 0, 1, 0 };
-		Math::Matrix R;
-		if (!MathAPI::FromToRotation(boneAxis, dL, R, maxRad, m_armAimWeight * strength)) { break; }
+		// 骨の現在位置から狙う点への向き(ワールド)。骨が動けば毎フレーム変わる
+		Math::Vector3 dirWorld = MathAPI::GetSafeNormal(
+			m_armAimTarget - GetBoneWorldMatrix(node).Translation());
 
-		// 【罠】前から掛けて初めて「骨の原点まわりで子を回す」＝関節を曲げる意味になる。
-		// 逆に掛けると腕が体から外れて飛ぶ(行ベクトル規約なので左が先)
-		node.m_localTransform = R * node.m_localTransform;
+		AimBoneToDir(node, dirWorld, boneAxis, m_armAimWeight * strength, maxRad);
 
 		break;
 	}
@@ -110,12 +96,31 @@ void CharaBase::UpdateArmAim(float _deltaTime)
 	m_modelWork.CalcNodeMatrices();
 }
 
+bool CharaBase::AimBoneToDir(KdModelWork::Node& _node, const Math::Vector3& _dirWorld,
+	const Math::Vector3& _boneAxis, float _weight, float _maxRad)
+{
+	// 狙う方向を骨のローカル空間へ移す(骨の軸と比べるため)。
+	// ワールド行列はGetBoneWorldMatrix経由＝GetDrawMatrixの掛け忘れをここで防ぐ
+	Math::Vector3 dirLocal = Math::Vector3::TransformNormal(
+		_dirWorld, GetBoneWorldMatrix(_node).Invert());
+	if (!MathAPI::TryNormalize(dirLocal)) { return false; }
+
+	// 骨の軸をその方向へ向ける回転(外積ゼロ・acosのNaNガードはMathAPI側にある)
+	Math::Matrix rot;
+	if (!MathAPI::FromToRotation(_boneAxis, dirLocal, rot, _maxRad, _weight)) { return false; }
+
+	// 🔴【罠】前から掛けて初めて「骨の原点まわりで子を回す」＝関節を曲げる意味になる。
+	// 逆に掛けると骨が体から外れて飛ぶ(行ベクトル規約なので左が先)
+	_node.m_localTransform = rot * _node.m_localTransform;
+	return true;
+}
+
 bool CharaBase::GetBoneWorldPos(std::string_view _name, Math::Vector3& _outPos) const
 {
 	const KdModelWork::Node* node = m_modelWork.FindNode(_name);
 	if (!node) { return false; }
 
-	_outPos = (node->m_worldTransform * GetDrawMatrix()).Translation();
+	_outPos = GetBoneWorldMatrix(*node).Translation();
 	return true;
 }
 

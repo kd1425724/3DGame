@@ -142,8 +142,23 @@ protected:
 	Math::Matrix GetDrawMatrix() const;
 
 	// 指定したボーンのワールド座標を返す。そのボーンが無ければfalse(呼び出し側で従来の位置へ戻せる)。
-	// ※ m_worldTransformはモデル原点基準なので、GetDrawMatrix()を掛けて初めてワールドになる
 	bool GetBoneWorldPos(std::string_view _name, Math::Vector3& _outPos) const;
+
+	// ボーンのワールド行列。
+	// 🔴【罠】m_worldTransformは「モデル原点基準」でしかない。GetDrawMatrix()を掛けないと
+	//   キャラの位置・向き・傾きが抜ける＝棒立ちで正面を向いているときだけ正しく見えるので
+	//   一番気づきにくい。ボーンをワールドで扱うときは必ずここを通すこと
+	Math::Matrix GetBoneWorldMatrix(const KdModelWork::Node& _node) const { return _node.m_worldTransform * GetDrawMatrix(); }
+
+	// ボーンの軸(_boneAxis:骨のローカル空間)を、ワールドの_dirWorld方向へ向ける。
+	// アニメの上に手続き的な姿勢を重ねるための共通部分＝腕を狙わせる/脚をなびかせるの両方が使う。
+	//  ・_weight … 効き具合(0=アニメそのまま / 1=完全に向ける)
+	//  ・_maxRad … 回転量の上限。無いと関節が反対側へ折れて破綻する
+	// 向きが決められなければfalse(呼び出し側は「この骨は触らない」でよい)。
+	// ※ CalcNodeMatrices()はここでは呼ばない。呼ぶ側がループの前後で1回ずつ呼ぶこと
+	//   (骨ごとに呼ぶと骨の数だけ全ノードの再計算が走る)
+	bool AimBoneToDir(KdModelWork::Node& _node, const Math::Vector3& _dirWorld,
+		const Math::Vector3& _boneAxis, float _weight, float _maxRad);
 
 	//滑らかに目標へ寄せる
 	void UpdateTilt(float _deltaTime);
