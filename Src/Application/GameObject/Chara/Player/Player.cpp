@@ -262,11 +262,8 @@ void Player::UpdateWireInput()
 
 		// === 立体機動装置の2本掛け ===
 		// 1回の入力で腰の左右から2本撃つ(進撃の巨人2も左右のフックを個別には操作しない)。
-		// 狙いは同じ照準点だが、左右のレイを水平に少し開いて飛ばす。こうすると
-		//   ・平らな壁を狙えば2本が近くに刺さる(＝1本に近い振り子のまま)
-		//   ・建物の谷間を狙えば左右別々の壁に刺さる(＝本物の2本掛けになる)
-		// という切り替えが、操作を増やさずに狙う場所だけで自然に起きる
-		float spreadDeg = DebugParams::Instance().Float(U8("ワイヤー/2本の開き角"), 4.0f, 0.0f, 20.0f);
+		// ただし「同じ照準点へ少し開いて撃つ」だけでは真横の壁に届かないので、
+		// 各フックが自分の側を扇状に探して取り付ける面を見つける(FindAnchorDir)
 		bool useTwo = DebugFlags::Instance().Get(U8("ワイヤー/2本掛け"), true);
 
 		// 撃った瞬間、今の速度(m_velocity)はそのまま引き継ぐ
@@ -274,14 +271,17 @@ void Player::UpdateWireInput()
 		int shots = useTwo ? kWireCount : 1;
 		for (int i = 0; i < shots; ++i)
 		{
-			// 開き角は世界の上(Y)まわりで振る。壁は縦面なので、水平に開くと
-			// 「谷間の左右の壁へ別々に刺さる」形になる
-			float sign = (i == 0) ? -1.0f : 1.0f;
-			float rad = DirectX::XMConvertToRadians(spreadDeg * 0.5f * sign);
-			Math::Vector3 shotDir = Math::Vector3::TransformNormal(dir, Math::Matrix::CreateRotationY(rad));
-
 			// 射出口はそれぞれの腰。見た目の線と物理の始点をそろえる
-			m_upWires[i]->Shoot(GetWireMuzzlePos(i), shotDir, maxLen);
+			Math::Vector3 muzzle = GetWireMuzzlePos(i);
+
+			Math::Vector3 shotDir = dir;
+			if (!FindAnchorDir(i, muzzle, dir, maxLen, shotDir))
+			{
+				// 扇の中に取り付けられる面が無ければ、そのフックは撃たない
+				continue;
+			}
+
+			m_upWires[i]->Shoot(muzzle, shotDir, maxLen);
 		}
 	}
 
@@ -1158,6 +1158,60 @@ void Player::ReleaseAllWires()
 	{
 		if (w) { w->Release(); }
 	}
+}
+
+bool Player::FindAnchorDir(int _index, const Math::Vector3& _from, const Math::Vector3& _aimDir,
+	float _maxLen, Math::Vector3& _outDir) const
+{
+	// 【なぜ扇状に探すのか】
+	// 街の実測: 建物は16.6m幅x20.1m高で15.5m間隔に並び、通りの幅は約3.8m(狭い路地)と
+	// 約39.4m(広場)の2種類しかない。路地では壁が1.9m横、広場では約20m横にある。
+	// 「レティクル方向へ1本のレイ」では、真横にある壁へは原理的に届かない
+	// (20m横の壁に4度で届くには前方286m必要)。
+	// だからフックは「狙った点」ではなく「自分の側にある取り付けられる面」を探す。
+	// 左フックは前方〜左、右フックは前方〜右へ扇状にレイを飛ばす。
+	//
+	// 【選び方】当たった中で「狙いからのズレが最小」のものを採用する。
+	// 壁を直接狙えば0度で当たるので照準がそのまま効き、通りを狙えば0度が抜けて
+	// 20〜60度で側面の壁を捉える。プレイヤーの意図を最大限尊重しつつ側面へ落ちる
+	float maxAngle = DebugParams::Instance().Float(U8("ワイヤー/探索の最大角度"), 75.0f, 0.0f, 120.0f);
+	int   rays     = DebugParams::Instance().Int(  U8("ワイヤー/探索の本数"),      5,   1,  12);
+	float upTilt   = DebugParams::Instance().Float(U8("ワイヤー/探索の上向き角"), 15.0f, 0.0f, 60.0f);
+	float minDist  = DebugParams::Instance().Float(U8("ワイヤー/最短の取り付き距離"), 4.0f, 0.5f, 30.0f);
+
+	// 添字0=左(-Y回り) / 1=右(+Y回り)
+	float sign = (_index == 0) ? -1.0f : 1.0f;
+
+	for (int r = 0; r < rays; ++r)
+	{
+		// 0度から順に外へ広げる。最初に当たったものが「ズレ最小」になる
+		float t = (rays <= 1) ? 0.0f : static_cast<float>(r) / static_cast<float>(rays - 1);
+		float angle = maxAngle * t;
+
+		Math::Vector3 dir = Math::Vector3::TransformNormal(
+			_aimDir, Math::Matrix::CreateRotationY(DirectX::XMConvertToRadians(angle * sign)));
+
+		// 横へ振るほど上向きに寄せる。建物は20mあるので、側面を狙うときは
+		// 高い所に刺さったほうが振り子として使える。真正面(0度)では傾けない=照準を壊さない
+		if (upTilt > 0.0f && t > 0.0f)
+		{
+			dir += Math::Vector3::Up * (std::tan(DirectX::XMConvertToRadians(upTilt)) * t);
+			if (!MathAPI::TryNormalize(dir)) { continue; }
+		}
+
+		Math::Vector3 pos;
+		bool isGround = false;
+		float dist = 0.0f;
+		if (!WireAction::CastAnchor(_from, dir, _maxLen, pos, isGround, dist)) { continue; }
+
+		// 目の前の壁に刺すと巻き取りで即激突するので、近すぎるものは飛ばす
+		if (dist < minDist) { continue; }
+
+		_outDir = dir;
+		return true;
+	}
+
+	return false;
 }
 
 Math::Vector3 Player::GetWireMuzzlePos(int _index) const

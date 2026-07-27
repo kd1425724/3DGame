@@ -49,6 +49,13 @@ public:
 	// スイング中はアンカーへ、グラップル突撃中は対象へ、とfrom/toは呼び出し側が決める
 	void Draw(const Math::Vector3& _from, const Math::Vector3& _to);
 
+	// 指定方向へレイを飛ばし、ワイヤーを取り付けられる面(建物TypeBump / 地面TypeGround)の
+	// 最も手前の交点を返す。当たらなければ false。
+	// 「何をアンカーにできるか」の定義をここ1箇所に置くための共通処理で、
+	// Shoot(実際に取り付ける) と アンカー探索(どこへ撃つか選ぶ) の両方から使う
+	static bool CastAnchor(const Math::Vector3& _from, const Math::Vector3& _dir, float _maxLength,
+		Math::Vector3& _outPos, bool& _outIsGround, float& _outDist);
+
 	// 照準方向へワイヤーを撃ち、当たった地形をアンカー(固定点)にする
 	//  _from      ... ワイヤーの発射位置(手元など)
 	//  _dir       ... 発射方向(正規化済みを想定)

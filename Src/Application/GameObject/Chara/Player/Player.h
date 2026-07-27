@@ -232,6 +232,12 @@ private:
 	// 立体機動装置は腰に付いているので、見た目の線はここから出す
 	Math::Vector3 GetWireMuzzlePos(int _index) const;
 
+	// フック_index(0=左/1=右)が取り付ける面を、自分の側へ扇状に探して方向を返す。
+	// 「レティクル方向へ1本」では真横の壁に届かないため(街の実測に基づく。実装のコメント参照)。
+	// 見つからなければfalse(そのフックは撃たない)
+	bool FindAnchorDir(int _index, const Math::Vector3& _from, const Math::Vector3& _aimDir,
+		float _maxLen, Math::Vector3& _outDir) const;
+
 	// 壁走り／壁ジャンプ(自動発動。走行中は通常移動とジャンプを止める)
 	std::unique_ptr<WallAction> m_upWall;
 

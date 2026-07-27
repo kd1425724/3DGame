@@ -290,12 +290,13 @@ void WireAction::Draw(const Math::Vector3& _from, const Math::Vector3& _to)
 }
 
 
-bool WireAction::Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, float _maxLength)
+bool WireAction::CastAnchor(const Math::Vector3& _from, const Math::Vector3& _dir, float _maxLength,
+	Math::Vector3& _outPos, bool& _outIsGround, float& _outDist)
 {
 	// 建物(TypeBump)と地面(TypeGround)を別々に撃って、どちらが手前だったかを覚える。
 	// 「地面に刺したか」が分かると、ワイヤー中に着地させるかどうかを切り替えられる
 	// (地面スレスレを飛ぶのが基本だが、地面そのものに刺した時は降りていくのが正しいため)
-	auto castNearest = [&](UINT _type, Math::Vector3& _outPos) -> float
+	auto castNearest = [&](UINT _type, Math::Vector3& _pos) -> float
 		{
 			KdCollider::RayInfo ray(_type, _from, _dir, _maxLength);
 			std::list<KdCollider::CollisionResult> results;
@@ -313,7 +314,7 @@ bool WireAction::Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, fl
 				if (dist < nearest)
 				{
 					nearest = dist;
-					_outPos = ret.m_hitPos;
+					_pos = ret.m_hitPos;
 					found = true;
 				}
 			}
@@ -325,36 +326,43 @@ bool WireAction::Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, fl
 	float bumpDist   = castNearest(KdCollider::TypeBump,   bumpPos);
 	float groundDist = castNearest(KdCollider::TypeGround, groundPos);
 
-	bool hit = false;
 	if (bumpDist >= 0.0f && (groundDist < 0.0f || bumpDist <= groundDist))
 	{
-		m_anchor = bumpPos;
-		m_anchorIsGround = false;
-		hit = true;
+		_outPos = bumpPos;
+		_outIsGround = false;
+		_outDist = bumpDist;
+		return true;
 	}
-	else if (groundDist >= 0.0f)
+	if (groundDist >= 0.0f)
 	{
-		m_anchor = groundPos;
-		m_anchorIsGround = true;
-		hit = true;
+		_outPos = groundPos;
+		_outIsGround = true;
+		_outDist = groundDist;
+		return true;
 	}
 
-	// ④ 命中したら:
-	//      ・m_anchor に交点をセット
-	//      ・m_length = _from と m_anchor の距離(＝撃った瞬間のワイヤー長)
-	//      ・m_isAttached = true
-	//      ・true を返す
-	//    命中しなかったら false を返す
+	return false;
+}
+
+bool WireAction::Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, float _maxLength)
+{
+	Math::Vector3 pos;
+	bool isGround = false;
+	float dist = 0.0f;
+	bool hit = CastAnchor(_from, _dir, _maxLength, pos, isGround, dist);
+
+	// 命中したらアンカーと長さを確定して繋ぐ
 	if (hit)
 	{
-		m_length = Math::Vector3::Distance(_from,m_anchor);
-		m_maxLength = m_length;   // 撃った瞬間の長さをリールアウトの上限にする
+		m_anchor = pos;
+		m_anchorIsGround = isGround;
+		m_length = dist;          // 撃った瞬間のワイヤー長
+		m_maxLength = m_length;   // リールアウトの上限にもする
 		m_isAttached = true;
 		m_occludedTime = 0.0f;    // 遮蔽デバウンスをリセット
 	}
 
-	// TODO: 上の①〜④を実装する
-	return hit; 
+	return hit;
 }
 
 void WireAction::Release()
