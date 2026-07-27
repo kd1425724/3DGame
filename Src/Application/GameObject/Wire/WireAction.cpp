@@ -178,14 +178,49 @@ void WireAction::UpdateSwingAll(CharaBase& _body, float _dt, const Math::Vector2
 		// そこで2つのアンカーの中点を支点にした球1つに置き換える。自由度が2に戻り、
 		// 1本と同じ振り子の感触になる。解が消える心配も無い(球1つなら常に解がある)。
 		//
-		// 半径は「両方の球に必ず収まる最大の球」にする:
-		//     半径 = min(左の長さ, 右の長さ) - アンカー間距離 / 2
-		// 中点から半径ぶん離れても、各アンカーからの距離は元の長さを超えない。
-		// アンカーが近い(同じ壁)ときは1本とほぼ同じ半径になり、
-		// 離れている(通りの左右)ほど小さくなる = 2本で張ると引き締まる
-		Math::Vector3 pivot = (live[0]->m_anchor + live[1]->m_anchor) * 0.5f;
-		float anchorDist = (live[0]->m_anchor - live[1]->m_anchor).Length();
-		float radius = std::min(live[0]->m_length, live[1]->m_length) - anchorDist * 0.5f;
+		// 【支点と半径の取り方】支点は2つのアンカーの中点ではなく、
+		// 「2つの球面が交わる円」の中心。半径はその円の半径。
+		//
+		// 撃った瞬間、各ワイヤーの長さはその時の実距離なので、プレイヤーはちょうど
+		// 両方の球面上＝交わる円の上にいる。だから円の中心・円の半径を使えば
+		// 撃った瞬間の位置がそのまま球面上に乗り、瞬間移動が起きない。
+		// (中点＋「両方に収まる最大の球」にすると、プレイヤーはその球の外にいるので
+		//  掛けた瞬間に中心方向へ引き込まれる。実際その不具合を出した)
+		//
+		//   d  = アンカー間距離
+		//   a  = (d^2 + rA^2 - rB^2) / (2d)   … Aから円の面までの距離
+		//   中心 = A + (B-A)/d * a
+		//   半径 = sqrt(rA^2 - a^2)
+		const Math::Vector3& anchorA = live[0]->m_anchor;
+		const Math::Vector3& anchorB = live[1]->m_anchor;
+		float rA = live[0]->m_length;
+		float rB = live[1]->m_length;
+
+		Math::Vector3 axis = anchorB - anchorA;
+		float d = 0.0f;
+		Math::Vector3 axisDir;
+		bool solved = false;
+		Math::Vector3 pivot = anchorA;
+		float radius = std::min(rA, rB);
+
+		if (MathAPI::ToDirectionAndLength(axis, axisDir, d))
+		{
+			float a = (d * d + rA * rA - rB * rB) / (2.0f * d);
+			float h2 = rA * rA - a * a;
+			if (h2 > 0.0f)
+			{
+				pivot = anchorA + axisDir * a;
+				radius = std::sqrt(h2);
+				solved = true;
+			}
+		}
+		// アンカーがほぼ同じ点／球が交わらないときは、短いほうの球1つで代用する
+		// (巻き取りのクランプで交わらない状態にはならないはずだが、保険)
+		if (!solved)
+		{
+			pivot = (rA <= rB) ? anchorA : anchorB;
+			radius = std::min(rA, rB);
+		}
 
 		float minLen = DebugParams::Instance().Float(U8("ワイヤー/最短の長さ"), 3.0f, 0.5f, 30.0f);
 		if (radius < minLen)
