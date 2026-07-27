@@ -96,6 +96,77 @@ void CharaBase::UpdateArmAim(float _deltaTime)
 	m_modelWork.CalcNodeMatrices();
 }
 
+void CharaBase::UpdateLegFlow(float _deltaTime)
+{
+	// DebugFlagsでオフにしたときも、いきなりアニメへ戻さず重みを0へ落として自然に抜ける
+	// (UpdateArmAimと同じ抜け方。切り替えた瞬間に脚が飛ぶと比較用のオンオフとして使えない)
+	bool enabled = DebugFlags::Instance().Get(U8("脚/慣性でなびかせる"), true);
+	bool wantFlow = enabled && SelectLegFlow();
+
+	float follow = DebugParams::Instance().Float(U8("脚/追従速度"), 12.0f, 1.0f, 60.0f);
+	m_legFlowWeight = MathAPI::InterpTo(m_legFlowWeight, wantFlow ? 1.0f : 0.0f, _deltaTime, follow);
+
+	// --- 脚の向きを進める ---
+	// ※ 重みが0(接地中)でも進め続ける。止めると次に浮いた瞬間、前回浮いていた時の
+	//    古い向きから動き出すことになり、脚が一度あらぬ方向へ振られる
+	float strength = DebugParams::Instance().Float(U8("脚/なびく強さ"),   0.8f,  0.0f,   2.0f);
+	float speedRef = DebugParams::Instance().Float(U8("脚/速度の基準"),  20.0f,  1.0f,  60.0f);
+	float stiff    = DebugParams::Instance().Float(U8("脚/バネの硬さ"),  60.0f,  1.0f, 200.0f);
+	float damp     = DebugParams::Instance().Float(U8("脚/減衰"),        10.0f,  0.0f,  50.0f);
+
+	// 目標＝真下から「進行方向の逆」へ、速さに応じて倒した向き。
+	// 真下に落ちるだけなら真下のまま＝脚は垂れる。速く振られるほど後ろへ流れる
+	const Math::Vector3 down = { 0.0f, -1.0f, 0.0f };
+	Math::Vector3 velDir = MathAPI::GetSafeNormal(m_velocity);
+	float speedRatio = std::clamp(m_velocity.Length() / speedRef, 0.0f, 1.0f);
+	Math::Vector3 target = MathAPI::GetSafeNormal(down - velDir * (speedRatio * strength), down);
+
+	// バネ＋減衰の2階積分。
+	// ※ Lerpでは慣性に見えない。Lerpは目標に着いたら止まるだけで、
+	//   「行きすぎて戻る(振り戻し)」が出ないため。速度を持たせて初めて慣性になる
+	// ⚠️ 明示的オイラー法なのでdtが大きいと発散する。処理落ちに備えて上限をかける
+	float dt = std::min(_deltaTime, 1.0f / 30.0f);
+	Math::Vector3 accel = (target - m_legFlowDir) * stiff - m_legFlowVel * damp;
+	m_legFlowVel += accel * dt;
+	m_legFlowDir += m_legFlowVel * dt;
+	MathAPI::TryNormalize(m_legFlowDir);
+
+	// ほぼ0なら何もしない=アニメそのまま。
+	// CalcNodeMatricesも走らないので、地上や脚を触らないキャラには負荷がかからない
+	if (m_legFlowWeight < 0.001f) { return; }
+
+	// 回転量の上限。無いと脚が真上を向くような破綻したポーズになる
+	float maxRad = DirectX::XMConvertToRadians(
+		DebugParams::Instance().Float(U8("脚/最大角度"), 70.0f, 0.0f, 120.0f));
+
+	// 腿の骨の軸はローカル+Y(glTFで子=膝への平行移動が左(0,0.4679,0)/右(0,0.4685,0)＝実測済み)。
+	// ※ 左右を別々に測った結果どちらも+Y。左を反転して決めつけないこと
+	const Math::Vector3 boneAxis = { 0.0f, 1.0f, 0.0f };
+
+	// 直前のUpdateArmAimが末尾で計算済みなら、ここは飛ばす。
+	// CalcNodeMatricesは無条件に全ノードを再計算する(ダーティフラグは最後にクリアするだけ)ので、
+	// 素直に呼ぶと1フレームに同じ計算が1回ぶん余る。腕が動いていない(重み0で早期リターン)
+	// フレームではフラグが立ったままなので、その時はちゃんと計算される
+	if (m_modelWork.NeedCalcNodeMatrices())
+	{
+		m_modelWork.CalcNodeMatrices();
+	}
+
+	int done = 0;
+	for (auto& node : m_modelWork.WorkNodes())
+	{
+		if (node.m_name != "mixamorig:LeftUpLeg" && node.m_name != "mixamorig:RightUpLeg") { continue; }
+
+		// 両腿を同じ向きへ向ける(＝脚が揃う)。開きが欲しければ段階3-bの膝と一緒にやる
+		AimBoneToDir(node, m_legFlowDir, boneAxis, m_legFlowWeight, maxRad);
+
+		++done;
+		if (done >= 2) { break; }
+	}
+
+	m_modelWork.CalcNodeMatrices();
+}
+
 bool CharaBase::AimBoneToDir(KdModelWork::Node& _node, const Math::Vector3& _dirWorld,
 	const Math::Vector3& _boneAxis, float _weight, float _maxRad)
 {

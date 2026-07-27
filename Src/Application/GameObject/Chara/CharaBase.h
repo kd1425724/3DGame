@@ -177,6 +177,16 @@ protected:
 	// ※ 既定実装では引数を使わないため、C4100(未参照パラメーター/このプロジェクトは/W4)を避けて名前を省いてある
 	virtual bool SelectArmAimTarget(Math::Vector3& /* _outTarget */) const { return false; }
 
+	// 脚を慣性でなびかせる(空中で振られると脚が後ろへ流れる)。
+	// 腿ボーンを「速度の変化に対してバネ＋減衰で遅れて追従する向き」へ向けることで慣性を作る。
+	// ※ UpdateArmAimの直後で呼ぶ。アニメ→腕→脚の順に上書きしていく
+	void UpdateLegFlow(float _deltaTime);
+
+	// 今なびかせるべきか。既定は「空中にいる間」。
+	// 接地中に混ぜると走行サイクルと喧嘩して足が滑るので、地上では効かせない。
+	// 判断は派生クラスの責務(SelectAnimation/SelectTilt/SelectArmAimTargetと同じ分け方)
+	virtual bool SelectLegFlow() const { return !m_isGrounded; }
+
 	// 表示用モデルワーク
 	KdModelWork m_modelWork;
 
@@ -243,4 +253,14 @@ protected:
 	//    アニメへ戻すため。保持しないと減衰中にワールド原点(0,0,0)へ振られる
 	float m_armAimWeight = 0.0f;
 	Math::Vector3 m_armAimTarget = {};
+
+	// 脚のなびき(UpdateLegFlow)の状態。
+	// ・m_legFlowWeight … 効き具合(0=アニメそのまま / 1=完全になびかせる)
+	// ・m_legFlowDir    … 今の脚の向き(ワールド)。バネで目標へ遅れて追従する
+	// ・m_legFlowVel    … その向きの変化速度。これを持つことで「行きすぎて戻る」慣性が出る
+	// ⚠️ m_legFlowDirをゼロベクトルで初期化しないこと(初回のNormalizeでゼロ除算する)。
+	//    「脚が真下に垂れている」= (0,-1,0) が自然な初期値
+	float m_legFlowWeight = 0.0f;
+	Math::Vector3 m_legFlowDir = { 0.0f, -1.0f, 0.0f };
+	Math::Vector3 m_legFlowVel = {};
 };

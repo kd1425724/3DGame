@@ -1014,6 +1014,10 @@ void Player::PostUpdate()
 	//腕の位置再計算
 	UpdateArmAim(Application::Instance().GetDeltaTime());
 
+	//脚を慣性でなびかせる(空中で振られると後ろへ流れる)
+	//腕の後に呼ぶ＝アニメ→腕→脚の順に上書きしていく
+	UpdateLegFlow(Application::Instance().GetDeltaTime());
+
 	// デバッグ用：状態値をDebugWatchへ(このフレームの最終状態を出す。PostUpdateは毎フレーム必ず走る)
 	WatchDebug();
 }
