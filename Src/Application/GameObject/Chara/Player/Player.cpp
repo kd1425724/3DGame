@@ -50,7 +50,11 @@ void Player::Init()
 	SetScale(Math::Vector3(1.0f, 1.0f, 1.0f));
 
 	//ワイヤー(物理＋見た目を内包。見た目の板ポリ生成はWireActionのctorが行う)
-	m_upWire = std::make_unique<WireAction>();
+	// 立体機動装置に合わせて腰の左右から2本ぶん用意する
+	for (std::unique_ptr<WireAction>& w : m_upWires)
+	{
+		w = std::make_unique<WireAction>();
+	}
 
 	// 壁走り／壁ジャンプ(当たり判定はCharaBase::ResolveBumpの結果を読むだけなので追加の負荷は無い)
 	m_upWall = std::make_unique<WallAction>();
@@ -113,8 +117,8 @@ void Player::Update()
 	// 移動入力をそのまま渡す：X=操舵(振り子の向きを曲げる) / Y=前方への漕ぎ。
 	// 加えて上下の噴射(立体機動のガス噴射にあたる)を Space=上 / Ctrl=下 で渡す。
 	// ※ ワイヤー中はジャンプが使われないのでSpaceを転用している
-	// 実際の移動はWireAction::UpdateSwingがこのキャラを動かす
-	if (m_upWire->IsAttached())
+	// 実際の移動はWireAction::UpdateSwingAllがこのキャラを動かす
+	if (IsAnyWireAttached())
 	{
 		// ワイヤーへ移ったら壁走りは中断する。
 		// ※ 壁走りは重力を止めている(m_gravityScale=0)ので、中断せずに素通りすると
@@ -135,7 +139,14 @@ void Player::Update()
 			}
 		}
 
-		m_upWire->UpdateSwing(*this, dt, wireMove);
+		// 繋がっている全ワイヤーをまとめて解く。重力・積分・当たり解決は
+		// この中で1フレームに1回だけ行われる(本数ぶん重複しない)
+		WireAction* wires[kWireCount] = {};
+		for (int i = 0; i < kWireCount; ++i)
+		{
+			wires[i] = m_upWires[i].get();
+		}
+		WireAction::UpdateSwingAll(*this, dt, wireMove, wires, kWireCount);
 		return;
 	}
 
@@ -251,7 +262,8 @@ void Player::UpdateWireInput()
 
 		// 撃った瞬間、今の速度(m_velocity)はそのまま引き継ぐ
 		// (走りながら撃てば横の勢いが乗る。速度は基底CharaBaseの共通m_velocity)
-		m_upWire->Shoot(from, dir, maxLen);
+		// ※ 今は0番(左)のみ発射する。2本目の射出は次の段階で入れる
+		m_upWires[0]->Shoot(from, dir, maxLen);
 	}
 
 	// ワイヤーとして撃った時だけ、離したら外す(攻撃で押した時は無視)。
@@ -260,7 +272,7 @@ void Player::UpdateWireInput()
 	{
 		if (m_anchorPressWasWire)
 		{
-			m_upWire->Release();
+			ReleaseAllWires();
 		}
 		m_anchorPressWasWire = false;
 	}
@@ -695,7 +707,7 @@ void Player::UpdateAirFocus()
 	//   ※ スローは初弾を"ためて狙う"時だけ。連続攻撃中(突撃/受付窓)はスローしない
 	//   ※ 2026/07/19の入力再設計で、長押し元を左クリックからE(Focus)へ移した。
 	//     左クリックはアンカー射出＋攻撃に統一したため
-	bool airborne = !m_isGrounded && !m_upWire->IsAttached();
+	bool airborne = !m_isGrounded && !IsAnyWireAttached();
 	bool canAim   = airborne && !m_isDiving;
 	bool holding  = KdInputManager::Instance().IsHold("Focus");
 
@@ -901,10 +913,7 @@ void Player::Respawn()
 	SetPos(m_spawnPos);
 	m_velocity = Math::Vector3::Zero;
 	m_isGrounded = false;
-	if (m_upWire)
-	{
-		m_upWire->Release();
-	}
+	ReleaseAllWires();
 	if (m_upWall)
 	{
 		m_upWall->Cancel(*this);   // 壁走り中にリセットしても重力が止まったままにならないように
@@ -935,7 +944,7 @@ void Player::PostUpdate()
 
 	// 地面(KdCollider::TypeGround)に立つ
 	// ※ ワイヤー中は地面吸着させず、ワイヤー物理(3D速度)に任せる
-	if (!m_upWire->IsAttached())
+	if (!IsAnyWireAttached())
 	{
 		GroundCheck();
 	}
@@ -1040,7 +1049,7 @@ std::string Player::SelectAnimation() const
 	// ※ 参考: ネギ夫氏「立体機動ポーズ集」pixiv id:38998125(ご自由にお使い下さい)を見ながら手付け
 	// ※ 体の前傾はこのクリップに焼き込んでいない。ゲーム側のUpdateTiltが
 	//    アンカー方向に応じて動的に傾けるので、二重に倒れないようクリップは直立で作ってある
-	if (m_upWire && m_upWire->IsAttached()) { return "20 odm fly"; }
+	if (IsAnyWireAttached()) { return "20 odm fly"; }
 
 	// 突撃中。専用が無いので落下で代用
 	if (m_isDiving) { return "08 fall (air)"; }
@@ -1104,10 +1113,36 @@ void Player::DrawUnLit()
 	m_upTargeting->DrawMarker();
 }
 
+bool Player::IsAnyWireAttached() const
+{
+	for (const std::unique_ptr<WireAction>& w : m_upWires)
+	{
+		if (w && w->IsAttached()) { return true; }
+	}
+
+	return false;
+}
+
+WireAction* Player::GetAttachedWire() const
+{
+	for (const std::unique_ptr<WireAction>& w : m_upWires)
+	{
+		if (w && w->IsAttached()) { return w.get(); }
+	}
+
+	return nullptr;
+}
+
+void Player::ReleaseAllWires()
+{
+	for (const std::unique_ptr<WireAction>& w : m_upWires)
+	{
+		if (w) { w->Release(); }
+	}
+}
+
 void Player::DrawWire()
 {
-	if (!m_upWire) { return; }
-
 	// ワイヤーの手元。左手のボーンから出す(腕をアンカーへ向けているので手もアンカー側を向く)。
 	// 端点だけ決め、線の描画はWireActionに任せる。
 	// ※ 【見た目だけ】ワイヤーの物理(振り子の支点・長さの拘束)はGetPos()基準のままにしてある。
@@ -1121,19 +1156,24 @@ void Player::DrawWire()
 		from = handPos;
 	}
 
-	// スイング中：アンカーへ線を引く
-	if (m_upWire->IsAttached())
+	// スイング中：繋がっている本数ぶんアンカーへ線を引く
+	if (IsAnyWireAttached())
 	{
-		m_upWire->Draw(from, m_upWire->GetAnchor());
+		for (const std::unique_ptr<WireAction>& w : m_upWires)
+		{
+			if (!w || !w->IsAttached()) { continue; }
+
+			w->Draw(from, w->GetAnchor());
+		}
 		return;
 	}
 
-	// 突撃(グラップル)中：引き寄せている対象へ線を引く
+	// 突撃(グラップル)中：引き寄せている対象へ線を引く(1本でよい)
 	if (m_isDiving)
 	{
 		if (std::shared_ptr<KdGameObject> spTarget = m_wpDiveTarget.lock())
 		{
-			m_upWire->Draw(from, spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f));
+			m_upWires[0]->Draw(from, spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f));
 		}
 	}
 }
@@ -1162,7 +1202,7 @@ void Player::WatchDebug() const
 	w.Watch(U8("Player/水平速度"),   GetHorizontalSpeed());
 	w.Watch(U8("Player/垂直速度"),   m_velocity.y);
 	w.Watch(U8("Player/接地"),       IsGrounded());
-	w.Watch(U8("Player/ワイヤー接続"), m_upWire && m_upWire->IsAttached());
+	w.Watch(U8("Player/ワイヤー接続"), IsAnyWireAttached());
 
 	// 再生中のアニメ名。空のままなら「名前が見つかっていない」= glTFのアニメ名との
 	// 綴り違いを疑う(Scifi_girlは "01 idle" のように番号＋半角スペース＋英字)
@@ -1222,10 +1262,12 @@ void Player::DrawDebugRanges()
 		}
 	}
 
-	// ワイヤー接続中：手元→アンカーの線(青)
-	if (m_upWire && m_upWire->IsAttached())
+	// ワイヤー接続中：手元→アンカーの線(青)。繋がっている本数ぶん引く
+	for (const std::unique_ptr<WireAction>& w : m_upWires)
 	{
-		m_pDebugWire->AddDebugLine(pos, m_upWire->GetAnchor(), Math::Color(0.4f, 0.6f, 1.0f, 1.0f));
+		if (!w || !w->IsAttached()) { continue; }
+
+		m_pDebugWire->AddDebugLine(pos, w->GetAnchor(), Math::Color(0.4f, 0.6f, 1.0f, 1.0f));
 	}
 }
 
@@ -1235,11 +1277,23 @@ Math::Vector2 Player::SelectTilt() const
 	float rollGain = DebugParams::Instance().Float(U8("傾き/ワイヤー時のロール係数"), 1.0f, -2.0f, 2.0f);
 	float leanGain = DebugParams::Instance().Float(U8("傾き/前傾の強さ"), 0.8f, -3.0f, 3.0f);
 
-	// ワイヤー中：体の「上」をアンカーへ向ける(ぶら下がって振られている姿勢)
-	if (m_upWire && m_upWire->IsAttached())
+	// ワイヤー中：体の「上」をアンカーへ向ける(ぶら下がって振られている姿勢)。
+	// ※ 2本掛かっているときは全アンカーの中点を向く。片方に引っ張られて偏らないように
+	if (IsAnyWireAttached())
 	{
 		//アンカーの向きを求める
-		Math::Vector3 toAnchor = m_upWire->GetAnchor() - GetPos();
+		Math::Vector3 anchorMid = Math::Vector3::Zero;
+		int attached = 0;
+		for (const std::unique_ptr<WireAction>& w : m_upWires)
+		{
+			if (!w || !w->IsAttached()) { continue; }
+
+			anchorMid += w->GetAnchor();
+			++attached;
+		}
+		anchorMid /= static_cast<float>(attached);
+
+		Math::Vector3 toAnchor = anchorMid - GetPos();
 		toAnchor.Normalize();
 
 		//キャラのローカル空間へ移す
@@ -1267,9 +1321,9 @@ bool Player::SelectArmAimTarget(Math::Vector3& _outTarget) const
 
 	// ワイヤーで繋がっている間は左腕をアンカーへ向ける。
 	// 判定条件はSelectTiltと同じなので、体の傾きと腕が同じタイミングで入り、同じタイミングで抜ける
-	if (m_upWire && m_upWire->IsAttached())
+	if (WireAction* w = GetAttachedWire())
 	{
-		_outTarget = m_upWire->GetAnchor();
+		_outTarget = w->GetAnchor();
 		return true;
 	}
 

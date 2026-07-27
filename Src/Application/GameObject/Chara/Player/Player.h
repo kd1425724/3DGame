@@ -54,7 +54,7 @@ public:
 private:
 
 	// --- Update()の中身を仕事ごとに分けたもの(挙動は分割前と同じ。Updateは流れだけ) ---
-	// ワイヤーの発射/解除の入力を処理する(スイング物理はWireAction::UpdateSwingに委譲)
+	// ワイヤーの発射/解除の入力を処理する(スイング物理はWireAction::UpdateSwingAllに委譲)
 	void UpdateWireInput();
 	// 通常移動(接地=入力に即セット/空中=エアアクセル。カメラの水平向き基準)
 	void UpdateMove(float dt);
@@ -213,8 +213,20 @@ private:
 	// 落下攻撃で突撃中の対象(Targetingの選択からコピー。ホーミングの狙い先)
 	std::weak_ptr<KdGameObject> m_wpDiveTarget;
 
-	//ワイヤー(物理＋見た目を内包)
-	std::unique_ptr<WireAction> m_upWire;
+	// ワイヤー(物理＋見た目を内包)。立体機動装置に合わせて腰の左右から2本。
+	// ※ 添字0=左 / 1=右。まだ発射は0番のみ(2本目の射出は次の段階で入れる)
+	static constexpr int kWireCount = 2;
+	std::array<std::unique_ptr<WireAction>, kWireCount> m_upWires;
+
+	// 1本でも繋がっているか
+	bool IsAnyWireAttached() const;
+
+	// 繋がっているワイヤーのうち最初の1本。無ければnullptr。
+	// 体の傾き・見た目の線・突撃の描画など「代表1本あればよい」場所が使う
+	WireAction* GetAttachedWire() const;
+
+	// 全ワイヤーを外す(リスポーンや状態リセット用)
+	void ReleaseAllWires();
 
 	// 壁走り／壁ジャンプ(自動発動。走行中は通常移動とジャンプを止める)
 	std::unique_ptr<WallAction> m_upWall;

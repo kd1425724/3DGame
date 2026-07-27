@@ -21,15 +21,13 @@ WireAction::WireAction()
 
 WireAction::~WireAction() = default;
 
-void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _moveInput)
+bool WireAction::UpdateOcclusion(const CharaBase& _body, float _dt)
 {
-	if (!m_isAttached) { return; }
-
 	// 手元とアンカーの間に壁(塔など)が入ったら、線が壁を突き抜けるのでワイヤーを外す(貫通させない)。
 	// ただし一瞬のかすりで外れないよう、一定時間(自動リリース猶予)遮蔽が続いた時だけ外す(デバウンス)。
 	// 外した瞬間の速度はそのまま残るので、スイングの勢いで飛んでいける(フリング)
 	Math::Vector3 hand = _body.GetPos() + Math::Vector3(0.0f, 1.0f, 0.0f);
-	float occMargin = DebugParams::Instance().Float(U8("ワイヤー/遮蔽の余白"),     1.0f, 0.0f, 5.0f);
+	float occMargin = DebugParams::Instance().Float(U8("ワイヤー/遮蔽の余白"), 1.0f, 0.0f, 5.0f);
 	if (CollisionGrid::IsWallBetween(hand, m_anchor, occMargin))
 	{
 		m_occludedTime += _dt;
@@ -43,8 +41,83 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 	if (m_occludedTime >= releaseDelay)
 	{
 		Release();
-		return;
+		return false;
 	}
+
+	return true;
+}
+
+void WireAction::Winch(float _dt)
+{
+	// === 巻き取り(ウインチ) ── 立体機動の推進力の本体 ===
+	// 【重要】呼び出し側は拘束を解く"前"にこれを呼ぶこと。ワイヤー長を縮めてから拘束を解くと
+	// 「ピンと張ったまま巻き取られる」状態が作れる。
+	//
+	// ※ 2026/07/20 に作り直し。
+	//   以前は「アンカー方向へ加速」で実装していたが、半径方向にだけ力を掛けると
+	//   アンカーへ一直線に飛ぶだけで弧を描かず、回転しないので上にも飛ばなかった。
+	//   張った紐を短くすると、接線方向の速度は保たれたまま半径だけ縮むので、
+	//   角速度が上がって振り回されながら上へ抜ける(紐に繋いだ球を手繰る動き)。
+	//   これが立体機動の「巻き取られて振られる」感触の正体。
+	float reelSpeed = DebugParams::Instance().Float(U8("ワイヤー/巻き取り速度"), 14.0f, 0.0f, 60.0f);
+	float minLen    = DebugParams::Instance().Float(U8("ワイヤー/最短の長さ"),   3.0f, 0.5f, 30.0f);
+
+	m_length -= reelSpeed * _dt;
+	if (m_length < minLen)
+	{
+		m_length = minLen;
+	}
+}
+
+void WireAction::ApplyRadialPull(const Math::Vector3& _pos, Math::Vector3& _vel, float _dt) const
+{
+	Math::Vector3 toAnchor = m_anchor - _pos;
+	float distToAnchor = toAnchor.Length();
+	if (distToAnchor <= 0.001f) { return; }
+
+	toAnchor /= distToAnchor;
+	float approach = _vel.Dot(toAnchor);
+
+	// 半径方向への加速。※ 既定を 20 → 0 にした(2026/07/20)。
+	// 半径方向に力を掛けるとアンカーへ一直線に向かってしまい、弧を描かなくなる
+	// (＝回転しないので上に飛ばない)。推進は「巻き取り」に任せるのが正しい。
+	// 真下にぶら下がった時など、どうしても寄せたい場合用にパラメータは残す(0で無効)
+	float reelAcc = DebugParams::Instance().Float(U8("ワイヤー/引き寄せ加速"),    0.0f, 0.0f, 120.0f);
+	float reelMax = DebugParams::Instance().Float(U8("ワイヤー/引き寄せ上限速度"), 30.0f, 0.0f, 120.0f);
+	if (reelAcc > 0.0f && approach < reelMax)
+	{
+		_vel += toAnchor * (reelAcc * _dt);
+	}
+
+	// ※ ここにあった自動離脱を 2026/07/20 に撤去した(ユーザー指示)。
+	//    撤去したのは (A)アンカーの追い越しで離す ＋ それを「上を向いてから」に
+	//    遅らせる待ち、(B)アンカーに近づきすぎたら離す(壁への激突防止の安全網)、の2つ。
+	//    自動で外れる条件は「手元〜アンカーが壁で遮られた時」(UpdateOcclusion)だけになり、
+	//    それ以外はプレイヤーが左クリックを離すまで繋がったままになる。
+	//    → (B)を消したので、正面の壁に水平に刺すとアンカーまで引かれて激突する。
+	//      切り離しは自分で行う前提。戻すならこのコミットをrevertする
+}
+
+void WireAction::UpdateSwingAll(CharaBase& _body, float _dt, const Math::Vector2& _moveInput,
+	WireAction* const* _wires, int _count)
+{
+	// 繋がっているワイヤーだけを集める。ここで1本ぶんに畳まないのは、
+	// 拘束を「全部まとめて」解く必要があるため(1本ずつ解くと後の1本が前の1本を壊す)
+	WireAction* live[4] = {};
+	int n = 0;
+	for (int i = 0; i < _count && n < 4; ++i)
+	{
+		WireAction* w = _wires[i];
+		if (!w || !w->m_isAttached) { continue; }
+
+		// 遮蔽で外れたものはこのフレームから除外する
+		if (!w->UpdateOcclusion(_body, _dt)) { continue; }
+
+		live[n++] = w;
+	}
+	if (n == 0) { return; }
+
+	// --- ここから下は「1フレームに1回だけ」の処理 ---
 
 	// 重力を3D速度に加える
 	float gravity = DebugParams::Instance().Float(U8("キャラ/重力"), 20.0f, 0.0f, 100.0f);
@@ -57,31 +130,26 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 
 	const bool winchMode = DebugFlags::Instance().Get(U8("ワイヤー/引き寄せモード"), true);
 
-	// === 巻き取り(ウインチ) ── 立体機動の推進力の本体 ===
-	// 【重要】ここは拘束を解く"前"に行う。ワイヤー長を縮めてから拘束を解くことで、
-	// 「ピンと張ったまま巻き取られる」状態が作れる。
-	//
-	// ※ 2026/07/20 に作り直し。
-	//   以前は「アンカー方向へ加速」で実装していたが、半径方向にだけ力を掛けると
-	//   アンカーへ一直線に飛ぶだけで弧を描かず、回転しないので上にも飛ばなかった。
-	//   張った紐を短くすると、接線方向の速度は保たれたまま半径だけ縮むので、
-	//   角速度が上がって振り回されながら上へ抜ける(紐に繋いだ球を手繰る動き)。
-	//   これが立体機動の「巻き取られて振られる」感触の正体。
 	if (winchMode)
 	{
-		float reelSpeed = DebugParams::Instance().Float(U8("ワイヤー/巻き取り速度"), 14.0f, 0.0f, 60.0f);
-		float minLen    = DebugParams::Instance().Float(U8("ワイヤー/最短の長さ"),   3.0f, 0.5f, 30.0f);
-
-		m_length -= reelSpeed * _dt;
-		if (m_length < minLen)
+		for (int i = 0; i < n; ++i)
 		{
-			m_length = minLen;
+			live[i]->Winch(_dt);
 		}
 	}
 
 	// 距離拘束を解く(球の外へは出られない。内側は自由＝紐であって棒ではない)。
+	// 2本以上のときは「片方へ射影→もう片方へ射影」を数回まわして両方を満たす点へ寄せる。
+	// (2つの球の交わりは円になる。1本なら1回で厳密解なので、従来と完全に同じ結果になる)
 	// ※ 手動リールは 2026/07/19 に廃止したので入力は 0。巻き取りは上の自動ウインチが担当
-	Update(pos, _body.m_velocity, _dt, 0.0f);
+	const int iterations = (n >= 2) ? 4 : 1;
+	for (int it = 0; it < iterations; ++it)
+	{
+		for (int i = 0; i < n; ++i)
+		{
+			live[i]->Update(pos, _body.m_velocity, _dt, 0.0f);
+		}
+	}
 
 	// === 補助的な半径方向の引き ===
 	// DebugFlags「ワイヤー/引き寄せモード」で挙動が2種類に分かれる。
@@ -89,33 +157,26 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 	//   OFF (Spider-Man)… 巻き取りなし。重力で落ちて振れる純粋な振り子
 	if (winchMode)
 	{
-		Math::Vector3 toAnchor = m_anchor - pos;
-		float distToAnchor = toAnchor.Length();
-		if (distToAnchor > 0.001f)
+		for (int i = 0; i < n; ++i)
 		{
-			toAnchor /= distToAnchor;
-
-			float approach = _body.m_velocity.Dot(toAnchor);
-
-			// 半径方向への加速。※ 既定を 20 → 0 にした(2026/07/20)。
-			// 半径方向に力を掛けるとアンカーへ一直線に向かってしまい、弧を描かなくなる
-			// (＝回転しないので上に飛ばない)。推進は上の「巻き取り」に任せるのが正しい。
-			// 真下にぶら下がった時など、どうしても寄せたい場合用にパラメータは残す(0で無効)
-			float reelAcc = DebugParams::Instance().Float(U8("ワイヤー/引き寄せ加速"),    0.0f, 0.0f, 120.0f);
-			float reelMax = DebugParams::Instance().Float(U8("ワイヤー/引き寄せ上限速度"), 30.0f, 0.0f, 120.0f);
-			if (reelAcc > 0.0f && approach < reelMax)
-			{
-				_body.m_velocity += toAnchor * (reelAcc * _dt);
-			}
+			live[i]->ApplyRadialPull(pos, _body.m_velocity, _dt);
 		}
+	}
 
-		// ※ ここにあった自動離脱を 2026/07/20 に撤去した(ユーザー指示)。
-		//    撤去したのは (A)アンカーの追い越しで離す ＋ それを「上を向いてから」に
-		//    遅らせる待ち、(B)アンカーに近づきすぎたら離す(壁への激突防止の安全網)、の2つ。
-		//    自動で外れる条件は「手元〜アンカーが壁で遮られた時」(UpdateSwing冒頭)だけになり、
-		//    それ以外はプレイヤーが左クリックを離すまで繋がったままになる。
-		//    → (B)を消したので、正面の壁に水平に刺すとアンカーまで引かれて激突する。
-		//      切り離しは自分で行う前提。戻すならこのコミットをrevertする
+	// 操舵と漕ぎで使う「アンカーから外向き」の基準。
+	// 2本あるときは各ワイヤーの外向きを平均する(=2本の中間を軸に振れる)。
+	// 1本なら従来どおりそのワイヤーの外向きそのもの
+	Math::Vector3 radialRef = Math::Vector3::Zero;
+	for (int i = 0; i < n; ++i)
+	{
+		radialRef += MathAPI::GetSafeNormalXZ(pos - live[i]->m_anchor);
+	}
+
+	// 地面スレスレ飛行の可否。アンカーが1本でも地面なら、そこへ降りるので着地を許す
+	bool anchorOnGround = false;
+	for (int i = 0; i < n; ++i)
+	{
+		anchorOnGround = anchorOnGround || live[i]->m_anchorIsGround;
 	}
 
 	// === 操舵と漕ぎ(進行方向の水平ベクトルを基準にする) ===
@@ -131,7 +192,7 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 		MathAPI::TryNormalize(side);
 
 		// アンカーから外向きの水平成分を落として、接線方向だけ残す
-		Math::Vector3 radial = MathAPI::FlattenY(pos - m_anchor);
+		Math::Vector3 radial = radialRef;
 		if (MathAPI::TryNormalize(radial))
 		{
 			tdir = MathAPI::ProjectOnPlane(tdir, radial);
@@ -188,7 +249,7 @@ void WireAction::UpdateSwing(CharaBase& _body, float _dt, const Math::Vector2& _
 	//    着地扱いにすると地面に触れるたび止まって勢いが死に、低空を飛べないため。
 	//    ただしアンカーを地面そのものに刺した場合は別で、そこへ引かれて降りていくのが
 	//    正しい動きなので通常どおり着地させる
-	bool allowLanding = m_anchorIsGround || !DebugFlags::Instance().Get(U8("ワイヤー/地面スレスレ飛行"), true);
+	bool allowLanding = anchorOnGround || !DebugFlags::Instance().Get(U8("ワイヤー/地面スレスレ飛行"), true);
 	_body.ResolveGround(pos, allowLanding);
 
 	// 上昇スイング中に頭上の天井へ潜り込むのを止める(高速上昇のトンネリングも掃引で拾う)
