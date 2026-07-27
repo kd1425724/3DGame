@@ -133,7 +133,7 @@ void CharaBase::UpdateLegFlow(float _deltaTime)
 	// バネ＋減衰の2階積分。
 	// ※ Lerpでは慣性に見えない。Lerpは目標に着いたら止まるだけで、
 	//   「行きすぎて戻る(振り戻し)」が出ないため。速度を持たせて初めて慣性になる
-	// ⚠️ 明示的オイラー法なのでdtが大きいと発散する。処理落ちに備えて上限をかける
+	// 明示的オイラー法なのでdtが大きいと発散する。処理落ちに備えて上限をかける
 	float dt = std::min(_deltaTime, 1.0f / 30.0f);
 	Math::Vector3 accel = (target - m_legFlowDir) * stiff - m_legFlowVel * damp;
 	m_legFlowVel += accel * dt;
@@ -189,7 +189,7 @@ bool CharaBase::AimBoneToDir(KdModelWork::Node& _node, const Math::Vector3& _dir
 	Math::Matrix rot;
 	if (!MathAPI::FromToRotation(_boneAxis, dirLocal, rot, _maxRad, _weight)) { return false; }
 
-	// 🔴【罠】前から掛けて初めて「骨の原点まわりで子を回す」＝関節を曲げる意味になる。
+	// 【罠】前から掛けて初めて「骨の原点まわりで子を回す」＝関節を曲げる意味になる。
 	// 逆に掛けると骨が体から外れて飛ぶ(行ベクトル規約なので左が先)
 	_node.m_localTransform = rot * _node.m_localTransform;
 	return true;

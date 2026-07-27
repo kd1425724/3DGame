@@ -145,7 +145,7 @@ protected:
 	bool GetBoneWorldPos(std::string_view _name, Math::Vector3& _outPos) const;
 
 	// ボーンのワールド行列。
-	// 🔴【罠】m_worldTransformは「モデル原点基準」でしかない。GetDrawMatrix()を掛けないと
+	// 【罠】m_worldTransformは「モデル原点基準」でしかない。GetDrawMatrix()を掛けないと
 	//   キャラの位置・向き・傾きが抜ける＝棒立ちで正面を向いているときだけ正しく見えるので
 	//   一番気づきにくい。ボーンをワールドで扱うときは必ずここを通すこと
 	Math::Matrix GetBoneWorldMatrix(const KdModelWork::Node& _node) const { return _node.m_worldTransform * GetDrawMatrix(); }
@@ -258,7 +258,7 @@ protected:
 	// ・m_legFlowWeight … 効き具合(0=アニメそのまま / 1=完全になびかせる)
 	// ・m_legFlowDir    … 今の脚の向き(ワールド)。バネで目標へ遅れて追従する
 	// ・m_legFlowVel    … その向きの変化速度。これを持つことで「行きすぎて戻る」慣性が出る
-	// ⚠️ m_legFlowDirをゼロベクトルで初期化しないこと(初回のNormalizeでゼロ除算する)。
+	//m_legFlowDirをゼロベクトルで初期化しないこと(初回のNormalizeでゼロ除算する)。
 	//    「脚が真下に垂れている」= (0,-1,0) が自然な初期値
 	float m_legFlowWeight = 0.0f;
 	Math::Vector3 m_legFlowDir = { 0.0f, -1.0f, 0.0f };
