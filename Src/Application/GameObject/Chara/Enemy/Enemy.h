@@ -23,6 +23,10 @@ public:
 	void PostUpdate()	override;
 
 	// 種別タグ：シーン内からEnemyを探すときの判定に使う(dynamic_pointer_castの代わり)
+	// 当たり判定デバッグ表示は「敵」カテゴリに出す(接地/壁判定はCharaBaseが描くので、
+	// ここで種類を教えないとプレイヤーと一緒くたに出てしまう)
+	DebugDraw::Category GetDebugCategory() const override;
+
 	ObjectTag GetObjectTag() override { return ObjectTag::Enemy; }
 
 	// 攻撃(レーザー等)に当たったときに呼ばれる：消滅する

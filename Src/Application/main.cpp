@@ -4,6 +4,7 @@
 #include "Debug/DebugManager.h"
 #include "Debug/DebugParams/DebugParams.h"
 #include "Debug/DebugFlags/DebugFlags.h"
+#include "Debug/DebugDraw/DebugDraw.h"
 #include "Editor/LevelEditor/LevelEditorManager.h"
 #include "Editor/HudEditor/HudEditorManager.h"
 #include "GameObject/Block/Block.h"
@@ -56,8 +57,10 @@ void Application::KdBeginUpdate()
 	// デバッグ用ImGui機能の更新開始(DebugWatchの前フレーム情報クリアなど)
 	DebugManager::Instance().BeginFrame();
 
-	// 当たり判定デバッグ表示の切り替え(全GameObject共通)
-	KdGameObject::s_showColliderDebug = DebugFlags::Instance().Get(U8("当たり判定/AABB表示"));
+	// デバッグ表示の大枠のON/OFF(全GameObject共通)。
+	// どのカテゴリを出すかは各描画箇所が DebugDraw::IsOn で個別に見る。
+	// ここを1つにまとめていた頃は「カメラの当たり判定だけ切りたい」ができなかった
+	KdGameObject::s_showColliderDebug = DebugDraw::IsAnyOn();
 
 	// レベルエディタの更新(3Dビューのクリック選択など)
 	LevelEditorManager::Instance().Update();
@@ -350,6 +353,11 @@ bool Application::Init(int w, int h)
 	//  登録する前にLoadしておくと、保存値がpendingとして既定値より優先される)
 	//===================================================================
 	DebugParams::Instance().Load();
+
+	// デバッグ表示のカテゴリを一覧へ登録する。
+	// DebugFlagsは「Getした時に登録」される遅延登録なので、まだ通っていないカテゴリは
+	// チェックリストに出てこない。起動時にまとめて登録して常に全部並ぶようにする
+	DebugDraw::RegisterAll();
 
 	//===================================================================
 	// HUD(画面2D)レイアウトをファイルから復元する(無ければ何も置かない)

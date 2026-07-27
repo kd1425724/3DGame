@@ -236,7 +236,22 @@ private:
 	// 「レティクル方向へ1本」では真横の壁に届かないため(街の実測に基づく。実装のコメント参照)。
 	// 見つからなければfalse(そのフックは撃たない)
 	bool FindAnchorDir(int _index, const Math::Vector3& _from, const Math::Vector3& _aimDir,
-		float _maxLen, Math::Vector3& _outDir) const;
+		float _maxLen, Math::Vector3& _outDir);
+
+	// ワイヤーの拘束範囲・アンカー・探索レイをデバッグ表示する(DrawDebugから呼ぶ)
+	void DrawDebugWire();
+
+	// 直近の探索レイ1本ぶん。撃った瞬間にしか存在しないので、
+	// 「なぜそこに刺さったのか」を後から見られるよう結果を残しておく
+	struct WireProbe
+	{
+		Math::Vector3 from = {};
+		Math::Vector3 dir = {};
+		float length = 0.0f;   // 当たったらその距離、外れたら探索距離いっぱい
+		bool hit = false;
+		bool used = false;     // 実際に採用された1本か
+	};
+	std::vector<WireProbe> m_wireProbes;
 
 	// 壁走り／壁ジャンプ(自動発動。走行中は通常移動とジャンプを止める)
 	std::unique_ptr<WallAction> m_upWall;

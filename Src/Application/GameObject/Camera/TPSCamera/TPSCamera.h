@@ -4,11 +4,17 @@
 class TPSCamera : public CameraBase
 {
 public:
+
 	TPSCamera()							{}
 	~TPSCamera()			override	{}
 
 	void Init()				override;
 	void PostUpdate()		override;
+
+	// 壁寄せのレイと、寄せた結果のカメラ位置を可視化する。
+	// DebugFlagsの「デバッグ表示/カメラ」でだけ出す。常に画面の中央付近に出るので、
+	// 他のデバッグ表示と一緒くたにすると邪魔になるため独立したカテゴリにしてある
+	void DrawDebug()		override;
 
 	// ロックオン状態を設定する(falseにするとロックオン対象も解除される)
 	void SetLockOn(bool isLockOn)

@@ -5,7 +5,13 @@
 #include "../../Debug/DebugParams/DebugParams.h"
 #include "../../Debug/DebugFlags/DebugFlags.h"
 #include "../../Collision/CollisionGrid.h"   // 静的コリジョンのbroadphase(近傍の建物だけ問い合わせる)
-#include "../../API/MathAPI/MathAPI.h"       // 安全な正規化・水平化などの共通計算
+#include "../../API/MathAPI/MathAPI.h"        // 安全な正規化・水平化などの共通計算
+#include "../../Debug/DebugDraw/DebugDraw.h"  // デバッグ表示のカテゴリ判定
+
+DebugDraw::Category CharaBase::GetDebugCategory() const
+{
+	return DebugDraw::Category::Player;
+}
 
 void CharaBase::SetAsset(const std::string& assetName)
 {
@@ -337,7 +343,7 @@ void CharaBase::ResolveGround(Math::Vector3& pos, bool _allowLanding)
 	KdCollider::RayInfo ray(KdCollider::TypeGround | KdCollider::TypeBump, rayPos, Math::Vector3::Down, rayRange);
 
 	// デバッグ表示：地面判定に使用したレイを可視化
-	if (KdGameObject::s_showColliderDebug)
+	if (KdGameObject::s_showColliderDebug && DebugDraw::IsOn(GetDebugCategory()))
 	{
 		if (!m_pDebugWire)
 		{
@@ -434,7 +440,7 @@ void CharaBase::ResolveCeiling(const Math::Vector3& fromPos, Math::Vector3& pos)
 	KdCollider::RayInfo ray(KdCollider::TypeBump, rayStart, Math::Vector3::Up, rayRange);
 
 	// デバッグ表示：天井判定に使用したレイを可視化(下向きの地面レイと色を変える=マゼンタ)
-	if (KdGameObject::s_showColliderDebug)
+	if (KdGameObject::s_showColliderDebug && DebugDraw::IsOn(GetDebugCategory()))
 	{
 		if (!m_pDebugWire)
 		{
@@ -494,7 +500,7 @@ void CharaBase::ResolveBump(Math::Vector3& pos)
 	float centerY = pos.y - GetBodyHalfHeight() + radius + 0.02f;
 
 	// デバッグ表示：壁当たり用の球を可視化(DebugFlags「当たり判定/AABB表示」でON/OFF)
-	if (KdGameObject::s_showColliderDebug)
+	if (KdGameObject::s_showColliderDebug && DebugDraw::IsOn(GetDebugCategory()))
 	{
 		if (!m_pDebugWire)
 		{
@@ -597,7 +603,7 @@ void CharaBase::ResolveBumpSweep(const Math::Vector3& fromPos, Math::Vector3& po
 	int steps = (int)(dist / step) + 1;   // 切り上げ(最後のステップはt=distにクランプ)
 
 	// デバッグ表示：スイープ経路を可視化
-	if (KdGameObject::s_showColliderDebug)
+	if (KdGameObject::s_showColliderDebug && DebugDraw::IsOn(GetDebugCategory()))
 	{
 		if (!m_pDebugWire)
 		{

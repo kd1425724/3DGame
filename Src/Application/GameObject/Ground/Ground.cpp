@@ -1,5 +1,6 @@
 ﻿#include "Ground.h"
 
+#include "../../Debug/DebugDraw/DebugDraw.h"
 #include "../../Culling/CullingManager.h"   // CalcLocalBoundingSphere(モデル全体の境界球)
 
 void Ground::Init()
@@ -66,7 +67,7 @@ void Ground::DrawDebug()
 	// ※ 以前は「1辺1の立方体をSetScaleで拡大」していたので半径0.5決め打ちでよかったが、
 	//    実寸モデル(332 x 1.2 x 297)へ変えたのでモデルの境界から半径を求める。
 	//    決め打ちのままだと緑の枠が0.5m角の点になって見えなくなる
-	if (KdGameObject::s_showColliderDebug && m_spModelWork)
+	if (KdGameObject::s_showColliderDebug && DebugDraw::IsOn(DebugDraw::Category::Terrain) && m_spModelWork)
 	{
 		if (!m_pDebugWire)
 		{

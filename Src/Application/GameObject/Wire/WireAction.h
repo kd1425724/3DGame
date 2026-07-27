@@ -76,6 +76,18 @@ public:
 	// アンカー(ワイヤーの先端)を取得する(描画側でワイヤーを引くのに使う)
 	const Math::Vector3& GetAnchor() const;
 
+	// --- デバッグ表示用。プレイヤーが閉じ込められている範囲を可視化するのに使う ---
+
+	// 現在のワイヤー長(＝1本で拘束しているときの球の半径)
+	float GetLength() const { return m_length; }
+
+	// 2本を1つの球にまとめている状態か。まとめている側(先頭のワイヤー)だけがtrue
+	bool IsMerged() const { return m_hasMerged; }
+
+	// まとめた球の中心と半径(IsMerged()がtrueのときだけ意味がある)
+	const Math::Vector3& GetMergedPivot() const { return m_mergedPivot; }
+	float GetMergedRadius() const { return m_mergedRadius; }
+
 	// アンカーが地面(TypeGround)に刺さっているか。
 	// ワイヤー中は原則「着地しない」で地面スレスレを飛べるようにするが、
 	// 地面そのものに刺した場合はそこへ降りるのが正しいので着地を許す判断に使う

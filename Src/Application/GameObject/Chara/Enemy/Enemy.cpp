@@ -4,7 +4,13 @@
 #include "../../../API/MathAPI/MathAPI.h"
 #include "../../../Scene/SceneManager.h"
 #include "../../../Debug/DebugParams/DebugParams.h"
+#include "../../../Debug/DebugDraw/DebugDraw.h"
 #include "../Player/Player.h"   // 突進命中時にPlayerの無敵判定/反撃通知/ノックバックを呼ぶため
+
+DebugDraw::Category Enemy::GetDebugCategory() const
+{
+	return DebugDraw::Category::Enemy;
+}
 
 void Enemy::Init()
 {
@@ -178,7 +184,7 @@ void Enemy::EnterRecover()
 void Enemy::PostUpdate()
 {
 	// デバッグ表示：接触判定(m_hitRadius)を可視化
-	if (KdGameObject::s_showColliderDebug)
+	if (KdGameObject::s_showColliderDebug && DebugDraw::IsOn(DebugDraw::Category::Enemy))
 	{
 		if (!m_pDebugWire)
 		{

@@ -1,5 +1,9 @@
 ﻿#pragma once
 
+// デバッグ表示のカテゴリ。実体はDebugDraw.hにあるが、ここでは種類を返すだけなので
+// 前方宣言で足りる(継承していない型を.hでincludeしない方針に合わせている)
+namespace DebugDraw { enum class Category : int; }
+
 //====================================================
 //
 // 全キャラクター(Player/Enemyなど)の基底クラス
@@ -130,6 +134,11 @@ protected:
 
 	// 1秒あたり何度まで回れるか。小さいほどぬるっと向き直る
 	virtual float SelectTurnSpeed() const { return 720.0f; }
+
+	// この体の当たり判定デバッグ表示がどのカテゴリに属するか。
+	// 接地/天井/壁の可視化はCharaBaseが描くので、Player由来かEnemy由来かを
+	// ここで分けないと「敵だけ消す」ができない。既定はプレイヤー、Enemyが上書きする
+	virtual DebugDraw::Category GetDebugCategory() const;
 
 	// 体の半分の高さ(pos=体の中心 から足元までの距離)。
 	// 当たり判定(接地/天井/壁)が「足元」「頭」を求めるのに使う共通の基準。

@@ -6,6 +6,7 @@
 #include "../../../Debug/DebugParams/DebugParams.h"
 #include "../CameraShake.h"
 #include "../../../API/MathAPI/MathAPI.h"   // 安全な正規化・追従補間・角度の最短補間
+#include "../../../Debug/DebugDraw/DebugDraw.h"   // デバッグ表示のカテゴリ判定
 
 void TPSCamera::Init()
 {
@@ -220,4 +221,28 @@ void TPSCamera::PostUpdate()
 			SetPos(_camPos);
 		}
 	}
+}
+
+void TPSCamera::DrawDebug()
+{
+	// 「デバッグ表示/カメラ」のときだけ出す。カメラの当たり判定は常に画面の中央付近に
+	// 描かれるので、他のカテゴリと一緒に出すと視界を塞いで邪魔になる
+	if (KdGameObject::s_showColliderDebug && DebugDraw::IsOn(DebugDraw::Category::Camera))
+	{
+		if (!m_pDebugWire)
+		{
+			m_pDebugWire = std::make_unique<KdDebugWireFrame>();
+		}
+
+		// 注視点(カメラが周回する中心)
+		m_pDebugWire->AddDebugSphere(m_smoothFollowPos, 0.15f, Math::Color(1.0f, 0.9f, 0.15f, 1.0f));
+
+		// 注視点→実際のカメラ位置。壁に当たって寄せられていれば、この線が短くなる
+		m_pDebugWire->AddDebugLine(m_smoothFollowPos, GetPos(), Math::Color(1.0f, 0.6f, 0.2f, 1.0f));
+
+		// 寄せた後のカメラ位置
+		m_pDebugWire->AddDebugSphere(GetPos(), 0.12f, Math::Color(1.0f, 0.6f, 0.2f, 1.0f));
+	}
+
+	KdGameObject::DrawDebug();
 }

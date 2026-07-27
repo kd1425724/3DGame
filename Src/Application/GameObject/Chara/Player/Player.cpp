@@ -11,7 +11,8 @@
 #include "../../../Effect/EffectManager.h"
 #include "../../Targeting/Targeting.h"
 #include "../../../Collision/CollisionGrid.h"   // IsWallBetween(落下攻撃の突撃先が壁の裏か)
-#include "../../../API/MathAPI/MathAPI.h"       // 安全な正規化・水平化
+#include "../../../API/MathAPI/MathAPI.h"
+#include "../../../Debug/DebugDraw/DebugDraw.h"   // デバッグ表示のカテゴリ判定
 
 #include"../../Wire/WireAction.h"
 #include"../../Wall/WallAction.h"
@@ -268,6 +269,9 @@ void Player::UpdateWireInput()
 
 		// 撃った瞬間、今の速度(m_velocity)はそのまま引き継ぐ
 		// (走りながら撃てば横の勢いが乗る。速度は基底CharaBaseの共通m_velocity)
+		// 前回の探索の軌跡は捨てる(デバッグ表示は「直近に撃った時」のものだけ出す)
+		m_wireProbes.clear();
+
 		int shots = useTwo ? kWireCount : 1;
 		for (int i = 0; i < shots; ++i)
 		{
@@ -1161,7 +1165,7 @@ void Player::ReleaseAllWires()
 }
 
 bool Player::FindAnchorDir(int _index, const Math::Vector3& _from, const Math::Vector3& _aimDir,
-	float _maxLen, Math::Vector3& _outDir) const
+	float _maxLen, Math::Vector3& _outDir)
 {
 	// 【なぜ扇状に探すのか】
 	// 街の実測: 建物は16.6m幅x20.1m高で15.5m間隔に並び、通りの幅は約3.8m(狭い路地)と
@@ -1199,19 +1203,75 @@ bool Player::FindAnchorDir(int _index, const Math::Vector3& _from, const Math::V
 			if (!MathAPI::TryNormalize(dir)) { continue; }
 		}
 
-		Math::Vector3 pos;
+		Math::Vector3 hitPos;
 		bool isGround = false;
 		float dist = 0.0f;
-		if (!WireAction::CastAnchor(_from, dir, _maxLen, pos, isGround, dist)) { continue; }
+		bool hit = WireAction::CastAnchor(_from, dir, _maxLen, hitPos, isGround, dist);
 
-		// 目の前の壁に刺すと巻き取りで即激突するので、近すぎるものは飛ばす
-		if (dist < minDist) { continue; }
+		// 目の前の壁に刺すと巻き取りで即激突するので、近すぎるものは採用しない
+		bool ok = hit && (dist >= minDist);
+
+		// デバッグ表示用に、探した軌跡を残しておく(採用/不採用も含めて)
+		m_wireProbes.push_back({ _from, dir, hit ? dist : _maxLen, hit, ok });
+
+		if (!ok) { continue; }
 
 		_outDir = dir;
 		return true;
 	}
 
 	return false;
+}
+
+void Player::DrawDebugWire()
+{
+	if (!m_pDebugWire) { return; }
+
+	// 探索レイ：どこを探して、どこで当たったか。緑=当たり / 灰=外れ / 黄=実際に採用した1本
+	for (const WireProbe& p : m_wireProbes)
+	{
+		Math::Color col = p.used ? Math::Color(1.0f, 0.9f, 0.15f, 1.0f)
+			: (p.hit ? Math::Color(0.3f, 0.9f, 0.3f, 1.0f) : Math::Color(0.45f, 0.45f, 0.45f, 1.0f));
+		m_pDebugWire->AddDebugLine(p.from, p.dir, p.length, col);
+	}
+
+	// 射出口(腰の左右)。位置の調整に使う
+	for (int i = 0; i < kWireCount; ++i)
+	{
+		m_pDebugWire->AddDebugSphere(GetWireMuzzlePos(i), 0.06f, kWhiteColor);
+	}
+
+	// アンカー(実際に刺さっている点)
+	for (const std::unique_ptr<WireAction>& w : m_upWires)
+	{
+		if (!w || !w->IsAttached()) { continue; }
+
+		m_pDebugWire->AddDebugSphere(w->GetAnchor(), 0.25f, kRedColor);
+	}
+
+	// 【本命】プレイヤーが閉じ込められている球。
+	// 2本を1つにまとめているときはその球、そうでなければ各ワイヤーの球を出す
+	const Math::Color kCage(0.25f, 0.75f, 1.0f, 1.0f);
+	bool drewMerged = false;
+	for (const std::unique_ptr<WireAction>& w : m_upWires)
+	{
+		if (!w || !w->IsAttached() || !w->IsMerged()) { continue; }
+
+		m_pDebugWire->AddDebugSphere(w->GetMergedPivot(), w->GetMergedRadius(), kCage);
+		// 支点(2本の中点に置いた仮想アンカー)
+		m_pDebugWire->AddDebugSphere(w->GetMergedPivot(), 0.2f, Math::Color(1.0f, 0.9f, 0.15f, 1.0f));
+		drewMerged = true;
+		break;
+	}
+	if (!drewMerged)
+	{
+		for (const std::unique_ptr<WireAction>& w : m_upWires)
+		{
+			if (!w || !w->IsAttached()) { continue; }
+
+			m_pDebugWire->AddDebugSphere(w->GetAnchor(), w->GetLength(), kCage);
+		}
+	}
 }
 
 Math::Vector3 Player::GetWireMuzzlePos(int _index) const
@@ -1267,15 +1327,27 @@ void Player::DrawWire()
 
 void Player::DrawDebug()
 {
-	// 当たり判定表示(DebugFlags「当たり判定/AABB表示」)ON時、索敵範囲・攻撃範囲などを可視化する
-	if (s_showColliderDebug)
+	// カテゴリごとに出す/出さないを分ける(DebugFlagsの「デバッグ表示/〜」)。
+	// プレイヤーの索敵/攻撃範囲と、ワイヤーの拘束範囲は別物なので別カテゴリにしてある
+	const bool showPlayer = s_showColliderDebug && DebugDraw::IsOn(DebugDraw::Category::Player);
+	const bool showWire   = s_showColliderDebug && DebugDraw::IsOn(DebugDraw::Category::Wire);
+
+	if (showPlayer || showWire)
 	{
 		if (!m_pDebugWire)
 		{
 			m_pDebugWire = std::make_unique<KdDebugWireFrame>();
 		}
+	}
+	if (showPlayer)
+	{
 		DrawDebugRanges();
 	}
+	if (showWire)
+	{
+		DrawDebugWire();
+	}
+
 	// KdGameObject::DrawDebugが m_pCollider のAABBを積み、m_pDebugWire をまとめて描画する
 	KdGameObject::DrawDebug();
 }
@@ -1356,13 +1428,8 @@ void Player::DrawDebugRanges()
 		}
 	}
 
-	// ワイヤー接続中：手元→アンカーの線(青)。繋がっている本数ぶん引く
-	for (const std::unique_ptr<WireAction>& w : m_upWires)
-	{
-		if (!w || !w->IsAttached()) { continue; }
-
-		m_pDebugWire->AddDebugLine(pos, w->GetAnchor(), Math::Color(0.4f, 0.6f, 1.0f, 1.0f));
-	}
+	// ※ ワイヤー関連の可視化(拘束範囲・アンカー・探索レイ)は DrawDebugWire へ移した。
+	//    「デバッグ表示/ワイヤー」で独立して出せるようにするため
 }
 
 Math::Vector2 Player::SelectTilt() const

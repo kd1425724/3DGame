@@ -1,5 +1,6 @@
 ﻿#include "Block.h"
 
+#include "../../Debug/DebugDraw/DebugDraw.h"
 #include "../../Culling/CullingManager.h"
 
 DirectX::BoundingSphere Block::WorldBoundingSphere()
@@ -58,7 +59,7 @@ void Block::DrawDebug()
 	// 当たり判定(モデル=1辺1の立方体)を箱で可視化する
 	// ※ KdModelCollisionはAddDebugWire未対応(no-op)で枠が出ないため、ここで箱を描いて代用。
 	//    m_mWorldに回転・スケールが入っているのでoriented=trueで実形状に一致させる
-	if (KdGameObject::s_showColliderDebug)
+	if (KdGameObject::s_showColliderDebug && DebugDraw::IsOn(DebugDraw::Category::Terrain))
 	{
 		if (!m_pDebugWire)
 		{
