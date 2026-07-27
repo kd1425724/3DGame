@@ -136,6 +136,32 @@ void WireAction::UpdateSwingAll(CharaBase& _body, float _dt, const Math::Vector2
 		{
 			live[i]->Winch(_dt);
 		}
+
+		// 【2本掛けの必須処理】2つの球が交わる条件は「半径の和 >= アンカー間の距離」。
+		// 両方を巻き取り続けると和が距離を下回り、交わりが消えて解が無くなる。
+		// そうなると反復射影が1点へ収束して体が固まり(ビタッと止まる)、
+		// 左右の長さの差のぶん短いほうへじりじり引かれる。
+		// 実際のウインチも張り切ればそれ以上巻けないので、同じように巻き取りを止める。
+		//
+		// 止める位置に「たるみ」を残すのが要点。ぴったり和=距離だと交わりが1点になり、
+		// 振れる余地がゼロのまま固定される。少し余らせると交わりが円になり、
+		// その円の上で振り子として振れる(たるみが大きいほど円が大きい=よく振れる)
+		if (n >= 2)
+		{
+			float slack = DebugParams::Instance().Float(U8("ワイヤー/2本のたるみ"), 0.15f, 0.0f, 1.0f);
+			float anchorDist = (live[0]->m_anchor - live[1]->m_anchor).Length();
+			float need = anchorDist * (1.0f + slack);
+			float sum  = live[0]->m_length + live[1]->m_length;
+			if (sum > 0.0001f && sum < need)
+			{
+				// 足りないぶんを両方へ比例配分して戻す(=これ以上は巻けない状態で釣り合う)
+				float k = need / sum;
+				for (int i = 0; i < 2; ++i)
+				{
+					live[i]->m_length = std::min(live[i]->m_length * k, live[i]->m_maxLength);
+				}
+			}
+		}
 	}
 
 	// 距離拘束を解く(球の外へは出られない。内側は自由＝紐であって棒ではない)。
