@@ -218,7 +218,7 @@ void Player::UpdateWireInput()
 
 	if (KdInputManager::Instance().IsPress("Anchor") && m_anchorPressWasWire)
 	{
-		Math::Vector3 from = GetPos() + Math::Vector3(0, 1.0f, 0);   // ワイヤーの手元
+		Math::Vector3 from = GetPos() + Math::Vector3(0, 1.0f, 0);   // 照準の基準(体の胸あたり)
 		float maxLen = DebugParams::Instance().Float(U8("ワイヤー/最大長"), 30.0f, 1.0f, 100.0f);
 
 		// 撃つ方向は「レティクル(画面中央)が指す点」へ向ける。
@@ -260,10 +260,29 @@ void Player::UpdateWireInput()
 		}
 		dir = MathAPI::GetSafeNormal(dir, Math::Vector3::Backward);
 
+		// === 立体機動装置の2本掛け ===
+		// 1回の入力で腰の左右から2本撃つ(進撃の巨人2も左右のフックを個別には操作しない)。
+		// 狙いは同じ照準点だが、左右のレイを水平に少し開いて飛ばす。こうすると
+		//   ・平らな壁を狙えば2本が近くに刺さる(＝1本に近い振り子のまま)
+		//   ・建物の谷間を狙えば左右別々の壁に刺さる(＝本物の2本掛けになる)
+		// という切り替えが、操作を増やさずに狙う場所だけで自然に起きる
+		float spreadDeg = DebugParams::Instance().Float(U8("ワイヤー/2本の開き角"), 4.0f, 0.0f, 20.0f);
+		bool useTwo = DebugFlags::Instance().Get(U8("ワイヤー/2本掛け"), true);
+
 		// 撃った瞬間、今の速度(m_velocity)はそのまま引き継ぐ
 		// (走りながら撃てば横の勢いが乗る。速度は基底CharaBaseの共通m_velocity)
-		// ※ 今は0番(左)のみ発射する。2本目の射出は次の段階で入れる
-		m_upWires[0]->Shoot(from, dir, maxLen);
+		int shots = useTwo ? kWireCount : 1;
+		for (int i = 0; i < shots; ++i)
+		{
+			// 開き角は世界の上(Y)まわりで振る。壁は縦面なので、水平に開くと
+			// 「谷間の左右の壁へ別々に刺さる」形になる
+			float sign = (i == 0) ? -1.0f : 1.0f;
+			float rad = DirectX::XMConvertToRadians(spreadDeg * 0.5f * sign);
+			Math::Vector3 shotDir = Math::Vector3::TransformNormal(dir, Math::Matrix::CreateRotationY(rad));
+
+			// 射出口はそれぞれの腰。見た目の線と物理の始点をそろえる
+			m_upWires[i]->Shoot(GetWireMuzzlePos(i), shotDir, maxLen);
+		}
 	}
 
 	// ワイヤーとして撃った時だけ、離したら外す(攻撃で押した時は無視)。
@@ -1216,7 +1235,14 @@ void Player::WatchDebug() const
 	w.Watch(U8("Player/水平速度"),   GetHorizontalSpeed());
 	w.Watch(U8("Player/垂直速度"),   m_velocity.y);
 	w.Watch(U8("Player/接地"),       IsGrounded());
-	w.Watch(U8("Player/ワイヤー接続"), IsAnyWireAttached());
+	// 何本掛かっているかを出す。2本掛けが成立しているかを目で確かめるため
+	// (谷間を狙えば2、平らな壁なら2、片方が外れれば1、切れば0)
+	int wireCount = 0;
+	for (const std::unique_ptr<WireAction>& wire : m_upWires)
+	{
+		if (wire && wire->IsAttached()) { ++wireCount; }
+	}
+	w.Watch(U8("Player/ワイヤー本数"), wireCount);
 
 	// 再生中のアニメ名。空のままなら「名前が見つかっていない」= glTFのアニメ名との
 	// 綴り違いを疑う(Scifi_girlは "01 idle" のように番号＋半角スペース＋英字)
