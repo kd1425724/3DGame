@@ -25,7 +25,8 @@ void DebugFlags::Draw()
 
 		DebugUtil::DrawGroupedByCategory(names, [this](const std::string& fullName, const std::string& label)
 		{
-			ImGui::Checkbox(label.c_str(), &m_flags[fullName]);
+			// 名前の頭の「数字_」は並び順を決めるための印なので表示からは落とす
+			ImGui::Checkbox(DebugUtil::StripOrderPrefix(label).c_str(), &m_flags[fullName]);
 		});
 	}
 

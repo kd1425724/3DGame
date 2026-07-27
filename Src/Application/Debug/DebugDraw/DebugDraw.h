@@ -38,4 +38,28 @@ namespace DebugDraw
 	// ImGuiのチェックリストを描く(DebugFlagsのウィンドウから呼ばれる)。
 	// 未登録のカテゴリをここで登録するので、起動直後から一覧に並ぶ
 	void RegisterAll();
+
+	// KdGameObject::DrawDebug() は s_showColliderDebug しか見ないため、
+	// 登録済みコライダーの可視化(KdColliderが緑の球などで描く)がカテゴリを無視して
+	// 全部出てしまう。基底を呼ぶ前後でフラグを一時的に絞るための入れ物。
+	//
+	//   void Enemy::DrawDebug()
+	//   {
+	//       DebugDraw::ScopedGate gate(DebugDraw::Category::Enemy);
+	//       KdGameObject::DrawDebug();
+	//   }
+	//
+	// ※ Framework(KdGameObject)を変更せずにカテゴリ分けするための手段
+	class ScopedGate
+	{
+	public:
+		explicit ScopedGate(Category _category);
+		~ScopedGate();
+
+		ScopedGate(const ScopedGate&) = delete;
+		void operator=(const ScopedGate&) = delete;
+
+	private:
+		bool m_prev = false;
+	};
 }

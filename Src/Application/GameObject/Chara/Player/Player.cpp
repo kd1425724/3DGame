@@ -1348,8 +1348,13 @@ void Player::DrawDebug()
 		DrawDebugWire();
 	}
 
-	// KdGameObject::DrawDebugが m_pCollider のAABBを積み、m_pDebugWire をまとめて描画する
-	KdGameObject::DrawDebug();
+	// KdGameObject::DrawDebugが m_pCollider の形状を積み、m_pDebugWire をまとめて描画する。
+	// 基底は s_showColliderDebug しか見ないので、コライダー可視化も「プレイヤー」で絞る
+	// (絞らないと、ワイヤーだけ見たいときにコライダーまで出てしまう)
+	{
+		DebugDraw::ScopedGate gate(DebugDraw::Category::Player);
+		KdGameObject::DrawDebug();
+	}
 }
 
 void Player::WatchDebug() const

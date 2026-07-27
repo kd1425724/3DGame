@@ -83,5 +83,7 @@ void Ground::DrawDebug()
 		}
 	}
 
+	// 基底は s_showColliderDebug しか見ないので、コライダー可視化も「地形」で絞る
+	DebugDraw::ScopedGate gate(DebugDraw::Category::Terrain);
 	KdGameObject::DrawDebug();
 }

@@ -22,11 +22,14 @@ public:
 	void Update()		override;
 	void PostUpdate()	override;
 
-	// 種別タグ：シーン内からEnemyを探すときの判定に使う(dynamic_pointer_castの代わり)
 	// 当たり判定デバッグ表示は「敵」カテゴリに出す(接地/壁判定はCharaBaseが描くので、
 	// ここで種類を教えないとプレイヤーと一緒くたに出てしまう)
 	DebugDraw::Category GetDebugCategory() const override;
 
+	// 登録済みコライダー(KdColliderが緑の球で描く)を「敵」カテゴリのときだけ出す
+	void DrawDebug() override;
+
+	// 種別タグ：シーン内からEnemyを探すときの判定に使う(dynamic_pointer_castの代わり)
 	ObjectTag GetObjectTag() override { return ObjectTag::Enemy; }
 
 	// 攻撃(レーザー等)に当たったときに呼ばれる：消滅する

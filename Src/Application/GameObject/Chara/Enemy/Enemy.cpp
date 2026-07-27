@@ -12,6 +12,15 @@ DebugDraw::Category Enemy::GetDebugCategory() const
 	return DebugDraw::Category::Enemy;
 }
 
+void Enemy::DrawDebug()
+{
+	// KdGameObject::DrawDebug は s_showColliderDebug しか見ないので、
+	// そのまま呼ぶと登録済みコライダー(緑の球)がカテゴリに関係なく出てしまう。
+	// 「敵」がOFFのときは基底の間だけフラグを落とす
+	DebugDraw::ScopedGate gate(DebugDraw::Category::Enemy);
+	KdGameObject::DrawDebug();
+}
+
 void Enemy::Init()
 {
 	SetAsset("Asset/Models/Test/Block/Block.gltf");

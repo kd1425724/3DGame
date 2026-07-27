@@ -25,6 +25,26 @@ namespace DebugUtil
 		}
 	}
 
+	// 表示名の頭に付いた「数字_」を取り除く。
+	// DebugFlags/DebugParamsはmapでキー順に並ぶので、日本語の名前だとバイト順になって
+	// 意図した並びにできない。キーに "1_プレイヤー" のように順番の印を付けておき、
+	// 表示するときだけここで落とす("1_" は出ない)
+	inline std::string StripOrderPrefix(const std::string& label)
+	{
+		size_t i = 0;
+		while (i < label.size() && label[i] >= '0' && label[i] <= '9')
+		{
+			++i;
+		}
+		// 数字が1文字以上あって、その直後が '_' のときだけ印とみなす
+		if (i > 0 && i < label.size() && label[i] == '_')
+		{
+			return label.substr(i + 1);
+		}
+
+		return label;
+	}
+
 	// names に入っている名前を "カテゴリ名/表示名" に従ってグループ分けし、
 	// 各項目に対して drawFunc(フルネーム, 表示名) を呼び出す
 	// ・カテゴリが付いている項目は折り畳み可能なツリーにまとめる

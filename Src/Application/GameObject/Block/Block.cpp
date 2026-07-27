@@ -68,5 +68,7 @@ void Block::DrawDebug()
 		m_pDebugWire->AddDebugBox(m_mWorld, Math::Vector3(0.5f, 0.5f, 0.5f), Math::Vector3::Zero, true, kGreenColor);
 	}
 
+	// 基底は s_showColliderDebug しか見ないので、コライダー可視化も「地形」で絞る
+	DebugDraw::ScopedGate gate(DebugDraw::Category::Terrain);
 	KdGameObject::DrawDebug();
 }

@@ -1,5 +1,6 @@
 ﻿#include "StageProp.h"
 
+#include "../../Debug/DebugDraw/DebugDraw.h"
 #include <filesystem>
 
 #include "../../Editor/LevelEditor/LevelEditorManager.h"
@@ -56,6 +57,8 @@ void StageProp::GenerateDepthMapFromLight()
 void StageProp::DrawDebug()
 {
 	// 当たり判定(モデル形状=COLメッシュ or 表示メッシュ)の可視化は基底に任せる
+	// 基底は s_showColliderDebug しか見ないので、コライダー可視化も「地形」で絞る
+	DebugDraw::ScopedGate gate(DebugDraw::Category::Terrain);
 	KdGameObject::DrawDebug();
 }
 
