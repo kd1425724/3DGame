@@ -128,113 +128,82 @@ void WireAction::UpdateSwingAll(CharaBase& _body, float _dt, const Math::Vector2
 	Math::Vector3 startPos = pos;   // 移動前の位置(スイープの始点)
 	pos += _body.m_velocity * _dt;
 
-	const bool winchMode = DebugFlags::Instance().Get(U8("ワイヤー/引き寄せモード"), true);
+	const bool winchMode   = DebugFlags::Instance().Get(U8("ワイヤー/引き寄せモード"), true);
+	const bool mergeSphere = DebugFlags::Instance().Get(U8("ワイヤー/2本を1つの球にする"), true);
+	const bool merged      = (n >= 2) && mergeSphere;
+
+	// 【2本を1つの球にまとめる】支点と半径は2本が揃った瞬間に1回だけ決める。
+	// 毎フレーム2本の長さから計算し直すと、左右の長さの差のぶん支点がじわじわ動き、
+	// 「片方へ引かれる」「クランプが効いた瞬間にガクッと跳ぶ」原因になる。
+	// 1回決めてしまえば、あとは1本のときと同じ「固定された支点の球を巻き取る」だけになる。
+	//
+	// 半径は「決めた瞬間のプレイヤーと支点の距離」。こうすれば掛けた瞬間に
+	// 位置がちょうど球面上に乗るので、引き込まれない(瞬間移動しない)
+	if (merged && !live[0]->m_hasMerged)
+	{
+		live[0]->m_mergedPivot  = (live[0]->m_anchor + live[1]->m_anchor) * 0.5f;
+		live[0]->m_mergedRadius = (pos - live[0]->m_mergedPivot).Length();
+		live[0]->m_hasMerged    = true;
+	}
+	if (!merged)
+	{
+		// 2本でなくなったら次に揃ったとき作り直す
+		for (int i = 0; i < n; ++i)
+		{
+			// 合体をやめた瞬間に個別の球へ切り替わると、長さが合わずに跳ねる。
+			// 残ったワイヤーの長さを今の実距離に合わせ直して段差を消す
+			if (live[i]->m_hasMerged)
+			{
+				live[i]->m_length = std::min((pos - live[i]->m_anchor).Length(), live[i]->m_maxLength);
+			}
+			live[i]->m_hasMerged = false;
+		}
+	}
 
 	if (winchMode)
 	{
-		for (int i = 0; i < n; ++i)
+		if (merged)
 		{
-			live[i]->Winch(_dt);
-		}
+			// まとめた球そのものを縮める(1本のときの巻き取りと同じ形)
+			float reelSpeed = DebugParams::Instance().Float(U8("ワイヤー/巻き取り速度"), 14.0f, 0.0f, 60.0f);
+			float minLen    = DebugParams::Instance().Float(U8("ワイヤー/最短の長さ"),   3.0f, 0.5f, 30.0f);
 
-		// 【2本掛けの必須処理】2つの球が交わる条件は「半径の和 >= アンカー間の距離」。
-		// 両方を巻き取り続けると和が距離を下回り、交わりが消えて解が無くなる。
-		// そうなると反復射影が1点へ収束して体が固まり(ビタッと止まる)、
-		// 左右の長さの差のぶん短いほうへじりじり引かれる。
-		// 実際のウインチも張り切ればそれ以上巻けないので、同じように巻き取りを止める。
-		//
-		// 止める位置に「たるみ」を残すのが要点。ぴったり和=距離だと交わりが1点になり、
-		// 振れる余地がゼロのまま固定される。少し余らせると交わりが円になり、
-		// その円の上で振り子として振れる(たるみが大きいほど円が大きい=よく振れる)
-		if (n >= 2)
-		{
-			float slack = DebugParams::Instance().Float(U8("ワイヤー/2本のたるみ"), 0.15f, 0.0f, 1.0f);
-			float anchorDist = (live[0]->m_anchor - live[1]->m_anchor).Length();
-			float need = anchorDist * (1.0f + slack);
-			float sum  = live[0]->m_length + live[1]->m_length;
-			if (sum > 0.0001f && sum < need)
+			live[0]->m_mergedRadius -= reelSpeed * _dt;
+			if (live[0]->m_mergedRadius < minLen)
 			{
-				// 足りないぶんを両方へ比例配分して戻す(=これ以上は巻けない状態で釣り合う)
-				float k = need / sum;
-				for (int i = 0; i < 2; ++i)
-				{
-					live[i]->m_length = std::min(live[i]->m_length * k, live[i]->m_maxLength);
-				}
+				live[0]->m_mergedRadius = minLen;
+			}
+
+			// 見た目の線の長さも縮めておく(拘束には使わないが、次に1本へ戻ったとき用)
+			for (int i = 0; i < n; ++i)
+			{
+				live[i]->m_length = std::min((pos - live[i]->m_anchor).Length(), live[i]->m_maxLength);
+			}
+		}
+		else
+		{
+			for (int i = 0; i < n; ++i)
+			{
+				live[i]->Winch(_dt);
 			}
 		}
 	}
 
 	// 距離拘束を解く(球の外へは出られない。内側は自由＝紐であって棒ではない)。
 	// ※ 手動リールは 2026/07/19 に廃止したので入力は 0。巻き取りは上の自動ウインチが担当
-	const bool mergeSphere = DebugFlags::Instance().Get(U8("ワイヤー/2本を1つの球にする"), true);
-
-	if (n >= 2 && mergeSphere)
+	if (merged)
 	{
-		// 【2本を1つの球にまとめる】
 		// 2つの球をそのまま解くと、両方張ったとき位置が「2つの球面が交わる円」の上に乗る。
 		// 円の上では自由度が1しかなく(その円の面内でしか振れない)、1本のときの
 		// 「球面を自由に滑る」感触が失われる。左右に刺すと左右方向へ振れなくなるのがこれ。
-		//
-		// そこで2つのアンカーの中点を支点にした球1つに置き換える。自由度が2に戻り、
-		// 1本と同じ振り子の感触になる。解が消える心配も無い(球1つなら常に解がある)。
-		//
-		// 【支点と半径の取り方】支点は2つのアンカーの中点ではなく、
-		// 「2つの球面が交わる円」の中心。半径はその円の半径。
-		//
-		// 撃った瞬間、各ワイヤーの長さはその時の実距離なので、プレイヤーはちょうど
-		// 両方の球面上＝交わる円の上にいる。だから円の中心・円の半径を使えば
-		// 撃った瞬間の位置がそのまま球面上に乗り、瞬間移動が起きない。
-		// (中点＋「両方に収まる最大の球」にすると、プレイヤーはその球の外にいるので
-		//  掛けた瞬間に中心方向へ引き込まれる。実際その不具合を出した)
-		//
-		//   d  = アンカー間距離
-		//   a  = (d^2 + rA^2 - rB^2) / (2d)   … Aから円の面までの距離
-		//   中心 = A + (B-A)/d * a
-		//   半径 = sqrt(rA^2 - a^2)
-		const Math::Vector3& anchorA = live[0]->m_anchor;
-		const Math::Vector3& anchorB = live[1]->m_anchor;
-		float rA = live[0]->m_length;
-		float rB = live[1]->m_length;
-
-		Math::Vector3 axis = anchorB - anchorA;
-		float d = 0.0f;
-		Math::Vector3 axisDir;
-		bool solved = false;
-		Math::Vector3 pivot = anchorA;
-		float radius = std::min(rA, rB);
-
-		if (MathAPI::ToDirectionAndLength(axis, axisDir, d))
-		{
-			float a = (d * d + rA * rA - rB * rB) / (2.0f * d);
-			float h2 = rA * rA - a * a;
-			if (h2 > 0.0f)
-			{
-				pivot = anchorA + axisDir * a;
-				radius = std::sqrt(h2);
-				solved = true;
-			}
-		}
-		// アンカーがほぼ同じ点／球が交わらないときは、短いほうの球1つで代用する
-		// (巻き取りのクランプで交わらない状態にはならないはずだが、保険)
-		if (!solved)
-		{
-			pivot = (rA <= rB) ? anchorA : anchorB;
-			radius = std::min(rA, rB);
-		}
-
-		float minLen = DebugParams::Instance().Float(U8("ワイヤー/最短の長さ"), 3.0f, 0.5f, 30.0f);
-		if (radius < minLen)
-		{
-			radius = minLen;
-		}
-
-		// 1本ぶんの拘束と同じ計算(球の外なら球面へ戻し、外向きの速度成分だけ消す)
-		Math::Vector3 toPos = pos - pivot;
+		// そこで支点1つの球に置き換える。自由度が2に戻り、1本と同じ振り子の感触になる。
+		// 解が消える心配も無い(球1つなら常に解がある)。支点と半径は上で1回だけ決めてある
+		Math::Vector3 toPos = pos - live[0]->m_mergedPivot;
 		float dist = 0.0f;
 		Math::Vector3 dir;
-		if (MathAPI::ToDirectionAndLength(toPos, dir, dist) && dist > radius)
+		if (MathAPI::ToDirectionAndLength(toPos, dir, dist) && dist > live[0]->m_mergedRadius)
 		{
-			pos = pivot + dir * radius;
+			pos = live[0]->m_mergedPivot + dir * live[0]->m_mergedRadius;
 			_body.m_velocity = MathAPI::ClipVelocity(_body.m_velocity, -dir);
 		}
 	}
@@ -470,6 +439,7 @@ void WireAction::Release()
 {
 	m_isAttached = false;
 	m_occludedTime = 0.0f;   // 遮蔽デバウンスをリセット
+	m_hasMerged = false;     // 2本を1つの球にまとめた状態も破棄(次に揃ったとき作り直す)
 }
 
 bool WireAction::IsAttached() const
