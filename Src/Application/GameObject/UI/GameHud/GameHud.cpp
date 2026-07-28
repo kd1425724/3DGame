@@ -15,7 +15,10 @@ void GameHud::DrawHud()
 void GameHud::DrawReticle()
 {
 	// 表示ON/OFF(DebugFlags「HUD/レティクル表示」)
-	if (!DebugFlags::Instance().Get(U8("HUD/レティクル表示"), true)) { return; }
+	// ※ 既定をfalseへ(2026/07/28 ユーザー指示「レティクルも消してほしい」)。
+	//   DebugFlagsはJSONに保存されず毎回この既定値から始まるので、ここを変えれば消える。
+	//   見たくなったらF3のデバッグUIから実行中にONにできる
+	if (!DebugFlags::Instance().Get(U8("HUD/レティクル表示"), false)) { return; }
 
 	// 種類を切り替えて見比べられるようにする(0=環A / 1=菱形B / 2=コンパスC)
 	int type = DebugParams::Instance().Int(U8("HUD/レティクル種類(0環1菱2羅)"), 0, 0, 2);
@@ -49,7 +52,8 @@ void GameHud::DrawReticle()
 
 void GameHud::DrawSpeedMeter()
 {
-	if (!DebugFlags::Instance().Get(U8("HUD/速度メーター表示"), true)) { return; }
+	// ※ 既定をfalseへ(2026/07/28 ユーザー指示「メーター消してほしい」)。レティクルと同じ扱い
+	if (!DebugFlags::Instance().Get(U8("HUD/速度メーター表示"), false)) { return; }
 
 	// プレイヤーを種別タグで探し、水平速度を取得する
 	std::shared_ptr<CharaBase> spPlayer =
