@@ -179,6 +179,16 @@ protected:
 	//滑らかに目標へ寄せる
 	void UpdateTilt(float _deltaTime);
 
+	// 接地面の法線に合わせて体を傾ける(2026/07/28)。
+	// 接地判定は体の中心の真下1点なので、斜面では体が垂直のまま面に乗り、
+	// 中心から離れた足が片方は埋まり片方は浮く。姿勢を面へ寄せるとこれが減る。
+	// ※ 傾きはローカル軸(X/Z)で効くので、UpdateTiltと同じくヨーが確定した後に呼ぶこと
+	// ※ これは【見た目だけ】。当たり判定の箱は垂直のまま
+	void UpdateSlopeAlign(float _deltaTime);
+
+	// 最後に接地した面の法線(ワールド・上向きに正規化済み)。接地中だけ意味がある
+	const Math::Vector3& GetGroundNormal() const { return m_groundNormal; }
+
 	//判断は派生クラスに任せる
 	virtual Math::Vector2 SelectTilt()const { return {}; }
 
@@ -241,6 +251,13 @@ protected:
 
 	// 地面を離れてからの猶予(コヨーテタイム)の残り秒数。ResolveGroundが毎フレーム更新する
 	float m_coyoteTimer = 0.0f;
+
+	// 最後に接地した面の法線(ワールド)。ResolveGroundが更新する
+	Math::Vector3 m_groundNormal = { 0.0f, 1.0f, 0.0f };
+
+	// 斜面に合わせた傾き(度)。x=X軸まわり / y=Z軸まわりで、m_tiltと同じ持ち方をする。
+	// ※ m_tilt(ワイヤーの前傾)とは別に持つ。合成はGetDrawMatrixで行う
+	Math::Vector2 m_slopeTilt = {};
 
 	// 手応え用：直近フレームに発生した着地/壁ヒットの衝撃(速度の大きさ)。
 	// ResolveGround(着地遷移時)/ResolveBumpSweep(壁で止めた時)が記録し、Consume〜で読み取る

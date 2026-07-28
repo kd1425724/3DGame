@@ -25,10 +25,53 @@ Math::Matrix CharaBase::GetDrawMatrix() const
 	// 原点が中心のモデル(Block等)は下げない
 	float half = m_modelOriginIsFeet ? GetBodyHalfHeight() : 0.0f;
 
-	return Math::Matrix::CreateTranslation(0.0f, -half, 0.0f)
+	// 斜面に合わせた傾きは【足元】を軸に回す。そのためTranslateより手前に置く。
+	// (原点が足元のモデルなら、この時点で足はまだ原点にいる)
+	// ※ Translateより後ろに置くと体の中心が軸になり、傾けたぶん足が地面へめり込む
+	Math::Matrix slope =
+		Math::Matrix::CreateRotationZ(DirectX::XMConvertToRadians(m_slopeTilt.y))
+		* Math::Matrix::CreateRotationX(DirectX::XMConvertToRadians(m_slopeTilt.x));
+
+	return slope
+		* Math::Matrix::CreateTranslation(0.0f, -half, 0.0f)
 		* Math::Matrix::CreateRotationZ(DirectX::XMConvertToRadians(m_tilt.y))
 		* Math::Matrix::CreateRotationX(DirectX::XMConvertToRadians(m_tilt.x))
 		* m_mWorld;
+}
+
+void CharaBase::UpdateSlopeAlign(float _deltaTime)
+{
+	// DebugFlagsでオフにしたときも、いきなり垂直へ戻さず目標を0にして自然に抜ける
+	// (UpdateArmAim/UpdateLegFlowと同じ抜け方。比較用のオンオフとして使うため)
+	bool enabled = DebugFlags::Instance().Get(U8("斜面/姿勢を合わせる"), true);
+
+	Math::Vector2 target = {};
+
+	// コヨーテタイム込みで見る。段差で1フレーム浮くたびに姿勢が垂直へ跳ねると目に付くため
+	if (enabled && IsGroundedOrCoyote())
+	{
+		// 接地面の法線をキャラのローカル空間へ移す(ヨーを打ち消す)。
+		// 傾きはローカル軸で効くので、先に向きを揃えないと横滑りした傾きになる
+		Math::Matrix invYaw = Math::Matrix::CreateRotationY(-DirectX::XMConvertToRadians(GetRot().y));
+		Math::Vector3 n = Math::Vector3::TransformNormal(m_groundNormal, invYaw);
+
+		// GetDrawMatrixが RotZ(y) → RotX(x) の順で掛けるので、上ベクトルは
+		// (-sin y, cos y * cos x, cos y * sin x) になる。これが n と一致する角度を逆算する
+		float rotZ = DirectX::XMConvertToDegrees(std::asin(std::clamp(-n.x, -1.0f, 1.0f)));
+		float rotX = DirectX::XMConvertToDegrees(std::atan2(n.z, n.y));
+
+		// 人は斜面でも上体を立てるので、全部は合わせずに混ぜる。
+		// 1.0にすると面と完全に平行＝急な屋根でキャラが寝てしまう
+		float weight = DebugParams::Instance().Float(U8("斜面/合わせる強さ"), 0.6f, 0.0f, 1.0f);
+		float maxDeg = DebugParams::Instance().Float(U8("斜面/最大角度"),  35.0f, 0.0f, 89.0f);
+
+		target.x = std::clamp(rotX * weight, -maxDeg, maxDeg);
+		target.y = std::clamp(rotZ * weight, -maxDeg, maxDeg);
+	}
+
+	// 現在値を目標へ寄せる(UpdateTiltと同じ寄せ方)
+	float k = DebugParams::Instance().Float(U8("斜面/追従速度"), 10.0f, 1.0f, 60.0f);
+	m_slopeTilt = MathAPI::InterpTo(m_slopeTilt, target, _deltaTime, k);
 }
 
 void CharaBase::UpdateTilt(float _deltaTime)
@@ -371,6 +414,7 @@ void CharaBase::ResolveGround(Math::Vector3& pos, bool _allowLanding)
 	// レイに当たったリストから一番遮った(overlapが最大の)地面を探す
 	float maxOverLap = 0;
 	Math::Vector3 hitPos;
+	Math::Vector3 hitNormal = Math::Vector3::Up;
 	bool hit = false;
 
 	for (auto& ret : retRayList)
@@ -379,6 +423,7 @@ void CharaBase::ResolveGround(Math::Vector3& pos, bool _allowLanding)
 		{
 			maxOverLap = ret.m_overlapDistance;
 			hitPos = ret.m_hitPos;
+			hitNormal = ret.m_hitNDir;
 			hit = true;
 		}
 	}
@@ -428,6 +473,22 @@ void CharaBase::ResolveGround(Math::Vector3& pos, bool _allowLanding)
 			m_velocity.y = 0.0f;   // 縦の勢いだけ止める(横の勢いはそのまま=着地滑りは各キャラのUpdate側で制御)
 			m_isGrounded = true;
 			m_coyoteTimer = DebugParams::Instance().Float(U8("キャラ/コヨーテタイム"), 0.1f, 0.0f, 0.5f);
+
+			// 接地面の法線を保存する(斜面へ姿勢を合わせるのに使う)。
+			// 【罠】MeshIntersectは三角形の辺の外積で法線を作るので、向きは頂点の巻き方向次第。
+			//   下を向いて返ってくることがあるので、必ず上向きへ揃えてから使う
+			m_groundNormal = Math::Vector3::Up;
+			if (hitNormal.LengthSquared() > 0.0001f)
+			{
+				hitNormal.Normalize();
+				m_groundNormal = (hitNormal.y < 0.0f) ? -hitNormal : hitNormal;
+			}
+
+			// デバッグ表示：接地面の法線(水色)。斜面で面に垂直に出ていれば正しい
+			if (KdGameObject::s_showColliderDebug && DebugDraw::IsOn(GetDebugCategory()) && m_pDebugWire)
+			{
+				m_pDebugWire->AddDebugLine(hitPos, m_groundNormal, 1.5f, Math::Color(0.0f, 1.0f, 1.0f, 1.0f));
+			}
 			return;
 		}
 	}

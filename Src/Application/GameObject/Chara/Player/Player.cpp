@@ -1041,6 +1041,10 @@ void Player::PostUpdate()
 	//傾きはローカル軸で効くので、先にヨーが確定している必要がある
 	UpdateTilt(Application::Instance().GetDeltaTime());
 
+	//斜面に合わせて体を傾ける(片足が埋まり片方が浮くのを減らす)
+	//UpdateTiltと同じくローカル軸で効くので、ヨーが確定したこの位置で呼ぶ
+	UpdateSlopeAlign(Application::Instance().GetDeltaTime());
+
 	// アニメーションを進める(2026/07/20 追加)。
 	// 接地・速度・突撃などの状態が全て確定したあとで呼ぶので、PostUpdateの最後に置く
 	UpdateAnimation();
