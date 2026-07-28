@@ -68,7 +68,7 @@ void StageProp::RegisterAllToEditor()
 	LevelEditorManager& mgr = LevelEditorManager::Instance();
 
 	// Asset/Models/Stage/ 直下のカテゴリごとに、その中の各 <名前>/<名前>.gltf を登録する
-	const char* categories[] = { "House", "Building", "Prop" };
+	const char* categories[] = { "House", "Building", "Prop", "Wall" };
 
 	for (const char* cat : categories)
 	{
