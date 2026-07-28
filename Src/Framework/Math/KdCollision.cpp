@@ -40,7 +40,8 @@ static void InvertRayInfo(DirectX::XMVECTOR& rayPosInv, DirectX::XMVECTOR& rayDi
 // レイとの当たり判定結果をリザルトにセットする
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
 static void SetRayResult(CollisionMeshResult& result, bool isHit, float closestDist,
-	const DirectX::XMVECTOR& rayPos, const DirectX::XMVECTOR& rayDir, float rayRange, std::vector<Math::Vector3>& finalFace)
+	const DirectX::XMVECTOR& rayPos, const DirectX::XMVECTOR& rayDir, float rayRange,
+	std::vector<Math::Vector3>& finalFace, const DirectX::XMMATRIX& matrix)
 {
 	// リザルトに結果を格納
 	result.m_hit = isHit;
@@ -56,6 +57,25 @@ static void SetRayResult(CollisionMeshResult& result, bool isHit, float closestD
 	Math::Vector3 _normalV2 = finalFace[2] - finalFace[0];
 
 	result.m_hitNDir = _normalV1.Cross(_normalV2);
+	result.m_hitNDir = DirectX::XMVector3Normalize(result.m_hitNDir);
+
+	// 【2026/07/28 追加】法線をワールド座標へ戻す。
+	// 判定はレイのほうを逆行列でモデルのローカル空間へ持ち込んで行う(そのほうが安い)ので、
+	// finalFace は【モデルのローカル座標の頂点】＝ここで作った法線もローカルのままだった。
+	// 一方 m_hitPos は上でワールドのrayPos/rayDirから作っており、距離も closestDist/scaleInv で
+	// ワールドへ戻してある。つまり【位置と距離は戻していたのに法線だけ戻し忘れていた】。
+	//
+	// 実害：Level.jsonで rot.y=90 等と回して置いたオブジェクトの上に立つと、法線がその回転ぶん
+	// ズレて返る。斜面へ姿勢を合わせる処理(CharaBase::UpdateSlopeAlign)が前後と左右を取り違え、
+	// 屋根の上でキャラが横倒しになっていた。
+	// ※ 今まで露見しなかったのは、この m_hitNDir をゲーム側が誰も読んでいなかったため。
+	//   壁の押し出しが見ている「歩ける斜面」判定は球判定の m_hitDir(押し出し方向)のほうで、
+	//   そちらは元からワールド座標なので正しく動いていた。
+	//
+	// 【注意】拡縮が均一でない場合、厳密には逆転置行列で変換しないと面に垂直でなくなる。
+	//   今のプロップは均一スケール(2,2,2 など)なので通常の変換＋正規化で足りる。
+	//   非均一に伸ばしたモデルを置くようになったらここを見直すこと
+	result.m_hitNDir = DirectX::XMVector3TransformNormal(result.m_hitNDir, matrix);
 	result.m_hitNDir = DirectX::XMVector3Normalize(result.m_hitNDir);
 }
 
@@ -122,7 +142,8 @@ bool PolygonsIntersect(const KdPolygon& poly, const DirectX::XMVECTOR& rayPos, c
 
 	if (pResult && isHit)
 	{
-		SetRayResult(*pResult, isHit, closestDist / scaleInv, rayPos, rayDir, rayRange, finalFace);
+		// matrixを渡すのは、ローカルで作った面法線をワールドへ戻すため(SetRayResult内の注記を参照)
+		SetRayResult(*pResult, isHit, closestDist / scaleInv, rayPos, rayDir, rayRange, finalFace, matrix);
 	}
 
 	return isHit;
@@ -211,7 +232,8 @@ bool MeshIntersect(const KdMesh& mesh, const DirectX::XMVECTOR& rayPos, const Di
 
 	if (pResult && isHit)
 	{
-		SetRayResult(*pResult, isHit, closestDist / scaleInv, rayPos, rayDir, rayRange, finalFace);
+		// matrixを渡すのは、ローカルで作った面法線をワールドへ戻すため(SetRayResult内の注記を参照)
+		SetRayResult(*pResult, isHit, closestDist / scaleInv, rayPos, rayDir, rayRange, finalFace, matrix);
 	}
 
 	return isHit;
@@ -288,12 +310,16 @@ static bool HitCheckAndPosUpdate(DirectX::XMVECTOR& finalPos, DirectX::XMVECTOR&
 // スフィアとの当たり判定結果をリザルトにセットする
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
 static void SetSphereResult(CollisionMeshResult& result, bool isHit, const DirectX::XMVECTOR& hitPos,
-	const DirectX::XMVECTOR& finalPos, std::vector<Math::Vector3>& finalFace, const DirectX::XMVECTOR& beginPos)
+	const DirectX::XMVECTOR& finalPos, std::vector<Math::Vector3>& finalFace, const DirectX::XMVECTOR& beginPos,
+	const DirectX::XMMATRIX& matrix)
 {
 	result.m_hit = isHit;
 
 	result.m_hitPos = hitPos;
 
+	// ※ m_hitDir は「押し出す方向」。呼び出し側が既にワールドの座標を渡してくるので元からワールド。
+	//   壁の押し出し(CharaBase::ResolveBump)の「歩ける斜面か」判定はこちらを見ており、
+	//   そちらは以前から正しく動いている。ここは触らない
 	result.m_hitDir = DirectX::XMVectorSubtract(finalPos, beginPos);
 
 	result.m_overlapDistance = DirectX::XMVector3Length(result.m_hitDir).m128_f32[0];
@@ -305,6 +331,13 @@ static void SetSphereResult(CollisionMeshResult& result, bool isHit, const Direc
 	Math::Vector3 _normalV2 = finalFace[2] - finalFace[0];
 
 	result.m_hitNDir = _normalV1.Cross(_normalV2);
+	result.m_hitNDir = DirectX::XMVector3Normalize(result.m_hitNDir);
+
+	// 【2026/07/28 追加】レイ側(SetRayResult)と同じ理由でワールドへ戻す。
+	// finalFace はモデルのローカル座標の頂点なので、そこから作った法線もローカルのまま。
+	// こちらは今ゲーム側から読まれていないが、同じ構造体のフィールドがレイと球で
+	// 別の座標系を返すほうが危ないので揃えておく
+	result.m_hitNDir = DirectX::XMVector3TransformNormal(result.m_hitNDir, matrix);
 	result.m_hitNDir = DirectX::XMVector3Normalize(result.m_hitNDir);
 }
 
@@ -354,8 +387,9 @@ bool PolygonsIntersect(const KdPolygon& poly, const DirectX::BoundingSphere& sph
 	// リザルトに結果を格納
 	if (pResult && isHit)
 	{
+		// matrixを渡すのは、ローカルで作った面法線をワールドへ戻すため(SetSphereResult内の注記を参照)
 		SetSphereResult(*pResult, isHit, XMVector3TransformCoord(finalHitPos, matrix),
-			XMVector3TransformCoord(finalPos, matrix), finalFace, XMLoadFloat3(&sphere.Center));
+			XMVector3TransformCoord(finalPos, matrix), finalFace, XMLoadFloat3(&sphere.Center), matrix);
 	}
 
 	return isHit;
@@ -422,8 +456,9 @@ bool MeshIntersect(const KdMesh& mesh, const DirectX::BoundingSphere& sphere,
 	// リザルトに結果を格納
 	if (pResult && isHit)
 	{
+		// matrixを渡すのは、ローカルで作った面法線をワールドへ戻すため(SetSphereResult内の注記を参照)
 		SetSphereResult(*pResult, isHit, XMVector3TransformCoord(finalHitPos, matrix),
-			XMVector3TransformCoord(finalPos, matrix), finalFace, XMLoadFloat3(&sphere.Center));
+			XMVector3TransformCoord(finalPos, matrix), finalFace, XMLoadFloat3(&sphere.Center), matrix);
 	}
 
 	return isHit;

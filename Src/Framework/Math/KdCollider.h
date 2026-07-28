@@ -139,9 +139,15 @@ public:
 	// 詳細な衝突結果
 	struct CollisionResult
 	{
-		Math::Vector3 m_hitPos;			// 衝突した座標
-		Math::Vector3 m_hitDir;			// 対象からの方向ベクトル（押し返しなどに使う
-		Math::Vector3 m_hitNDir;		// HITした面の法線ベクトル
+		Math::Vector3 m_hitPos;			// 衝突した座標(ワールド)
+		// 対象からの方向ベクトル（押し返しなどに使う。ワールド）
+		// ※ レイ判定では「レイの向きの反転」でしかない(真下へ撃てば常に真上)。法線として使わないこと。
+		//   球判定では押し出す向き＝実質的に面の法線になる
+		Math::Vector3 m_hitDir;
+		// HITした面の法線ベクトル(ワールド)
+		// ※ 2026/07/28まで【モデルのローカル座標】のまま返っており、回して置いたオブジェクトの上で
+		//   向きがズレていた。KdCollision.cppのSetRayResult/SetSphereResultでワールドへ戻すよう修正済み
+		Math::Vector3 m_hitNDir;
 		float m_overlapDistance = 0.0f; // 重なり量
 	};
 
