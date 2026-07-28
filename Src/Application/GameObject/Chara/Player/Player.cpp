@@ -1012,7 +1012,9 @@ void Player::PostUpdate()
 	// 着地した瞬間を捉えて、着地モーションを流す時間を確保する。
 	// 「接地しているか」だけで判定すると、着地の次のフレームには走り/待機へ移ってしまい
 	// 着地モーションがほぼ見えないため、瞬間にタイマーを立ててその間だけ再生する
-	if (IsGrounded() && !m_wasGroundedForAnim)
+	// ※ コヨーテタイム込みで見る。素のIsGroundedだと、段差で1フレーム浮くたびに
+	//    ここが立ち上がりと判定されて着地モーション(1.73秒)が鳴り続ける
+	if (IsGroundedOrCoyote() && !m_wasGroundedForAnim)
 	{
 		// クリップの実長(ローリングは52フレーム=約1.73秒)を入れておく。
 		// 再生倍率で割るのは、速く再生するとそのぶん早く終わるため。
@@ -1021,7 +1023,7 @@ void Player::PostUpdate()
 		float scale = GetAnimSpeedScale(U8("アニメ/着地の再生速度"));
 		m_landingAnimTimer = (scale > 0.0f) ? (len / scale) : len;
 	}
-	m_wasGroundedForAnim = IsGrounded();
+	m_wasGroundedForAnim = IsGroundedOrCoyote();   // 立ち上がり検出と同じ基準で持つ
 
 	if (m_landingAnimTimer > 0.0f)
 	{
@@ -1084,7 +1086,8 @@ std::string Player::SelectAnimation() const
 	if (m_isDodging) { return "02 speed up"; }
 
 	// 空中
-	if (!IsGrounded()) { return "08 fall (air)"; }
+	// ※ コヨーテタイム込みで見る。1〜数フレームの浮きで落下モーションへ飛ばないようにするため
+	if (!IsGroundedOrCoyote()) { return "08 fall (air)"; }
 
 	// 着地の余韻(PostUpdateでタイマーを立てている)
 	if (m_landingAnimTimer > 0.0f) { return "10 fall (landing)"; }

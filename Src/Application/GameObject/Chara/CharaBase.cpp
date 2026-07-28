@@ -335,7 +335,12 @@ void CharaBase::ResolveGround(Math::Vector3& pos, bool _allowLanding)
 	float feetY = pos.y - GetBodyHalfHeight();
 	float fallThisFrame = (m_velocity.y < 0.0f) ? (-m_velocity.y * deltaTime) : 0.0f;
 	const float rayStepUp = 0.3f;   // 足元より上をどれだけ見るか(=乗り上げできる段差の高さ・接地の許容)
-	const float rayBelow  = 0.2f;   // 足元より下をどれだけ見るか(接地の許容)
+
+	// 足元より下をどれだけ見るか。下方向の吸着距離ぶんは必ず見ないと、
+	// 吸着しようにも床がレイに入らない(＝伸ばすのは吸着の前提条件)
+	float snapDown = DebugParams::Instance().Float(U8("キャラ/接地の吸着距離"), 0.45f, 0.0f, 1.5f);
+	const float rayBelowMin = 0.2f;
+	float rayBelow = (snapDown > rayBelowMin) ? snapDown : rayBelowMin;
 	Math::Vector3 rayPos(pos.x, feetY + rayStepUp + fallThisFrame, pos.z);
 	float rayRange = rayStepUp + fallThisFrame + rayBelow;
 
@@ -384,7 +389,18 @@ void CharaBase::ResolveGround(Math::Vector3& pos, bool _allowLanding)
 	{
 		// 体の半分の高さだけ持ち上げて、足が地面に接する位置に立たせる
 		float standY = hitPos.y + GetBodyHalfHeight();
-		if (pos.y <= standY)
+
+		// 【下方向の吸着】(2026/07/28 追加)
+		// 以前は pos.y <= standY ＝「地面にめり込んでいるとき」しか接地にしていなかった。
+		// そのため屋根の傾斜や段差で床がわずかに下がるだけで空中扱いになり、
+		// 10cmの段差でも着地まで約9フレーム(√(2*0.1/9.8)≒0.14秒)かかって、
+		// そのたびに着地モーションが再生されていた。
+		// → 直前に接地していたなら、吸着距離以内の床までは降ろして接地を維持する。
+		// ※ wasGrounded を条件に入れるのが肝。入れるとジャンプ直後や落下中に
+		//    床へ吸い寄せられることがなくなる(屋根の端から飛び降りる動作は壊れない)
+		bool canSnapDown = wasGrounded && (pos.y - standY) <= snapDown;
+
+		if (pos.y <= standY || canSnapDown)
 		{
 			// 「着地しない」モード(ワイヤーで地面スレスレを飛ぶ用)。
 			// 地面へのめり込みだけ直し、落下は止めるが、接地扱いにはしない。
@@ -398,6 +414,7 @@ void CharaBase::ResolveGround(Math::Vector3& pos, bool _allowLanding)
 					m_velocity.y = 0.0f;
 				}
 				m_isGrounded = false;
+				m_coyoteTimer = 0.0f;   // 意図的に着地させないモードなので猶予も与えない
 				return;
 			}
 
@@ -410,12 +427,18 @@ void CharaBase::ResolveGround(Math::Vector3& pos, bool _allowLanding)
 			pos.y = standY;
 			m_velocity.y = 0.0f;   // 縦の勢いだけ止める(横の勢いはそのまま=着地滑りは各キャラのUpdate側で制御)
 			m_isGrounded = true;
+			m_coyoteTimer = DebugParams::Instance().Float(U8("キャラ/コヨーテタイム"), 0.1f, 0.0f, 0.5f);
 			return;
 		}
 	}
 
-	// それ以外は空中
+	// それ以外は空中。猶予(コヨーテタイム)を減らしていく
 	m_isGrounded = false;
+	m_coyoteTimer -= deltaTime;
+	if (m_coyoteTimer < 0.0f)
+	{
+		m_coyoteTimer = 0.0f;
+	}
 }
 
 void CharaBase::ResolveCeiling(const Math::Vector3& fromPos, Math::Vector3& pos)
@@ -676,8 +699,9 @@ void CharaBase::ResolveBumpSweep(const Math::Vector3& fromPos, Math::Vector3& po
 
 void CharaBase::Jump()
 {
-	// 接地しているときだけジャンプできる
-	if (!m_isGrounded) { return; }
+	// 接地しているとき、または地面を離れた直後の猶予中だけジャンプできる。
+	// 崖際で入力が数フレーム遅れても跳べるようにするため(2026/07/28)
+	if (!IsGroundedOrCoyote()) { return; }
 	DoJump();
 }
 
@@ -686,4 +710,7 @@ void CharaBase::DoJump()
 	// ジャンプ初速はDebugParamsで調整可能(垂直速度に初速を与える)。接地判定はしない
 	m_velocity.y = DebugParams::Instance().Float(U8("キャラ/ジャンプ力"), 8.0f, 0.0f, 30.0f);
 	m_isGrounded = false;
+
+	// 猶予を使い切る。消さないと、コヨーテタイムの間に空中で2回目が跳べてしまう
+	m_coyoteTimer = 0.0f;
 }

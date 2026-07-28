@@ -86,6 +86,13 @@ protected:
 	// 接地しているか
 	bool IsGrounded() const { return m_isGrounded; }
 
+	// 接地しているか、または地面を離れた直後の猶予(コヨーテタイム)の最中か。
+	// 段差や傾斜で1〜数フレームだけ浮いてしまうのを吸収する用と、崖際でジャンプ入力が
+	// 少し遅れても跳べるようにする用を兼ねる。
+	// ※ 押し戻しなど【物理の解決】には使わないこと。あちらは実際に接地しているかで判断する。
+	//    こちらは「操作の受付」と「見た目(アニメ)」用
+	bool IsGroundedOrCoyote() const { return m_isGrounded || m_coyoteTimer > 0.0f; }
+
 	// ※ IsWallBetween(from→toの間に壁があるか) は 2026/07/19 に CollisionGrid へ移動した。
 	//    キャラに依存しない世界クエリで、照準(Targeting)の遮蔽判定からも使うため。
 	//    → CollisionGrid::IsWallBetween(from, to, margin)
@@ -231,6 +238,9 @@ protected:
 
 	// 接地しているか(GroundCheckで毎フレーム更新)
 	bool m_isGrounded = false;
+
+	// 地面を離れてからの猶予(コヨーテタイム)の残り秒数。ResolveGroundが毎フレーム更新する
+	float m_coyoteTimer = 0.0f;
 
 	// 手応え用：直近フレームに発生した着地/壁ヒットの衝撃(速度の大きさ)。
 	// ResolveGround(着地遷移時)/ResolveBumpSweep(壁で止めた時)が記録し、Consume〜で読み取る
