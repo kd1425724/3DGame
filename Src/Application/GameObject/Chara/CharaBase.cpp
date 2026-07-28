@@ -61,12 +61,19 @@ void CharaBase::UpdateSlopeAlign(float _deltaTime)
 		float rotX = DirectX::XMConvertToDegrees(std::atan2(n.z, n.y));
 
 		// 人は斜面でも上体を立てるので、全部は合わせずに混ぜる。
-		// 1.0にすると面と完全に平行＝急な屋根でキャラが寝てしまう
-		float weight = DebugParams::Instance().Float(U8("斜面/合わせる強さ"), 0.6f, 0.0f, 1.0f);
-		float maxDeg = DebugParams::Instance().Float(U8("斜面/最大角度"),  35.0f, 0.0f, 89.0f);
+		// 1.0にすると面と完全に平行＝急な屋根でキャラが寝てしまう。
+		//
+		// 【前後と左右で強さを分ける理由】(2026/07/28)
+		// 尾根に沿って走ると斜面の傾きは「真横」になる。法線に合わせれば横へ倒れるのが
+		// 数学的には正しいが、人型が横に傾くと「転びかけている」ようにしか見えない。
+		// 実際に屋根で試して「横に倒れる」と指摘を受けたので、左右は既定を弱くしてある。
+		// (多くのゲームが前後だけ合わせて左右をほぼ切っているのと同じ理由)
+		float weightPitch = DebugParams::Instance().Float(U8("斜面/前後の強さ"), 0.6f,  0.0f, 1.0f);
+		float weightRoll  = DebugParams::Instance().Float(U8("斜面/左右の強さ"), 0.25f, 0.0f, 1.0f);
+		float maxDeg      = DebugParams::Instance().Float(U8("斜面/最大角度"),  35.0f, 0.0f, 89.0f);
 
-		target.x = std::clamp(rotX * weight, -maxDeg, maxDeg);
-		target.y = std::clamp(rotZ * weight, -maxDeg, maxDeg);
+		target.x = std::clamp(rotX * weightPitch, -maxDeg, maxDeg);   // X軸まわり＝前後
+		target.y = std::clamp(rotZ * weightRoll,  -maxDeg, maxDeg);   // Z軸まわり＝左右
 	}
 
 	// 現在値を目標へ寄せる(UpdateTiltと同じ寄せ方)
