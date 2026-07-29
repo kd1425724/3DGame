@@ -12160,16 +12160,16 @@
         ]
     },
     {
-        "type": "Building/House3Upload",
-        "name": "House3Upload",
+        "type": "Building/Church1Upload",
+        "name": "Church1Upload",
         "pos": [
-            -5.63,
+            1.81,
             0.6,
-            235.99
+            234.43
         ],
         "rot": [
             0.0,
-            180.0,
+            0.0,
             0.0
         ],
         "scale": [
