@@ -208,6 +208,21 @@ protected:
 	// ※ UpdateArmAimの直後で呼ぶ。アニメ→腕→脚の順に上書きしていく
 	void UpdateLegFlow(float _deltaTime);
 
+	// 【部位破壊の土台(2026/07/29)】指定した名前のボーンを潰し、その先の部位を見えなくする。
+	// スキンメッシュは頂点をボーン行列で動かすので、ボーンの拡縮をほぼ0にすると、
+	// そこへ重み付けされた頂点が関節の1点へ集まり、その先が消えたように見える。
+	// 業界標準の切断表現(UnrealのHideBoneByNameに相当)の中核部分にあたる。
+	// ・子ボーンは親の行列を受け継ぐので、上腕を潰せば前腕・手も一緒に消える
+	// ・ボーンが見つからなければ何もしない(モデル差し替えで名前が変わっても落ちない)
+	// ※ アニメが毎フレーム骨を上書きするので、UpdateAnimation/ArmAim/LegFlowの【後】に呼ぶこと
+	// ※ CalcNodeMatrices()はここでは呼ばない(AimBoneToDirと同じ約束)。呼ぶ側がまとめて1回呼ぶ
+	void CollapseBone(std::string_view _boneName);
+
+	// 上のCollapseBoneがこの環境で本当に効くかを実機で確かめるための検証用スイッチ。
+	// DebugFlags「部位破壊/…を潰す」で切り替える。
+	// ※ 本番の部位破壊は部位HPから駆動するので、これはあくまで方式の確認用
+	void UpdateBoneCollapseTest();
+
 	// 今なびかせるべきか。既定は「空中にいる間」。
 	// 接地中に混ぜると走行サイクルと喧嘩して足が滑るので、地上では効かせない。
 	// 判断は派生クラスの責務(SelectAnimation/SelectTilt/SelectArmAimTargetと同じ分け方)

@@ -251,6 +251,52 @@ bool CharaBase::AimBoneToDir(KdModelWork::Node& _node, const Math::Vector3& _dir
 	return true;
 }
 
+void CharaBase::CollapseBone(std::string_view _boneName)
+{
+	KdModelWork::Node* node = m_modelWork.FindWorkNode(_boneName);
+	if (!node) { return; }
+
+	// 完全な0にすると行列が退化して、法線の計算などで0除算・NaNを踏む恐れがある。
+	// ごく小さい値なら見た目は0と区別が付かず、その危険だけ避けられる
+	constexpr float kCollapseScale = 0.0001f;
+
+	// 平行移動は残して拡縮だけ潰す。こうすると「関節の位置」に頂点が集まる。
+	// 平行移動まで消すとモデル原点へ吸い込まれ、体の中心に潰れた塊が出る
+	const Math::Vector3 translation = node->m_localTransform.Translation();
+	node->m_localTransform = Math::Matrix::CreateScale(kCollapseScale);
+	node->m_localTransform.Translation(translation);
+}
+
+void CharaBase::UpdateBoneCollapseTest()
+{
+	// 検証したいのは「ボーンを潰せば部位が消えるか」の1点だけなので、
+	// 代表的な部位をいくつか個別に切り替えられるようにしておく。
+	// ボーン名はMixamoリグのもの。UpdateArmAim/UpdateLegFlowが既に使っている名前と同じで、
+	// このモデル経路が吐くリグには必ず存在する
+	static const struct { const char* flag; const char* bone; } kParts[] =
+	{
+		{ U8("部位破壊/左腕を潰す"),   "mixamorig:LeftArm"     },
+		{ U8("部位破壊/右腕を潰す"),   "mixamorig:RightArm"    },
+		{ U8("部位破壊/左脚を潰す"),   "mixamorig:LeftUpLeg"   },
+		{ U8("部位破壊/右脚を潰す"),   "mixamorig:RightUpLeg"  },
+		{ U8("部位破壊/頭を潰す"),     "mixamorig:Head"        },
+	};
+
+	bool any = false;
+	for (const auto& part : kParts)
+	{
+		if (!DebugFlags::Instance().Get(part.flag, false)) { continue; }
+
+		CollapseBone(part.bone);
+		any = true;
+	}
+
+	// 1本も潰していないなら、全ノードの再計算は無駄なので走らせない
+	if (!any) { return; }
+
+	m_modelWork.CalcNodeMatrices();
+}
+
 bool CharaBase::GetBoneWorldPos(std::string_view _name, Math::Vector3& _outPos) const
 {
 	const KdModelWork::Node* node = m_modelWork.FindNode(_name);

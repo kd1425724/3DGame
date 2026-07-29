@@ -1056,6 +1056,10 @@ void Player::PostUpdate()
 	//腕の後に呼ぶ＝アニメ→腕→脚の順に上書きしていく
 	UpdateLegFlow(Application::Instance().GetDeltaTime());
 
+	// 【部位破壊の方式確認(2026/07/29)】ボーンを潰すと部位が消えるかを実機で確かめる。
+	// アニメ→腕→脚と骨を上書きしてきた最後に呼ぶ。ここより前だと後段に塗り潰される
+	UpdateBoneCollapseTest();
+
 	// デバッグ用：状態値をDebugWatchへ(このフレームの最終状態を出す。PostUpdateは毎フレーム必ず走る)
 	WatchDebug();
 }
