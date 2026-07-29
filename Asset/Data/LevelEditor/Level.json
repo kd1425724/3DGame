@@ -12160,25 +12160,6 @@
         ]
     },
     {
-        "type": "Building/Church1Upload",
-        "name": "Church1Upload",
-        "pos": [
-            1.81,
-            0.6,
-            234.43
-        ],
-        "rot": [
-            0.0,
-            0.0,
-            0.0
-        ],
-        "scale": [
-            2.0,
-            2.0,
-            2.0
-        ]
-    },
-    {
         "type": "Wall/WallSegment",
         "name": "WallSegment",
         "pos": [
