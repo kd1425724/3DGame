@@ -33,6 +33,3 @@ x64/
 *.shaderInc
 
 imgui.ini
-
-# TextureGen の確認用一覧画像(生成物。中身はAsset側のPNGを並べただけなので追跡しない)
-Tool/TextureGen/_preview.png
