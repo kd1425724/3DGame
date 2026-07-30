@@ -33,11 +33,15 @@ void Enemy::Init()
 	SetScale(Math::Vector3::One);
 	m_modelOriginIsFeet = true;
 
-	// モデルの実測値(Icosphereの残骸を除いた後の高さ)。
+	// 高さの実測値。スキン変形を計算して求めた値(幅3.764 × 高さ4.368 × 奥行3.000)。
+	// 【罠】このモデルの生の頂点座標は±19000という巨大な値で、スキン変形で初めて
+	//   正しい位置に戻る。頂点座標をそのまま測ると桁が違う値が出るので必ず変形後を見ること。
 	// GetBodyHalfHeight()経由で接地・天井・壁の判定が足元と頭の位置を出すのに使う
-	m_bodyHeight = 4.38f;
+	m_bodyHeight = 4.37f;
 
-	// このモデルの正面は -Z
+	// 【未確認】正面の向きは実機で見て決めること。
+	//   モデルごとに違い、Blenderの軸から推論して外した実績がある(→memory)。
+	//   進行方向のちょうど逆を向いていたら false にする
 	m_modelForwardIsMinusZ = true;
 
 	// ※ 当たり判定(KdCollider)は登録しない。
