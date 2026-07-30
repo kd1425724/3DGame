@@ -39,10 +39,12 @@ void Enemy::Init()
 	// GetBodyHalfHeight()経由で接地・天井・壁の判定が足元と頭の位置を出すのに使う
 	m_bodyHeight = 4.37f;
 
-	// 【未確認】正面の向きは実機で見て決めること。
-	//   モデルごとに違い、Blenderの軸から推論して外した実績がある(→memory)。
-	//   進行方向のちょうど逆を向いていたら false にする
-	m_modelForwardIsMinusZ = true;
+	// 正面は +Z。実機で見て確定させた(2026/07/29)。
+	// 【罠】glTFのデータ上ではセンサー(Camera_08)が -Z 側にあるので -Z が正面に見える。
+	//   しかしローダーは頂点の z を反転する(KdGLTFLoader.cpp:501 の `* -1`)ため、
+	//   glTFの -Z はエンジンでは +Z になる。
+	//   データから推論すると必ず逆になるので、この値は実機で見て決めること。
+	m_modelForwardIsMinusZ = false;
 
 	// ※ 当たり判定(KdCollider)は登録しない。
 	//   ①以前登録していた "EnemyDamage"(TypeDamage)は Src/Application 全体で
