@@ -23,24 +23,33 @@ void Enemy::DrawDebug()
 
 void Enemy::Init()
 {
-	SetAsset("Asset/Models/Test/Block/Block.gltf");
+	// 【2026/07/29】立方体(Block.gltf)のテスト実装から、リグ付きの戦闘メカへ差し替えた。
+	// 部位破壊の題材として選んだモデル。骨が Arm_L / Minigun_L / Camera / Top_Leg_L … と
+	// 最初から機械の部位で分かれており、部位ごとの当たり判定を骨に追従させやすい。
+	// ライセンスは CC BY 4.0(作者クレジット必須) → THIRD_PARTY_LICENSES.txt
+	SetAsset("Asset/Models/Character/W9231Mech/W9231Mech.gltf");
 
-	// 他のオブジェクトと見分けが付くように赤色にする
-	m_color = kRedColor;
+	// 実寸モデルなので等倍。原点は足元にある(実測 足元Z=0.018)
+	SetScale(Math::Vector3::One);
+	m_modelOriginIsFeet = true;
 
-	// Playerと同じ比率で縮小
-	SetScale(Math::Vector3(0.5f, 0.5f, 0.5f));
+	// モデルの実測値(Icosphereの残骸を除いた後の高さ)。
+	// GetBodyHalfHeight()経由で接地・天井・壁の判定が足元と頭の位置を出すのに使う
+	m_bodyHeight = 4.38f;
 
-	// 攻撃を受ける側の当たり判定(球)を登録する
-	// ※ 半径はローカル値。Intersects時にworld行列(このEnemyはscale0.5)で縮むため、
-	//    world半径≒m_hitRadiusになるようローカル半径をscaleで割って指定する
-	m_pCollider = std::make_unique<KdCollider>();
-	m_pCollider->RegisterCollisionShape(
-		"EnemyDamage",
-		Math::Vector3::Zero,
-		m_hitRadius / 0.5f,
-		KdCollider::TypeDamage
-	);
+	// このモデルの正面は -Z
+	m_modelForwardIsMinusZ = true;
+
+	// ※ 当たり判定(KdCollider)は登録しない。
+	//   ①以前登録していた "EnemyDamage"(TypeDamage)は Src/Application 全体で
+	//     誰も問い合わせていなかった(実際の命中判定はPlayer側の距離チェック)
+	//   ②部位破壊の判定は【骨のワールド座標から毎フレーム球を作る自前計算】で行う。
+	//     KdColliderに登録した形状はモデルのローカル座標に固定で、
+	//     RegisterCollisionShapeがemplace(同名で上書きされない)なので、
+	//     アニメーションで動く骨には追従できない
+	//   ③モデルを RegisterCollisionShape に渡してはいけない。
+	//     このモデルはCOLノードを持たないので、渡すと見た目の70,832三角が
+	//     そのまま当たり判定メッシュになる(KdModel.cpp:107-110のフォールバック)
 }
 
 void Enemy::OnHit(KdGameObject* /*_other*/)
@@ -155,12 +164,16 @@ void Enemy::Update()
 	}
 	}
 
-	// 見た目：状態で色を変えて攻撃を予告する(黄=予備動作 / 明るい赤=突進 / 通常=赤)
+	// 見た目：状態で色を変えて攻撃を予告する(黄=予備動作 / 明るい赤=突進)。
+	// 【2026/07/29】通常時は赤ではなく白(=色味を掛けない)にした。
+	//   立方体だった頃は「他と見分けるため」赤くしていたが、実物のメカは
+	//   暗い金属＋発光部で見た目が成立しているので、赤く染めると台無しになる。
+	//   予備動作と突進の色は攻撃の予告として機能するので残す
 	switch (m_state)
 	{
 	case State::Windup: m_color = Math::Color(1.0f, 0.9f, 0.2f, 1.0f); break;
 	case State::Strike: m_color = Math::Color(1.0f, 0.35f, 0.2f, 1.0f); break;
-	default:            m_color = kRedColor; break;
+	default:            m_color = kWhiteColor; break;
 	}
 }
 
