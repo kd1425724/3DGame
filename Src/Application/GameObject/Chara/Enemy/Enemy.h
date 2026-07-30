@@ -57,6 +57,11 @@ private:
 	float m_stateTimer = 0.0f;          // 現在状態の残り時間(Windup/Strike/Recoverで使用)
 	Math::Vector3 m_lungeDir = {};      // 突進方向。Windup終了時に固定する(以後は追尾しない=回避で避けられる)
 
+	// 【調査用・一時】メカが画面に出ない原因を切り分けるため、エンジンから見た
+	// モデルの状態を一時ファイルへ書き出す(初回のみ)。
+	// 原因が判明したら "部位破壊調査" で grep して丸ごと削除する
+	void DumpModelDiagnostics() const;
+
 	// 突進が命中した瞬間の処理(無敵なら反撃成立で自滅／無防備ならノックバック)
 	void ResolveStrikeHit(const std::shared_ptr<KdGameObject>& _target);
 	// 硬直状態へ移行する(突進の後隙)
