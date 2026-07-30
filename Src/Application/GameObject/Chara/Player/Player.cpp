@@ -117,7 +117,12 @@ void Player::Update()
 	//   ワイヤーが無いと即returnするので、飛行の進行をそこに混ぜることはできない
 	for (const std::unique_ptr<WireAction>& w : m_upWires)
 	{
-		if (w) { w->UpdateFlight(GetPos(), dt); }
+		if (!w) { continue; }
+
+		if (w->UpdateFlight(GetPos(), dt))
+		{
+			SpawnWireImpactFx(*w);
+		}
 	}
 
 	// 加速/空中ステップ(右クリック)。ワイヤー中でも使えるよう、ワイヤー分岐より前で処理する
@@ -440,6 +445,36 @@ void Player::SpawnBoostFx(const Math::Vector3& _dir, float _dt)
 	{
 		m_boostFxTimer -= interval;
 		EffectManager::Instance().SpawnBoost(GetBoostSpawnPos(_dir), _dir);
+	}
+}
+
+void Player::SpawnWireImpactFx(const WireAction& _wire)
+{
+	// 粒はSpawnWallRun(壁を擦った火花)を流用する。
+	// 【なぜ専用のエフェクトを作らないか】壁走りの火花と語彙を揃えたいのと、
+	//   「硬いものに金属が当たった」という意味が同じなので、見た目を分ける理由が無い
+	Math::Vector3 anchor = _wire.GetAnchor();
+
+	// フックが進んだ向き。火花はこの逆へ流れる(SpawnWallRunが進行方向の逆へ飛ばす)
+	Math::Vector3 flightDir = anchor - _wire.GetLaunchPos();
+	if (!MathAPI::TryNormalize(flightDir))
+	{
+		flightDir = Math::Vector3::Backward;
+	}
+
+	// 面の法線は分からない(CastAnchorは交点しか返さない)ので、
+	// 「アンカーからプレイヤーへ向かう向き」で代用する。ワイヤーはその方向から
+	// 飛んできたので、面の外向きとおおよそ一致する。火花が壁にめり込まなければ充分
+	Math::Vector3 outward = GetPos() - anchor;
+	if (!MathAPI::TryNormalize(outward))
+	{
+		outward = Math::Vector3::Up;
+	}
+
+	int count = DebugParams::Instance().Int(U8("ワイヤー/着弾の火花の数"), 8, 0, 40);
+	for (int i = 0; i < count; ++i)
+	{
+		EffectManager::Instance().SpawnWallRun(anchor, flightDir, outward);
 	}
 }
 
@@ -1343,7 +1378,11 @@ void Player::DrawWire()
 		if (!w || !w->IsActive()) { continue; }
 
 		anyActive = true;
-		w->Draw(GetWireMuzzlePos(i), w->GetHookPos());
+		Math::Vector3 muzzle = GetWireMuzzlePos(i);
+		w->Draw(muzzle, w->GetHookPos());
+
+		// 先端のフック。線だけだと飛行中に空中で途切れて終わって見える
+		w->DrawHook(muzzle);
 	}
 	if (anyActive) { return; }
 

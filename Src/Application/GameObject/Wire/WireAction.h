@@ -46,8 +46,19 @@ public:
 		WireAction* const* _wires, int _count);
 
 	// ワイヤーの線(手元from→終点to)を描く。見た目もワイヤーの責務としてここに持つ。
-	// スイング中はアンカーへ、グラップル突撃中は対象へ、とfrom/toは呼び出し側が決める
+	// スイング中はアンカーへ、グラップル突撃中は対象へ、とfrom/toは呼び出し側が決める。
+	//
+	// 【1枚の板ではなく複数の節に分けて描く理由が2つある】
+	//   ①たわみ … 張っていないときに垂らすには折れ線でないと表現できない
+	//   ②模様の繰り返し … 板1枚だと、長いワイヤーでテクスチャが引き伸ばされて
+	//     撚りが見えなくなる。節に分ければ各節が模様を1回ずつ持つので密度が保たれる。
+	//     UVをいじる方法(SetUVTiling)もあるが、あれはシェーダのグローバル状態なので
+	//     戻し忘れると以降の全描画が狂う。節に分ければそこに触らずに済む
 	void Draw(const Math::Vector3& _from, const Math::Vector3& _to);
+
+	// ワイヤー先端のフックを描く。_from は射出口(手元)で、フックの向きを決めるのに使う。
+	// ※ Drawと分けてあるのは、グラップル突撃の線(対象へ引く線)にはフックを出さないため
+	void DrawHook(const Math::Vector3& _from);
 
 	// 指定方向へレイを飛ばし、ワイヤーを取り付けられる面(建物TypeBump / 地面TypeGround)の
 	// 最も手前の交点を返す。当たらなければ false。
@@ -75,7 +86,11 @@ public:
 	//   「ワイヤー中か」の分岐より前に呼ぶこと
 	//
 	//  _bodyPos ... 現在のキャラの位置。着弾時のワイヤー長をここから決める
-	void UpdateFlight(const Math::Vector3& _bodyPos, float _dt);
+	//  戻り値   ... このフレームで着弾したか(着弾の演出を出すのに使う)
+	bool UpdateFlight(const Math::Vector3& _bodyPos, float _dt);
+
+	// 撃った瞬間の射出点。着弾の火花を飛ばす向き(＝フックが進んだ向き)を出すのに使う
+	const Math::Vector3& GetLaunchPos() const { return m_launchPos; }
 
 	// ワイヤーを外す(拘束を解除する)。飛行中のフックも取り消す
 	void Release();
@@ -186,6 +201,15 @@ private:
 	Math::Vector3 m_mergedPivot = {};
 	float m_mergedRadius = 0.0f;
 
-	// ワイヤーの見た目(板ポリを線に沿わせカメラへ向ける軸固定ビルボード)
+	// ワイヤー1節ぶんの板ポリ(線に沿わせカメラへ向ける軸固定ビルボード)。
+	// 節の数だけ位置と長さを変えて使い回す(節ごとに実体を持つ必要はない)
 	std::unique_ptr<KdSquarePolygon> m_upPoly;
+
+	// 先端のフック用の板ポリ。ワイヤー本体とテクスチャが違うので別に持つ
+	std::unique_ptr<KdSquarePolygon> m_upHookPoly;
+
+	// 線の1節を描く(Drawが節の数だけ呼ぶ)。
+	// 太さと色を引数で受けるのは、DebugParamsの読み取りを節ごとに繰り返さないため
+	void DrawSegment(const Math::Vector3& _from, const Math::Vector3& _to,
+		float _thickness, const Math::Color& _col, const Math::Vector3& _emissive);
 };
