@@ -56,18 +56,41 @@ public:
 	static bool CastAnchor(const Math::Vector3& _from, const Math::Vector3& _dir, float _maxLength,
 		Math::Vector3& _outPos, bool& _outIsGround, float& _outDist);
 
-	// 照準方向へワイヤーを撃ち、当たった地形をアンカー(固定点)にする
+	// 照準方向へワイヤーを撃ち、当たった地形をアンカー(固定点)にする。
+	// アンカーはこの瞬間にレイで確定するが、拘束はまだ効かせない：フックが飛んで
+	// 着弾するまで待つ(UpdateFlight)。「撃ったのに即座に引っ張られる」と因果が逆に見えるため
 	//  _from      ... ワイヤーの発射位置(手元など)
 	//  _dir       ... 発射方向(正規化済みを想定)
 	//  _maxLength ... ワイヤーが届く最大距離
-	//  戻り値     ... 命中してアンカーが決まったか
+	//  戻り値     ... 命中してアンカーが決まったか(=飛行を開始したか)
 	bool Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, float _maxLength);
 
-	// ワイヤーを外す(拘束を解除する)
+	// 飛行(発射から着弾まで)を1フレーム進め、到達したら拘束を開始する。
+	//
+	// 【なぜ UpdateSwingAll と別の入口なのか】
+	//   UpdateSwingAll は「繋がっているワイヤーが1本も無ければ即return」する。
+	//   飛行中はまだ繋がっていないので、そこに混ぜると飛行が進まない。
+	//   繋がっていない時も呼ばれる必要があるため独立させてある。
+	//   また、着弾したフレームにそのままスイングへ入れるよう、キャラ側の
+	//   「ワイヤー中か」の分岐より前に呼ぶこと
+	//
+	//  _bodyPos ... 現在のキャラの位置。着弾時のワイヤー長をここから決める
+	void UpdateFlight(const Math::Vector3& _bodyPos, float _dt);
+
+	// ワイヤーを外す(拘束を解除する)。飛行中のフックも取り消す
 	void Release();
 
 	// 今ワイヤーが繋がっているか
 	bool IsAttached() const;
+
+	// 飛行中(撃ったが、まだ着弾していない)か。見た目の線を引くかどうかの判断に使う
+	bool IsFlying() const { return m_isFlying; }
+
+	// 飛行中か繋がっているか(=見た目の線を描くべき状態か)
+	bool IsActive() const { return m_isFlying || m_isAttached; }
+
+	// フック先端の現在位置。飛行中は射出点からアンカーへの途中、着弾後はアンカーそのもの
+	Math::Vector3 GetHookPos() const;
 
 	// 毎フレームの拘束処理。_pos / _vel を拘束後の値に書き換える
 	//  _reelInput ... +1でたぐり寄せ(縮む) / -1で伸ばす / 0で維持
@@ -130,6 +153,24 @@ private:
 	// ワイヤー中は原則「着地しない」で地面スレスレを飛べるようにするが、
 	// 地面そのものに刺した場合はそこへ降りていくのが正しいので、通常どおり着地させる
 	bool m_anchorIsGround = false;
+
+	// --- 発射から着弾までの飛行。見た目だけで、当たり判定はやり直さない ---
+	//
+	// 【なぜ飛翔体を実体化しないのか】
+	//   アンカーにできるのは建物(TypeBump)と地面(TypeGround)だけで、どちらも動かない。
+	//   さらに向きの決定(キャラ側のアンカー探索)は撃つ瞬間に扇状のレイで行っている。
+	//   つまりフックを実体として飛ばして毎フレーム判定しても、撃った瞬間のレイと
+	//   必ず同じ答えになる。得るものが無く、「探索の答えが飛行中に無効になる」
+	//   リスクだけが増えるので、飛ぶのは見た目(線とフック先端)のみとした
+	bool m_isFlying = false;
+
+	// 飛行の経過時間と、着弾までの所要時間
+	float m_flightTime = 0.0f;
+	float m_flightDuration = 0.0f;
+
+	// 撃った瞬間の射出口。フック先端はここからアンカーへ向かって進む。
+	// 射出口(手元)は毎フレーム動くが、フックが飛び始めた点は動かないので別に覚える
+	Math::Vector3 m_launchPos = {};
 
 	// ※ 自動離脱まわりの状態(m_releasePending / m_releasePendingTime / m_passedTime /
 	//    m_prevVelY / m_swingTime)は 2026/07/20 に撤去した(ユーザー指示)。

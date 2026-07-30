@@ -7,6 +7,32 @@
 #include "../../Collision/CollisionGrid.h"      // IsWallBetween(手元〜アンカー間の遮蔽判定)
 #include "../../API/MathAPI/MathAPI.h"          // 安全な正規化・水平化
 
+namespace
+{
+	// フックが着弾するまでの所要時間(秒)を、撃った距離から決める。
+	//
+	// 【なぜ距離に比例させたうえで上限を掛けるのか】
+	//   素直な等速だと、ワイヤー最大長100mまで撃てるので遠距離で0.5秒を超える
+	//   入力遅延になる。逆に一律の固定時間にすると、至近距離(街の路地は3.8m)で
+	//   フックがふわりと飛んで鈍く感じる。
+	//   そこで「距離÷速さ」を基本にしつつ、上限でクランプして遅延を頭打ちにする。
+	//   遠距離ほど実際の見た目の速さが上がるが、そこは知覚できない
+	float FlightDuration(float _dist)
+	{
+		// 【罠】DebugParamsは「Floatで読んだ時に登録される」遅延登録なので、
+		//   下のフラグ判定より前に必ず読む。早期returnで読み飛ばすとImGuiの一覧から
+		//   消え、その状態でSaveするとJSONからキーごと落ちてしまう
+		//   (過去に同じ形でキーが黙って消える事故を起こしている)
+		float speed = DebugParams::Instance().Float(U8("ワイヤー/射出速度"), 150.0f, 10.0f, 1000.0f);
+		float cap   = DebugParams::Instance().Float(U8("ワイヤー/射出時間の上限"), 0.2f, 0.0f, 1.0f);
+
+		// 飛ばさない設定(＝撃った瞬間に繋がる、2026/07/30より前の挙動)と比較できるようにしてある
+		if (!DebugFlags::Instance().Get(U8("ワイヤー/射出を飛ばす"), true)) { return 0.0f; }
+
+		return std::min(_dist / speed, cap);
+	}
+}
+
 // 見た目の板ポリ(KdSquarePolygon)はPch経由で見える。unique_ptr(前方宣言)の生成/破棄を
 // ここ(完全な型が見える.cpp)で行うため、ctor/dtorを定義する
 WireAction::WireAction()
@@ -430,19 +456,62 @@ bool WireAction::Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, fl
 	bool isGround = false;
 	float dist = 0.0f;
 	bool hit = CastAnchor(_from, _dir, _maxLength, pos, isGround, dist);
+	if (!hit) { return false; }
 
-	// 命中したらアンカーと長さを確定して繋ぐ
-	if (hit)
-	{
-		m_anchor = pos;
-		m_anchorIsGround = isGround;
-		m_length = dist;          // 撃った瞬間のワイヤー長
-		m_maxLength = m_length;   // リールアウトの上限にもする
-		m_isAttached = true;
-		m_occludedTime = 0.0f;    // 遮蔽デバウンスをリセット
-	}
+	// 前の状態(繋がっていた／飛んでいた)を確実に畳んでから撃ち直す。
+	// 合体状態が残ると次に2本揃ったときに作り直されず、古い支点で拘束してしまう
+	Release();
 
-	return hit;
+	m_anchor = pos;
+	m_anchorIsGround = isGround;
+
+	// 飛行を開始する。ここではまだ繋がない(m_isAttachedはfalseのまま)。
+	// ※ m_length / m_maxLength もここでは入れない。飛んでいる間もキャラは
+	//   重力と入力で動き続けるので、撃った瞬間の距離(dist)で拘束を張ると
+	//   着弾時にキャラが球の外にいる状態になり、引き込まれて瞬間移動する。
+	//   長さは着弾した瞬間の実距離で決める(UpdateFlight)
+	m_launchPos      = _from;
+	m_flightTime     = 0.0f;
+	m_flightDuration = FlightDuration(dist);
+	m_isFlying       = true;
+
+	return true;
+}
+
+void WireAction::UpdateFlight(const Math::Vector3& _bodyPos, float _dt)
+{
+	if (!m_isFlying) { return; }
+
+	m_flightTime += _dt;
+	if (m_flightTime < m_flightDuration) { return; }
+
+	// --- 着弾。ここで初めて拘束を張る ---
+	m_isFlying = false;
+	m_isAttached = true;
+	m_occludedTime = 0.0f;   // 遮蔽デバウンスをリセット
+
+	// 【重要】長さは「着弾した瞬間の実距離」。撃った瞬間の距離ではない。
+	//   飛行中もキャラは動いているので、撃った瞬間の距離を使うとキャラが球の
+	//   外にいる状態から拘束が始まり、球面まで引き込まれて瞬間移動する
+	//   (2本掛けの実装でまったく同じ形の不具合を出した。→ WireAction.cpp の合体処理)。
+	//   今の位置がそのまま拘束を満たすように初期化すれば、補間もフェードも要らない
+	m_length = (_bodyPos - m_anchor).Length();
+
+	// ※ 最大長へ丸めてはいけない。飛行中にアンカーから離れていれば実距離は
+	//   最大長を超えうるが、丸めると実距離より短い拘束になり、それがまさに
+	//   瞬間移動の原因になる。合体処理と同じ考え方で、上限のほうを広げる
+	m_maxLength = m_length;
+}
+
+Math::Vector3 WireAction::GetHookPos() const
+{
+	if (!m_isFlying) { return m_anchor; }
+
+	// 射出点からアンカーへ等速で進む。飛行時間が0なら即アンカー(ゼロ除算も避ける)
+	if (m_flightDuration <= 0.0f) { return m_anchor; }
+
+	float t = std::clamp(m_flightTime / m_flightDuration, 0.0f, 1.0f);
+	return Math::Vector3::Lerp(m_launchPos, m_anchor, t);
 }
 
 void WireAction::Release()
@@ -450,6 +519,13 @@ void WireAction::Release()
 	m_isAttached = false;
 	m_occludedTime = 0.0f;   // 遮蔽デバウンスをリセット
 	m_hasMerged = false;     // 2本を1つの球にまとめた状態も破棄(次に揃ったとき作り直す)
+
+	// 飛行中のフックも取り消す。これが無いと「飛行時間より短くタップした」場合に
+	// 離した後で着弾して勝手に繋がる(キャラ側は離した時にReleaseを呼ぶだけなので、
+	// 飛行中はIsAttached()がfalseで、外す対象として見えない)
+	m_isFlying = false;
+	m_flightTime = 0.0f;
+	m_flightDuration = 0.0f;
 }
 
 bool WireAction::IsAttached() const
