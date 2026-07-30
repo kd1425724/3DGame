@@ -23,30 +23,46 @@ void Enemy::DrawDebug()
 
 void Enemy::Init()
 {
-	// 【2026/07/29】立方体(Block.gltf)のテスト実装から、リグ付きの戦闘メカへ差し替えた。
+	// 【2026/07/30】戦闘メカ(W9231)から、暫定でテスト用の立方体へ戻した。
+	// メカが出現した瞬間に画面がかくつくため(ユーザー報告)、敵の見た目は
+	// 「石のゴーレム」へ差し替える方針が決まっている間の仮置きとして立方体に据える。
+	// メカのアセット(Asset/Models/Character/W9231Mech/)は消していないので、
+	// 下のコメントを入れ替えればいつでも戻せる。
+	SetAsset("Asset/Models/Test/Block/Block.gltf");
+
+	// 他のオブジェクトと見分けが付くように赤色にする
+	m_color = kRedColor;
+
+	// Playerと同じ比率で縮小
+	SetScale(Math::Vector3(0.5f, 0.5f, 0.5f));
+
+	// --- 戦闘メカ(W9231)を使う場合の設定。戻すときはここを有効にして上の3行を消す ---
 	// 部位破壊の題材として選んだモデル。骨が Arm_L / Minigun_L / Camera / Top_Leg_L … と
 	// 最初から機械の部位で分かれており、部位ごとの当たり判定を骨に追従させやすい。
 	// ライセンスは CC BY 4.0(作者クレジット必須) → THIRD_PARTY_LICENSES.txt
-	SetAsset("Asset/Models/Character/W9231Mech/W9231Mech.gltf");
-
+	// あわせて Enemy.h の m_hitRadius を 0.6 → 1.8 に戻すこと(幅3.77×奥行3.00の実測から)。
+	//SetAsset("Asset/Models/Character/W9231Mech/W9231Mech.gltf");
+	//
 	// 実寸モデルなので等倍。原点は足元にある(実測 足元Z=0.018)
-	SetScale(Math::Vector3::One);
-	m_modelOriginIsFeet = true;
-
+	//SetScale(Math::Vector3::One);
+	//m_modelOriginIsFeet = true;
+	//
 	// 高さの実測値。スキン変形を計算して求めた値(幅3.764 × 高さ4.368 × 奥行3.000)。
 	// 【罠】このモデルの生の頂点座標は±19000という巨大な値で、スキン変形で初めて
 	//   正しい位置に戻る。頂点座標をそのまま測ると桁が違う値が出るので必ず変形後を見ること。
 	// GetBodyHalfHeight()経由で接地・天井・壁の判定が足元と頭の位置を出すのに使う
-	m_bodyHeight = 4.37f;
-
+	//m_bodyHeight = 4.37f;
+	//
 	// 正面は +Z。実機で見て確定させた(2026/07/29)。
 	// 【罠】glTFのデータ上ではセンサー(Camera_08)が -Z 側にあるので -Z が正面に見える。
 	//   しかしローダーは頂点の z を反転する(KdGLTFLoader.cpp:501 の `* -1`)ため、
 	//   glTFの -Z はエンジンでは +Z になる。
 	//   データから推論すると必ず逆になるので、この値は実機で見て決めること。
-	m_modelForwardIsMinusZ = false;
+	//m_modelForwardIsMinusZ = false;
 
-	// ※ 当たり判定(KdCollider)は登録しない。
+	// ※ 当たり判定(KdCollider)は登録しない。立方体へ戻す際も復活させていない。
+	//   理由は下記①のとおり「登録しても誰も問い合わせていなかった」ため、
+	//   戻すと動かないコードが復活するだけになる。
 	//   ①以前登録していた "EnemyDamage"(TypeDamage)は Src/Application 全体で
 	//     誰も問い合わせていなかった(実際の命中判定はPlayer側の距離チェック)
 	//   ②部位破壊の判定は【骨のワールド座標から毎フレーム球を作る自前計算】で行う。
@@ -170,16 +186,15 @@ void Enemy::Update()
 	}
 	}
 
-	// 見た目：状態で色を変えて攻撃を予告する(黄=予備動作 / 明るい赤=突進)。
-	// 【2026/07/29】通常時は赤ではなく白(=色味を掛けない)にした。
-	//   立方体だった頃は「他と見分けるため」赤くしていたが、実物のメカは
-	//   暗い金属＋発光部で見た目が成立しているので、赤く染めると台無しになる。
-	//   予備動作と突進の色は攻撃の予告として機能するので残す
+	// 見た目：状態で色を変えて攻撃を予告する(黄=予備動作 / 明るい赤=突進 / 通常=赤)。
+	// 【2026/07/30】立方体へ戻したので通常時も赤に戻した。
+	//   メカを使う場合はここを kWhiteColor にすること(暗い金属＋発光部で見た目が
+	//   成立しているモデルを赤く染めると台無しになるため)。
 	switch (m_state)
 	{
 	case State::Windup: m_color = Math::Color(1.0f, 0.9f, 0.2f, 1.0f); break;
 	case State::Strike: m_color = Math::Color(1.0f, 0.35f, 0.2f, 1.0f); break;
-	default:            m_color = kWhiteColor; break;
+	default:            m_color = kRedColor; break;
 	}
 }
 
