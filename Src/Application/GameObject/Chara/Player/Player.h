@@ -83,6 +83,8 @@ private:
 	void ClampSpeed();
 	// 加速中の噴射エフェクトを出す(時間あたりの個数で制御するのでフレームレートに依らない)
 	void SpawnBoostFx(const Math::Vector3& _dir, float _dt);
+	// フックが着弾した瞬間の火花を出す。刺さった手応えを見せるためのもの
+	void SpawnWireImpactFx(const WireAction& _wire);
 	// 噴射エフェクトの発生位置(体の中心あたりから加速方向の少し後ろ)
 	Math::Vector3 GetBoostSpawnPos(const Math::Vector3& _dir) const;
 	// 左クリックが「攻撃」か「ワイヤー」かを判定する。

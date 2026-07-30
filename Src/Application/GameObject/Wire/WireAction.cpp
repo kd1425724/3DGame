@@ -9,6 +9,10 @@
 
 namespace
 {
+	// 線を分ける節の上限。100mのワイヤーで節が増えすぎないようにするための頭打ち。
+	// 2本掛けなので実際の板ポリ数はこの2倍まで
+	constexpr int kMaxWireSegments = 64;
+
 	// フックが着弾するまでの所要時間(秒)を、撃った距離から決める。
 	//
 	// 【なぜ距離に比例させたうえで上限を掛けるのか】
@@ -37,12 +41,21 @@ namespace
 // ここ(完全な型が見える.cpp)で行うため、ctor/dtorを定義する
 WireAction::WireAction()
 {
-	// 白テクスチャを土台に、描画時に水色＋発光を乗せる。軸(ワイヤー方向)固定ビルボード。
-	// テクスチャはKdAssetsのキャッシュから取り、板ポリに渡す
-	std::shared_ptr<KdTexture> spTex = KdAssets::Instance().m_textures.GetData("Asset/Textures/System/WhiteNoise.png");
+	// 撚った鋼のケーブルのテクスチャ。軸(ワイヤー方向)固定ビルボード。
+	// ※ 以前は System/WhiteNoise.png を流用していたが、あれはノイズ画像でアルファも無く、
+	//   「光る棒」にしか見えなかった(BoostEffectでも同じ理由で捨てられているテクスチャ)。
+	//   Wire.png は幅方向に中心が明るく端が透明で、平らな板を丸いケーブルに見せる。
+	//   生成は Desktop\Cloude\Project\3DGame\TextureGen\Recipes\Wire.ps1
+	std::shared_ptr<KdTexture> spTex = KdAssets::Instance().m_textures.GetData("Asset/Textures/Effect/Wire.png");
 	m_upPoly = std::make_unique<KdSquarePolygon>(spTex);
 	m_upPoly->Set2DObject(false);
 	m_upPoly->SetBillboardMode(KdPolygon::BillboardMode::eAxis);
+
+	// 先端のフック(3本爪)。こちらも軸固定にして、爪が進行方向(アンカー側)を向くようにする
+	std::shared_ptr<KdTexture> spHookTex = KdAssets::Instance().m_textures.GetData("Asset/Textures/Effect/WireHook.png");
+	m_upHookPoly = std::make_unique<KdSquarePolygon>(spHookTex);
+	m_upHookPoly->Set2DObject(false);
+	m_upHookPoly->SetBillboardMode(KdPolygon::BillboardMode::eAxis);
 }
 
 WireAction::~WireAction() = default;
@@ -370,29 +383,132 @@ void WireAction::UpdateSwingAll(CharaBase& _body, float _dt, const Math::Vector2
 	_body.SetPos(pos);
 }
 
-void WireAction::Draw(const Math::Vector3& _from, const Math::Vector3& _to)
+void WireAction::DrawSegment(const Math::Vector3& _from, const Math::Vector3& _to,
+	float _thickness, const Math::Color& _col, const Math::Vector3& _emissive)
 {
-	if (!m_upPoly) { return; }
-
 	// 軸(=ワイヤー方向)と長さ
 	Math::Vector3 axis = _to - _from;
 	float length = axis.Length();
 	if (length < 0.001f) { return; }   // 長さ0は描けない
 	axis /= length;
 
-	// 板の寸法(幅=太さ / 高さ=ワイヤー長)。太さはDebugParamsで調整
-	float thickness = DebugParams::Instance().Float(U8("ワイヤー/見た目の太さ"), 0.08f, 0.01f, 1.0f);
-	m_upPoly->SetScale(Math::Vector2(thickness, length));
+	// 板の寸法(幅=太さ / 高さ=この節の長さ)
+	m_upPoly->SetScale(Math::Vector2(_thickness, length));
 
 	// 軸(Y=ワイヤー方向)と中点だけ入れる。面をカメラへ向ける計算はeAxisビルボードでDrawPolygonが行う
 	Math::Matrix world = Math::Matrix::Identity;
 	world.Up(axis);
 	world.Translation((_from + _to) * 0.5f);
 
-	// 発光っぽい水色のワイヤーとして描く(DrawPolygonはCullNoneなので裏表は気にしなくてよい)
-	Math::Color   col(0.4f, 0.85f, 1.0f, 1.0f);
-	Math::Vector3 emissive(0.1f, 0.4f, 0.7f);
-	KdShaderManager::Instance().m_StandardShader.DrawPolygon(*m_upPoly, world, col, emissive);
+	// ※ 調整値は呼び出し側(Draw)で1回だけ読んで渡している。
+	//   ここで読むと節の数だけ文字列キーの検索が走る(最大64節×2本)ので、外に出した
+	KdShaderManager::Instance().m_StandardShader.DrawPolygon(*m_upPoly, world, _col, _emissive);
+}
+
+void WireAction::Draw(const Math::Vector3& _from, const Math::Vector3& _to)
+{
+	if (!m_upPoly) { return; }
+
+	Math::Vector3 span = _to - _from;
+	float length = span.Length();
+	if (length < 0.001f) { return; }
+
+	// 節の数は長さから決める。模様の間隔(1節ぶんの長さ)を基準にするので、
+	// 長いワイヤーほど節が増え、撚りの密度が距離によらず一定に見える。
+	// 上限を切ってあるのは、100mのワイヤーで節が増えすぎないようにするため
+	// (上限に当たると模様は引き伸ばされるが、その距離では見分けが付かない)
+	float tile = DebugParams::Instance().Float(U8("ワイヤー/模様の間隔"), 1.0f, 0.1f, 10.0f);
+	int segments = (int)std::ceil(length / tile);
+	segments = std::clamp(segments, 1, kMaxWireSegments);
+
+	// たわみ量。張っているときは0＝真っ直ぐで、緩んでいるほど垂れる。
+	//
+	// 【なぜ張り具合から出すのか】
+	//   ピンと張った紐は直線になる。拘束が効いている間は実距離がワイヤー長に等しいので
+	//   自動的に0になり、巻き取り中も張るので垂れない。プレイヤーが球の内側にいる
+	//   (＝ワイヤーが余っている)ときだけ垂れる。見た目が状態を語ってくれる
+	//
+	// 飛行中は垂らさない。射出は真っ直ぐ伸びるほうが「撃った」に見えるため
+	float sag = 0.0f;
+	if (m_isAttached && m_length > 0.001f)
+	{
+		float slack = 1.0f - std::clamp(length / m_length, 0.0f, 1.0f);
+
+		// 【死帯を入れる理由】m_lengthは「体の中心」からアンカーまでの距離だが、
+		//   線は腰の射出口から引く。射出口は体の中心から0.2mほどずれているので、
+		//   ピンと張っていても両者は完全に一致しない。死帯を入れないと、
+		//   張っている間ずっとわずかに垂れ続けてしまう
+		constexpr float kSlackDeadZone = 0.02f;
+		if (slack < kSlackDeadZone)
+		{
+			slack = 0.0f;
+		}
+
+		float sagScale = DebugParams::Instance().Float(U8("ワイヤー/たわみ"), 0.6f, 0.0f, 5.0f);
+
+		// 垂れ幅は長さに比例させる(短いワイヤーが大きく垂れると不自然)
+		sag = slack * sagScale * length;
+	}
+
+	// 調整値と色はここで1回だけ読む(節ごとに読むと文字列キーの検索が節の数だけ走る)。
+	// ※ テクスチャ側をほぼ無彩色にしてあるので、色味の決定権はここにある。
+	//   以前の水色(0.4,0.85,1.0)＋強い発光は「エネルギーの線」に見えていたので、
+	//   鋼のケーブルとして既定を淡くした
+	float thickness = DebugParams::Instance().Float(U8("ワイヤー/見た目の太さ"), 0.08f, 0.01f, 1.0f);
+	Math::Vector3& tint = DebugParams::Instance().Vector3Param(U8("ワイヤー/色"), Math::Vector3(0.78f, 0.86f, 0.95f));
+	float emi = DebugParams::Instance().Float(U8("ワイヤー/発光の強さ"), 0.12f, 0.0f, 1.0f);
+
+	Math::Color   col(tint.x, tint.y, tint.z, 1.0f);
+	Math::Vector3 emissive(tint.x * emi, tint.y * emi, tint.z * emi);
+
+	// 節ごとに、始点と終点を放物線でずらしながら描く。
+	// 4*t*(1-t) は t=0,1 で0・t=0.5で1になるので、両端を動かさずに中央だけ垂らせる
+	auto pointAt = [&](float _t) -> Math::Vector3
+		{
+			Math::Vector3 p = _from + span * _t;
+			if (sag > 0.0f)
+			{
+				p.y -= sag * 4.0f * _t * (1.0f - _t);
+			}
+			return p;
+		};
+
+	for (int i = 0; i < segments; ++i)
+	{
+		float t0 = (float)i / segments;
+		float t1 = (float)(i + 1) / segments;
+		DrawSegment(pointAt(t0), pointAt(t1), thickness, col, emissive);
+	}
+}
+
+void WireAction::DrawHook(const Math::Vector3& _from)
+{
+	if (!m_upHookPoly || !IsActive()) { return; }
+
+	Math::Vector3 hookPos = GetHookPos();
+
+	// 爪をアンカー側へ向ける。テクスチャは上が爪・下が柄なので、板の+Yを進行方向に合わせる。
+	// ※ 向きが逆(爪がプレイヤー側を向く)なら axis を反転すればよい。
+	//   UVの上下の対応は実機で見ないと確定できないので、そこは目で確認する
+	Math::Vector3 axis = hookPos - _from;
+	if (!MathAPI::TryNormalize(axis))
+	{
+		axis = Math::Vector3::Up;   // 射出口とフックが同じ位置＝向きが決まらないときの逃げ
+	}
+
+	float size = DebugParams::Instance().Float(U8("ワイヤー/フックの大きさ"), 0.5f, 0.05f, 3.0f);
+	m_upHookPoly->SetScale(Math::Vector2(size, size));
+
+	Math::Matrix world = Math::Matrix::Identity;
+	world.Up(axis);
+	world.Translation(hookPos);
+
+	Math::Vector3& tint = DebugParams::Instance().Vector3Param(U8("ワイヤー/色"), Math::Vector3(0.78f, 0.86f, 0.95f));
+	float emi = DebugParams::Instance().Float(U8("ワイヤー/発光の強さ"), 0.12f, 0.0f, 1.0f);
+
+	Math::Color   col(tint.x, tint.y, tint.z, 1.0f);
+	Math::Vector3 emissive(tint.x * emi, tint.y * emi, tint.z * emi);
+	KdShaderManager::Instance().m_StandardShader.DrawPolygon(*m_upHookPoly, world, col, emissive);
 }
 
 
@@ -478,12 +594,12 @@ bool WireAction::Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, fl
 	return true;
 }
 
-void WireAction::UpdateFlight(const Math::Vector3& _bodyPos, float _dt)
+bool WireAction::UpdateFlight(const Math::Vector3& _bodyPos, float _dt)
 {
-	if (!m_isFlying) { return; }
+	if (!m_isFlying) { return false; }
 
 	m_flightTime += _dt;
-	if (m_flightTime < m_flightDuration) { return; }
+	if (m_flightTime < m_flightDuration) { return false; }
 
 	// --- 着弾。ここで初めて拘束を張る ---
 	m_isFlying = false;
@@ -501,6 +617,8 @@ void WireAction::UpdateFlight(const Math::Vector3& _bodyPos, float _dt)
 	//   最大長を超えうるが、丸めると実距離より短い拘束になり、それがまさに
 	//   瞬間移動の原因になる。合体処理と同じ考え方で、上限のほうを広げる
 	m_maxLength = m_length;
+
+	return true;   // このフレームで着弾した(呼び出し側が火花を出す)
 }
 
 Math::Vector3 WireAction::GetHookPos() const
