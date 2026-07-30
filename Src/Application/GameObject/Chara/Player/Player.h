@@ -214,7 +214,7 @@ private:
 	std::weak_ptr<KdGameObject> m_wpDiveTarget;
 
 	// ワイヤー(物理＋見た目を内包)。立体機動装置に合わせて腰の左右から2本。
-	// ※ 添字0=左 / 1=右。まだ発射は0番のみ(2本目の射出は次の段階で入れる)
+	// ※ 添字0=左 / 1=右。2本同時に撃つ(DebugFlags「ワイヤー/2本掛け」でOFFにすると0番のみ)
 	static constexpr int kWireCount = 2;
 	std::array<std::unique_ptr<WireAction>, kWireCount> m_upWires;
 

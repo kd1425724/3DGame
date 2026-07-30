@@ -111,6 +111,15 @@ void Player::Update()
 	// ワイヤーの発射/解除(入力・狙いはPlayer側。スイング物理はWireActionに委譲)
 	UpdateWireInput();
 
+	// 発射したフックの飛行を進める(着弾したらここで拘束が始まる)。
+	// ※ 下の「ワイヤー中か」の分岐より前に置くこと。後ろに置くと、着弾したフレームの
+	//   スイングが1フレーム遅れる。またWireAction::UpdateSwingAllは繋がっている
+	//   ワイヤーが無いと即returnするので、飛行の進行をそこに混ぜることはできない
+	for (const std::unique_ptr<WireAction>& w : m_upWires)
+	{
+		if (w) { w->UpdateFlight(GetPos(), dt); }
+	}
+
 	// 加速/空中ステップ(右クリック)。ワイヤー中でも使えるよう、ワイヤー分岐より前で処理する
 	UpdateAccel(dt);
 
@@ -886,6 +895,17 @@ void Player::StartDive()
 	// 壁を走りながらでも攻撃に移れるように、壁走りは中断する(重力も戻る)
 	m_upWall->Cancel(*this);
 
+	// 飛行中／接続中のワイヤーは畳んでおく。
+	// 【なぜ現状これが空振りでも入れておくのか】
+	//   左クリックは「押す→離す→押す」の順しか踏めず、離した時点で
+	//   UpdateWireInput が ReleaseAllWires を呼ぶので、ここに来る時点で
+	//   ワイヤーは既に外れている。つまり今は到達しない。
+	//   ただし「突撃中にワイヤーが着弾する」と、Update内でワイヤー分岐が
+	//   UpdateDive より先に return するため突撃が止まったまま固まる。
+	//   その不変条件を離れた場所(入力の押し離し順)に頼りたくないので、
+	//   突撃を始める側で明示的に畳んでおく
+	ReleaseAllWires();
+
 	m_isDiving = true;
 	m_comboWindowTimer = 0.0f;
 
@@ -1313,18 +1333,19 @@ Math::Vector3 Player::GetWireMuzzlePos(int _index) const
 
 void Player::DrawWire()
 {
-	// スイング中：繋がっている本数ぶん、それぞれの射出口からアンカーへ線を引く
-	if (IsAnyWireAttached())
+	// 発射中／スイング中：本数ぶん、それぞれの射出口からフック先端へ線を引く。
+	// 終点にアンカーではなく GetHookPos() を使うのは、着弾前は線が伸びていく途中だから。
+	// 着弾後は GetHookPos() がアンカーそのものを返すので、同じ経路で描ける
+	bool anyActive = false;
+	for (int i = 0; i < kWireCount; ++i)
 	{
-		for (int i = 0; i < kWireCount; ++i)
-		{
-			const std::unique_ptr<WireAction>& w = m_upWires[i];
-			if (!w || !w->IsAttached()) { continue; }
+		const std::unique_ptr<WireAction>& w = m_upWires[i];
+		if (!w || !w->IsActive()) { continue; }
 
-			w->Draw(GetWireMuzzlePos(i), w->GetAnchor());
-		}
-		return;
+		anyActive = true;
+		w->Draw(GetWireMuzzlePos(i), w->GetHookPos());
 	}
+	if (anyActive) { return; }
 
 	// 突撃(グラップル)中：引き寄せている対象へ線を引く(1本でよい)
 	if (m_isDiving)
