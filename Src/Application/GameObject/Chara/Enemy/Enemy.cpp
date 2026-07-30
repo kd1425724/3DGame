@@ -7,6 +7,10 @@
 #include "../../../Debug/DebugDraw/DebugDraw.h"
 #include "../Player/Player.h"   // 突進命中時にPlayerの無敵判定/反撃通知/ノックバックを呼ぶため
 
+// 【部位破壊調査(一時)】DumpModelDiagnostics で一時ファイルへ書き出すため
+#include <filesystem>
+#include <fstream>
+
 DebugDraw::Category Enemy::GetDebugCategory() const
 {
 	return DebugDraw::Category::Enemy;
@@ -56,6 +60,73 @@ void Enemy::Init()
 	//     そのまま当たり判定メッシュになる(KdModel.cpp:107-110のフォールバック)
 }
 
+// ===== 部位破壊調査(一時) =====
+// メカが画面に出ない。glTF側はスキン変形後の位置・向き・大きさすべて正常と確認済みなので、
+// エンジンから見てモデルがどう見えているかを実際に書き出して切り分ける。
+// 原因が判明したら "部位破壊調査" で grep して削除する。
+void Enemy::DumpModelDiagnostics() const
+{
+	static bool s_done = false;
+	if (s_done) { return; }
+	s_done = true;
+
+	std::filesystem::path out = std::filesystem::temp_directory_path() / "mech_diag.txt";
+	std::ofstream f(out);
+	if (!f) { return; }
+
+	f << "[部位破壊調査] エンジンから見たメカのモデル\n";
+	f << "IsEnable        = " << (m_modelWork.IsEnable() ? "true" : "false") << "\n";
+
+	const std::shared_ptr<KdModelData> data = m_modelWork.GetData();
+	f << "GetData()       = " << (data ? "あり" : "null(=読み込み失敗)") << "\n";
+	if (!data)
+	{
+		f << "→ モデルの読み込み自体が失敗している\n";
+		return;
+	}
+
+	f << "全ノード数      = " << data->GetOriginalNodes().size() << "\n";
+	f << "描画ノード数    = " << data->GetDrawMeshNodeIndices().size() << "\n";
+	f << "当たりノード数  = " << data->GetCollisionMeshNodeIndices().size() << "\n";
+	f << "ボーン数        = " << data->GetBoneNodeIndices().size() << "\n";
+	f << "IsSkinMesh      = " << (data->IsSkinMesh() ? "true" : "false") << "\n";
+	f << "マテリアル数    = " << data->GetMaterials().size() << "\n";
+
+	// 描画ノードごとに、メッシュがあるか・三角形数・境界球を出す。
+	// 境界球の中心と半径が桁違いなら、頂点データの解釈がずれている
+	for (int idx : data->GetDrawMeshNodeIndices())
+	{
+		const KdModelData::Node& n = data->GetOriginalNodes()[idx];
+		f << "  node[" << idx << "] name=" << n.m_name
+		  << " mesh=" << (n.m_spMesh ? "あり" : "null")
+		  << " isSkin=" << (n.m_isSkinMesh ? "true" : "false");
+		if (n.m_spMesh)
+		{
+			const DirectX::BoundingSphere& bs = n.m_spMesh->GetBoundingSphere();
+			f << " 面数=" << n.m_spMesh->GetFaces().size()
+			  << " 境界球中心=(" << bs.Center.x << ", " << bs.Center.y << ", " << bs.Center.z << ")"
+			  << " 半径=" << bs.Radius;
+		}
+		f << "\n";
+	}
+
+	// ボーンのワールド座標(部位判定の前提。体の付近に来ていないと使えない)
+	for (const char* boneName : { "Root_01", "Camera_08", "Arm_L_02", "Top_Leg_L_09" })
+	{
+		const KdModelWork::Node* node = m_modelWork.FindNode(boneName);
+		if (!node)
+		{
+			f << "  bone " << boneName << " = 見つからない\n";
+			continue;
+		}
+		const Math::Vector3 t = node->m_worldTransform.Translation();
+		f << "  bone " << boneName << " モデル空間=(" << t.x << ", " << t.y << ", " << t.z << ")\n";
+	}
+
+	f << "敵の位置        = (" << GetPos().x << ", " << GetPos().y << ", " << GetPos().z << ")\n";
+	f << "m_bodyHeight    = " << m_bodyHeight << "\n";
+}
+
 void Enemy::OnHit(KdGameObject* /*_other*/)
 {
 	// 攻撃に当たったら消滅する
@@ -64,6 +135,9 @@ void Enemy::OnHit(KdGameObject* /*_other*/)
 
 void Enemy::Update()
 {
+	// 【部位破壊調査(一時)】初回だけモデルの状態を一時ファイルへ書き出す
+	DumpModelDiagnostics();
+
 	// 追従対象が未設定なら、シーン内のPlayerを自動で探す
 	// (レベルエディタ配置など、外部からSetTarget()を呼ばれない経路のため)
 	// ※ Init()の時点ではSceneManagerのシングルトン初期化(=GameScene::Init())が
