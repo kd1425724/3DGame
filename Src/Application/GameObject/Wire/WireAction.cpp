@@ -35,6 +35,17 @@ namespace
 
 		return std::min(_dist / speed, cap);
 	}
+
+	// フックが射出口へ帰るまでの所要時間(秒)。射出と同じ「距離÷速さ、上限でクランプ」。
+	// 帰りを射出より速くしてあるのは、外した後の操作を待たせたくないため
+	// (巻き戻しは見た目だけなので操作は止まらないが、線が長く残ると鈍く見える)
+	float RetractDuration(float _dist)
+	{
+		float speed = DebugParams::Instance().Float(U8("ワイヤー/巻き戻し速度"), 250.0f, 10.0f, 1000.0f);
+		float cap   = DebugParams::Instance().Float(U8("ワイヤー/巻き戻し時間の上限"), 0.25f, 0.0f, 1.0f);
+
+		return std::min(_dist / speed, cap);
+	}
 }
 
 // 見た目の板ポリ(KdSquarePolygon)はPch経由で見える。unique_ptr(前方宣言)の生成/破棄を
@@ -483,18 +494,22 @@ void WireAction::Draw(const Math::Vector3& _from, const Math::Vector3& _to)
 
 void WireAction::DrawHook(const Math::Vector3& _from)
 {
-	if (!m_upHookPoly || !IsActive()) { return; }
+	if (!m_upHookPoly || !IsVisible()) { return; }
 
 	Math::Vector3 hookPos = GetHookPos();
 
-	// 爪をアンカー側へ向ける。テクスチャは上が爪・下が柄なので、板の+Yを進行方向に合わせる。
-	// ※ 向きが逆(爪がプレイヤー側を向く)なら axis を反転すればよい。
-	//   UVの上下の対応は実機で見ないと確定できないので、そこは目で確認する
+	// 爪をアンカー側へ向ける。テクスチャは上が爪・下が柄なので、板の+Yを進行方向に合わせる
+	// (向きが正しいことは2026/07/30に実機で確認済み)
 	Math::Vector3 axis = hookPos - _from;
-	if (!MathAPI::TryNormalize(axis))
-	{
-		axis = Math::Vector3::Up;   // 射出口とフックが同じ位置＝向きが決まらないときの逃げ
-	}
+
+	// 射出口とフックがほぼ重なっているときは描かない。
+	// 【なぜ必要か】巻き戻しの終わりぎわはフックが手元へ吸い込まれて距離が0に近づき、
+	//   向きが決まらなくなる。逃げの値(上向き)へ切り替わると1フレームだけ爪が
+	//   跳ねて見えるので、そもそも描かないほうが素直。手元にあるので隠れて困らない
+	constexpr float kMinHookDist = 0.05f;
+	if (axis.Length() < kMinHookDist) { return; }
+
+	if (!MathAPI::TryNormalize(axis)) { return; }
 
 	float size = DebugParams::Instance().Float(U8("ワイヤー/フックの大きさ"), 0.5f, 0.05f, 3.0f);
 	m_upHookPoly->SetScale(Math::Vector2(size, size));
@@ -585,21 +600,62 @@ bool WireAction::Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, fl
 	// ※ m_length / m_maxLength もここでは入れない。飛んでいる間もキャラは
 	//   重力と入力で動き続けるので、撃った瞬間の距離(dist)で拘束を張ると
 	//   着弾時にキャラが球の外にいる状態になり、引き込まれて瞬間移動する。
-	//   長さは着弾した瞬間の実距離で決める(UpdateFlight)
+	//   長さは着弾した瞬間の実距離で決める(UpdateHookMotion)
 	m_launchPos      = _from;
 	m_flightTime     = 0.0f;
 	m_flightDuration = FlightDuration(dist);
 	m_isFlying       = true;
 
+	// 描画が UpdateHookMotion より先に走っても破綻しないよう初期値を入れる
+	m_hookPos = _from;
+
 	return true;
 }
 
-bool WireAction::UpdateFlight(const Math::Vector3& _bodyPos, float _dt)
+bool WireAction::UpdateHookMotion(const Math::Vector3& _bodyPos, const Math::Vector3& _muzzlePos, float _dt)
 {
-	if (!m_isFlying) { return false; }
+	// --- 巻き戻し中(見た目だけ)。拘束は Release の時点で既に切れている ---
+	if (m_isRetracting)
+	{
+		m_retractTime += _dt;
+		if (m_retractTime >= m_retractDuration)
+		{
+			m_isRetracting = false;
+			m_hookPos = _muzzlePos;
+			return false;
+		}
+
+		float t = (m_retractDuration > 0.0f)
+			? std::clamp(m_retractTime / m_retractDuration, 0.0f, 1.0f)
+			: 1.0f;
+
+		// 帰る先は「今の」射出口。外した後もプレイヤーは飛び続けるので、
+		// 外した瞬間の射出口へ帰らせるとフックが体から離れた点に着いてしまう
+		m_hookPos = Math::Vector3::Lerp(m_retractFrom, _muzzlePos, t);
+		return false;
+	}
+
+	if (!m_isFlying)
+	{
+		// 繋がっている間はアンカーがそのまま先端
+		if (m_isAttached)
+		{
+			m_hookPos = m_anchor;
+		}
+		return false;
+	}
 
 	m_flightTime += _dt;
-	if (m_flightTime < m_flightDuration) { return false; }
+	if (m_flightTime < m_flightDuration)
+	{
+		// 射出点からアンカーへ等速で進む
+		float t = (m_flightDuration > 0.0f)
+			? std::clamp(m_flightTime / m_flightDuration, 0.0f, 1.0f)
+			: 1.0f;
+
+		m_hookPos = Math::Vector3::Lerp(m_launchPos, m_anchor, t);
+		return false;
+	}
 
 	// --- 着弾。ここで初めて拘束を張る ---
 	m_isFlying = false;
@@ -617,23 +673,34 @@ bool WireAction::UpdateFlight(const Math::Vector3& _bodyPos, float _dt)
 	//   最大長を超えうるが、丸めると実距離より短い拘束になり、それがまさに
 	//   瞬間移動の原因になる。合体処理と同じ考え方で、上限のほうを広げる
 	m_maxLength = m_length;
+	m_hookPos = m_anchor;
 
 	return true;   // このフレームで着弾した(呼び出し側が火花を出す)
 }
 
-Math::Vector3 WireAction::GetHookPos() const
+void WireAction::Release(bool _animate)
 {
-	if (!m_isFlying) { return m_anchor; }
+	// 巻き戻しを始めるかどうかは、外す【前】の状態で決める必要がある。
+	// 下で全部falseにしてしまうので、先に判定して位置と距離も控えておく
+	const bool startRetract = _animate && (m_isAttached || m_isFlying);
+	const Math::Vector3 retractFrom = m_hookPos;
 
-	// 射出点からアンカーへ等速で進む。飛行時間が0なら即アンカー(ゼロ除算も避ける)
-	if (m_flightDuration <= 0.0f) { return m_anchor; }
+	// 帰る距離＝フックから射出口まで。
+	// 【罠】ここで「フックからアンカーまで」を測ってはいけない。繋がっている間は
+	//   フックがアンカー上にあるので必ず0になり、巻き戻しが一瞬で終わってしまう
+	//   (最初そう書いて自分で踏んだ)。
+	//   繋がっているときは m_length(体からアンカーまで)がそのまま帰る距離。
+	//   飛行中はフックが射出点からどれだけ進んだかで代用する
+	float retractDist = 0.0f;
+	if (m_isAttached)
+	{
+		retractDist = m_length;
+	}
+	else if (m_isFlying)
+	{
+		retractDist = (m_hookPos - m_launchPos).Length();
+	}
 
-	float t = std::clamp(m_flightTime / m_flightDuration, 0.0f, 1.0f);
-	return Math::Vector3::Lerp(m_launchPos, m_anchor, t);
-}
-
-void WireAction::Release()
-{
 	m_isAttached = false;
 	m_occludedTime = 0.0f;   // 遮蔽デバウンスをリセット
 	m_hasMerged = false;     // 2本を1つの球にまとめた状態も破棄(次に揃ったとき作り直す)
@@ -644,6 +711,19 @@ void WireAction::Release()
 	m_isFlying = false;
 	m_flightTime = 0.0f;
 	m_flightDuration = 0.0f;
+
+	// 進行中の巻き戻しは一旦畳む(撃ち直しで Release が呼ばれた場合に残さないため)
+	m_isRetracting = false;
+	m_retractTime = 0.0f;
+	m_retractDuration = 0.0f;
+
+	if (!startRetract) { return; }
+
+	// フックが射出口へ帰る見た目を再生する。拘束はもう切れているので操作は止まらない。
+	// 位置は UpdateHookMotion が毎フレーム「今の射出口」へ向けて補間する
+	m_retractFrom = retractFrom;
+	m_retractDuration = RetractDuration(retractDist);
+	m_isRetracting = true;
 }
 
 bool WireAction::IsAttached() const
