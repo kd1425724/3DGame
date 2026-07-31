@@ -29,10 +29,10 @@ BoostEffect::BoostEffect(const Math::Vector3& _pos, const Math::Vector3& _vel)
 
 BoostEffect::~BoostEffect() = default;
 
-void BoostEffect::SetEmissiveOverride(const Math::Vector3& _emissive)
+void BoostEffect::SetColorOverride(const Math::Vector3& _color)
 {
-	m_emissiveOverride = _emissive;
-	m_hasEmissiveOverride = true;
+	m_colorOverride = _color;
+	m_hasColorOverride = true;
 }
 
 void BoostEffect::Update()
@@ -65,17 +65,23 @@ void BoostEffect::DrawUnLit()
 	Math::Matrix world = Math::Matrix::Identity;
 	world.Translation(m_pos);
 
-	// 【注意】このシェーダは発光色で最終色を"上書き"する
-	//   KdStandardShader_PS_Lit.hlsl:  outColor = 発光テクスチャ * g_Emissive * 頂点色
-	// つまり見た目の色を決めているのは基本色(col.rgb)ではなく emissive のほう。
-	// 最初 emissive を青寄り(0.25,0.5,0.7)にしていたため、col を白にしても
-	// 青い玉のままだった。色は emissive 側で調整すること
-	// 粒ごとの上書きがあればそれを使う。無ければ噴射ジェットの色。
-	// ※ 火花に流用したとき、上書きが無いとジェットと同じ淡い青白＝銀色になる
-	Math::Vector3 emissive = m_hasEmissiveOverride
-		? m_emissiveOverride
-		: DebugParams::Instance().Vector3Param(U8("加速エフェクト/発光色"), Math::Vector3(0.65f, 0.85f, 1.0f));
+	// 【2026/07/31 訂正】ここには以前「色を決めているのは基本色ではなく emissive のほう」
+	//   と書いてあったが、UnLitパスでは【誤り】だった。実測して確かめた事実：
+	//     ・KdStandardShader_PS_UnLit.hlsl は
+	//         outColor = 基本色テクスチャ * 頂点色 * g_BaseColor
+	//         if (g_OnlyEmissie) 上書き else 【加算】 発光テクスチャ * g_Emissive * 頂点色
+	//     ・g_OnlyEmissie は定義だけで【どこからも設定されておらず常に0】＝必ず加算になる
+	//     ・発光テクスチャは未設定なので白が入る(KdStandardShader.cpp の WriteMaterial)
+	//     ・Particle.png は【全ピクセルが純白(1,1,1)】で、形はアルファだけで作られている
+	//   つまり 白 + 発光色 は必ず1.0で飽和し、【発光色を何にしても白にしかならない】。
+	//   ジェットの色(0.65,0.85,1.0)もこれまで一度も効いていなかった。
+	//
+	//   正しい染め方は基本色(colRate)のほう。ここは基本色テクスチャに掛け算されるので、
+	//   純白のテクスチャがそのまま指定した色になる。発光は0にして飽和を避ける
+	Math::Vector3 tint = m_hasColorOverride
+		? m_colorOverride
+		: DebugParams::Instance().Vector3Param(U8("加速エフェクト/色"), Math::Vector3(1.0f, 1.0f, 1.0f));
 
-	Math::Color col(1.0f, 1.0f, 1.0f, alpha);
-	KdShaderManager::Instance().m_StandardShader.DrawPolygon(*pPoly, world, col, emissive);
+	Math::Color col(tint.x, tint.y, tint.z, alpha);
+	KdShaderManager::Instance().m_StandardShader.DrawPolygon(*pPoly, world, col, Math::Vector3::Zero);
 }

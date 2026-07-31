@@ -64,13 +64,14 @@ void EffectManager::SpawnWallRun(const Math::Vector3& _pos, const Math::Vector3&
 	std::shared_ptr<BoostEffect> spFx = std::make_shared<BoostEffect>(_pos + jitter, vel);
 
 	// 火花の色は噴射ジェットと分ける。
-	// 【なぜ分けるのか】粒はBoostEffect(噴射ジェット)の流用なので、色を指定しないと
-	//   ジェットと同じ淡い青白になり「銀色の火花」に見える(2026/07/30にユーザー指摘)。
-	//   金属が硬いものを擦る/噛む火花なので既定は橙。壁走りとワイヤーの着弾で共有する
-	//   (どちらも同じ現象なので見た目を分ける理由が無い)
+	// 【なぜ分けるのか】粒はBoostEffect(噴射ジェット)の流用なので、指定しないと
+	//   ジェットと同じ色になる。金属が硬いものを擦る/噛む火花なので既定は橙。
+	//   壁走りとワイヤーの着弾で共有する(どちらも同じ現象なので分ける理由が無い)
+	// ※ 「発光色」ではなく基本色として渡す。UnLitパスでは発光は加算で、
+	//   純白のParticle.pngに足しても飽和して白にしかならない → BoostEffect.cpp の訂正コメント
 	Math::Vector3& sparkColor = DebugParams::Instance().Vector3Param(
-		U8("火花/発光色"), Math::Vector3(1.0f, 0.55f, 0.15f));
-	spFx->SetEmissiveOverride(sparkColor);
+		U8("火花/色"), Math::Vector3(1.0f, 0.55f, 0.15f));
+	spFx->SetColorOverride(sparkColor);
 
 	Add(spFx);
 }
