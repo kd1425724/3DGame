@@ -115,11 +115,13 @@ void Player::Update()
 	// ※ 下の「ワイヤー中か」の分岐より前に置くこと。後ろに置くと、着弾したフレームの
 	//   スイングが1フレーム遅れる。またWireAction::UpdateSwingAllは繋がっている
 	//   ワイヤーが無いと即returnするので、飛行の進行をそこに混ぜることはできない
-	for (const std::unique_ptr<WireAction>& w : m_upWires)
+	for (int i = 0; i < kWireCount; ++i)
 	{
+		const std::unique_ptr<WireAction>& w = m_upWires[i];
 		if (!w) { continue; }
 
-		if (w->UpdateFlight(GetPos(), dt))
+		// 射出口を渡すのは、巻き戻し中のフックが「今の」手元へ帰ってくるようにするため
+		if (w->UpdateHookMotion(GetPos(), GetWireMuzzlePos(i), dt))
 		{
 			SpawnWireImpactFx(*w);
 		}
@@ -309,7 +311,9 @@ void Player::UpdateWireInput()
 	{
 		if (m_anchorPressWasWire)
 		{
-			ReleaseAllWires();
+			// 自分でボタンを離した時だけ、フックが手元へ帰る見た目を出す
+			// (自動リリースやリセットは即座に消す。→ WireAction::Release のコメント)
+			ReleaseAllWires(true);
 		}
 		m_anchorPressWasWire = false;
 	}
@@ -1222,11 +1226,11 @@ WireAction* Player::GetAttachedWire() const
 	return nullptr;
 }
 
-void Player::ReleaseAllWires()
+void Player::ReleaseAllWires(bool _animate)
 {
 	for (const std::unique_ptr<WireAction>& w : m_upWires)
 	{
-		if (w) { w->Release(); }
+		if (w) { w->Release(_animate); }
 	}
 }
 
@@ -1375,7 +1379,7 @@ void Player::DrawWire()
 	for (int i = 0; i < kWireCount; ++i)
 	{
 		const std::unique_ptr<WireAction>& w = m_upWires[i];
-		if (!w || !w->IsActive()) { continue; }
+		if (!w || !w->IsVisible()) { continue; }
 
 		anyActive = true;
 		Math::Vector3 muzzle = GetWireMuzzlePos(i);

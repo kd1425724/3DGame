@@ -227,8 +227,11 @@ private:
 	// 体の傾き・見た目の線・突撃の描画など「代表1本あればよい」場所が使う
 	WireAction* GetAttachedWire() const;
 
-	// 全ワイヤーを外す(リスポーンや状態リセット用)
-	void ReleaseAllWires();
+	// 全ワイヤーを外す(リスポーンや状態リセット用)。
+	//  _animate ... trueならフックが手元へ帰る見た目を出す。
+	//    既定falseにしているのは、自動リリース(壁の遮蔽)やリセットで演出を出すと
+	//    フックが壁を貫通して戻るなど不自然になるため。→ WireAction::Release
+	void ReleaseAllWires(bool _animate = false);
 
 	// ワイヤーの射出口(腰の左右)のワールド位置。_index 0=左 / 1=右。
 	// 立体機動装置は腰に付いているので、見た目の線はここから出す

@@ -29,6 +29,12 @@ BoostEffect::BoostEffect(const Math::Vector3& _pos, const Math::Vector3& _vel)
 
 BoostEffect::~BoostEffect() = default;
 
+void BoostEffect::SetEmissiveOverride(const Math::Vector3& _emissive)
+{
+	m_emissiveOverride = _emissive;
+	m_hasEmissiveOverride = true;
+}
+
 void BoostEffect::Update()
 {
 	float dt = Application::Instance().GetDeltaTime();
@@ -64,8 +70,11 @@ void BoostEffect::DrawUnLit()
 	// つまり見た目の色を決めているのは基本色(col.rgb)ではなく emissive のほう。
 	// 最初 emissive を青寄り(0.25,0.5,0.7)にしていたため、col を白にしても
 	// 青い玉のままだった。色は emissive 側で調整すること
-	Math::Vector3 emissive = DebugParams::Instance().Vector3Param(
-		U8("加速エフェクト/発光色"), Math::Vector3(0.65f, 0.85f, 1.0f));
+	// 粒ごとの上書きがあればそれを使う。無ければ噴射ジェットの色。
+	// ※ 火花に流用したとき、上書きが無いとジェットと同じ淡い青白＝銀色になる
+	Math::Vector3 emissive = m_hasEmissiveOverride
+		? m_emissiveOverride
+		: DebugParams::Instance().Vector3Param(U8("加速エフェクト/発光色"), Math::Vector3(0.65f, 0.85f, 1.0f));
 
 	Math::Color col(1.0f, 1.0f, 1.0f, alpha);
 	KdShaderManager::Instance().m_StandardShader.DrawPolygon(*pPoly, world, col, emissive);

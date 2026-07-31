@@ -85,27 +85,40 @@ public:
 	//   また、着弾したフレームにそのままスイングへ入れるよう、キャラ側の
 	//   「ワイヤー中か」の分岐より前に呼ぶこと
 	//
-	//  _bodyPos ... 現在のキャラの位置。着弾時のワイヤー長をここから決める
-	//  戻り値   ... このフレームで着弾したか(着弾の演出を出すのに使う)
-	bool UpdateFlight(const Math::Vector3& _bodyPos, float _dt);
+	//  _bodyPos   ... 現在のキャラの位置。着弾時のワイヤー長をここから決める
+	//  _muzzlePos ... 射出口。巻き戻し中はフックがここへ帰ってくる
+	//  戻り値     ... このフレームで着弾したか(着弾の演出を出すのに使う)
+	bool UpdateHookMotion(const Math::Vector3& _bodyPos, const Math::Vector3& _muzzlePos, float _dt);
 
 	// 撃った瞬間の射出点。着弾の火花を飛ばす向き(＝フックが進んだ向き)を出すのに使う
 	const Math::Vector3& GetLaunchPos() const { return m_launchPos; }
 
-	// ワイヤーを外す(拘束を解除する)。飛行中のフックも取り消す
-	void Release();
+	// ワイヤーを外す(拘束を解除する)。飛行中のフックも取り消す。
+	//  _animate ... trueならフックが射出口へ帰る見た目を再生する(拘束は即座に切れる)。
+	//
+	// 【既定をfalseにしている理由】
+	//   自動リリース(手元とアンカーの間が壁で遮られた場合)で演出を出すと、
+	//   フックが【壁を貫通して】戻ってくる。その遮蔽を避けるための機能なので本末転倒になる。
+	//   突撃への移行やリスポーンのリセットも、見た目を引きずらせたくないので即座に消す。
+	//   演出を出すのは「プレイヤーが自分でボタンを離した」時だけ
+	void Release(bool _animate = false);
 
 	// 今ワイヤーが繋がっているか
 	bool IsAttached() const;
 
-	// 飛行中(撃ったが、まだ着弾していない)か。見た目の線を引くかどうかの判断に使う
+	// 飛行中(撃ったが、まだ着弾していない)か
 	bool IsFlying() const { return m_isFlying; }
 
-	// 飛行中か繋がっているか(=見た目の線を描くべき状態か)
-	bool IsActive() const { return m_isFlying || m_isAttached; }
+	// 巻き戻し中(外れた後、フックが射出口へ帰る見た目を再生中)か。物理には一切影響しない
+	bool IsRetracting() const { return m_isRetracting; }
 
-	// フック先端の現在位置。飛行中は射出点からアンカーへの途中、着弾後はアンカーそのもの
-	Math::Vector3 GetHookPos() const;
+	// 見た目の線とフックを描くべき状態か。
+	// ※ 「拘束が効いているか」ではないので物理の判断には使わないこと(巻き戻し中も真になる)
+	bool IsVisible() const { return m_isFlying || m_isAttached || m_isRetracting; }
+
+	// フック先端の現在位置。飛行中は射出点からアンカーへの途中、着弾後はアンカー、
+	// 巻き戻し中は射出口へ帰る途中。UpdateHookMotionが毎フレーム決めた値を返す
+	const Math::Vector3& GetHookPos() const { return m_hookPos; }
 
 	// 毎フレームの拘束処理。_pos / _vel を拘束後の値に書き換える
 	//  _reelInput ... +1でたぐり寄せ(縮む) / -1で伸ばす / 0で維持
@@ -186,6 +199,19 @@ private:
 	// 撃った瞬間の射出口。フック先端はここからアンカーへ向かって進む。
 	// 射出口(手元)は毎フレーム動くが、フックが飛び始めた点は動かないので別に覚える
 	Math::Vector3 m_launchPos = {};
+
+	// --- 巻き戻し(外れた後、フックが射出口へ帰る見た目)。物理には一切影響しない ---
+	// 拘束は Release の時点で既に切れていて、ここで動かすのは見た目だけ
+	bool m_isRetracting = false;
+	float m_retractTime = 0.0f;
+	float m_retractDuration = 0.0f;
+
+	// 外れた瞬間のフックの位置。ここから射出口へ向かって帰る
+	Math::Vector3 m_retractFrom = {};
+
+	// フック先端の現在位置。飛行/接続/巻き戻しのどの状態かに応じて
+	// UpdateHookMotion が毎フレーム決める。描画側はこれを読むだけでよい
+	Math::Vector3 m_hookPos = {};
 
 	// ※ 自動離脱まわりの状態(m_releasePending / m_releasePendingTime / m_passedTime /
 	//    m_prevVelY / m_swingTime)は 2026/07/20 に撤去した(ユーザー指示)。
