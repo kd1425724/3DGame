@@ -24,13 +24,8 @@ public:
 	~BoostEffect() override;
 
 	// 色を粒ごとに上書きする(渡さなければ噴射ジェットの色をDebugParamsから読む)。
-	//
-	// 【なぜ必要になったか】
-	//   この粒は噴射ジェットとして作られたが、火花にも流用している。
-	//   色はDebugParams「加速エフェクト/発光色」を全粒で共有していたため、
-	//   火花もジェットと同じ淡い青白＝銀色に見えていた(ユーザー指摘)。
-	//   用途ごとに色を変えられるようにする
-	void SetEmissiveOverride(const Math::Vector3& _emissive);
+	// この粒は噴射ジェットとして作られたが、火花にも流用しているので用途ごとに色を変えたい
+	void SetColorOverride(const Math::Vector3& _color);
 
 	void Update() override;      // 流しながら経過を進め、寿命で m_isExpired = true
 	void DrawUnLit() override;   // 縮みながらフェードして描画
@@ -43,8 +38,8 @@ private:
 	float m_life = 0.35f;
 
 	// 色の上書き。未設定ならDebugParamsの噴射色を使う
-	bool m_hasEmissiveOverride = false;
-	Math::Vector3 m_emissiveOverride = {};
+	bool m_hasColorOverride = false;
+	Math::Vector3 m_colorOverride = {};
 
 	// 全BoostEffectで共有する板ポリ(初回描画時に生成)
 	static KdSquarePolygon* GetSharedPoly();
