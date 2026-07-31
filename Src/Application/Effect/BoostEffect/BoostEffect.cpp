@@ -2,6 +2,7 @@
 
 #include "../../main.h"   // Application::GetDeltaTime
 #include "../../Debug/DebugParams/DebugParams.h"
+#include "../../API/MathAPI/MathAPI.h"   // 火花の向き(速度)を正規化する
 
 // 共有の板ポリ実体。KdSquarePolygon(前方宣言)の破棄には完全な型が要るので.cpp側に置く
 std::unique_ptr<KdSquarePolygon> BoostEffect::s_upPolyJet;
@@ -12,12 +13,12 @@ KdSquarePolygon* BoostEffect::GetSharedPoly(Style _style)
 	// 初回だけ生成。用途ごとにテクスチャが違うので別々に持つ。
 	// ※ 最初はSystem/WhiteNoise.pngを流用したが、あれはノイズ画像でアルファも無く、
 	//    四角いノイズの塊がそのまま出て見た目が破綻したため専用テクスチャを用意した
-	auto make = [](const char* _path) -> std::unique_ptr<KdSquarePolygon>
+	auto make = [](const char* _path, KdPolygon::BillboardMode _mode) -> std::unique_ptr<KdSquarePolygon>
 		{
 			std::shared_ptr<KdTexture> spTex = KdAssets::Instance().m_textures.GetData(_path);
 			std::unique_ptr<KdSquarePolygon> up = std::make_unique<KdSquarePolygon>(spTex);
 			up->Set2DObject(false);
-			up->SetBillboardMode(KdPolygon::BillboardMode::eScreen);
+			up->SetBillboardMode(_mode);
 			return up;
 		};
 
@@ -29,16 +30,18 @@ KdSquarePolygon* BoostEffect::GetSharedPoly(Style _style)
 		//   中央しか色が乗らず、周りは背景の色のままに見える(2026/07/31にユーザー指摘)。
 		//   Spark.pngは可視部分の53%がアルファ0.9以上のべた塗りなので、色がそのまま出る。
 		//   生成は Cloude\Project\3DGame\TextureGen\Recipes\Spark.ps1
+		// 【軸固定ビルボード】にするのが要点。画面ビルボードだと筋が常に画面の上を向き、
+		// 進行方向と無関係になって「飛んでいる粒の残像」に見えない
 		if (!s_upPolySpark)
 		{
-			s_upPolySpark = make("Asset/Textures/Effect/Spark.png");
+			s_upPolySpark = make("Asset/Textures/Effect/Spark.png", KdPolygon::BillboardMode::eAxis);
 		}
 		return s_upPolySpark.get();
 	}
 
 	if (!s_upPolyJet)
 	{
-		s_upPolyJet = make("Asset/Textures/Effect/Particle.png");
+		s_upPolyJet = make("Asset/Textures/Effect/Particle.png", KdPolygon::BillboardMode::eScreen);
 	}
 	return s_upPolyJet.get();
 }
@@ -75,23 +78,50 @@ void BoostEffect::DrawUnLit()
 
 	const bool isSpark = (m_style == Style::Spark);
 
-	// 大きさと濃さも用途で分ける。
-	// 火花の濃さの既定を1.0にしてあるのは、半透明だと背景が透けて色が出ないため
+	// 濃さは用途で分ける。
+	// 火花の既定を1.0にしてあるのは、半透明だと背景が透けて色が出ないため
 	// (ジェットの0.6のままだと、テクスチャを硬くしても薄まって同じ問題が残る)
-	float baseSize = isSpark
-		? DebugParams::Instance().Float(U8("火花/サイズ"), 0.10f, 0.02f, 3.0f)
-		: DebugParams::Instance().Float(U8("加速エフェクト/サイズ"), 0.18f, 0.02f, 3.0f);
-
 	float density = isSpark
 		? DebugParams::Instance().Float(U8("火花/濃さ"), 1.0f, 0.05f, 1.0f)
 		: DebugParams::Instance().Float(U8("加速エフェクト/濃さ"), 0.6f, 0.05f, 1.0f);
 
 	float t = (m_life > 0.0f) ? (m_age / m_life) : 1.0f;   // 0→1
-	float size  = baseSize * (1.0f - 0.6f * t);            // だんだん縮む
+	float shrink = 1.0f - 0.6f * t;                        // だんだん縮む
 	float alpha = (1.0f - t) * density;                    // フェードアウト(全体の濃さも掛ける)
-	pPoly->SetScale(Math::Vector2(size, size));
 
 	Math::Matrix world = Math::Matrix::Identity;
+
+	if (isSpark)
+	{
+		// 【火花は丸い粒ではなく、進行方向に伸びた筋】
+		//   板を速度方向へ向け、細長い長方形として描く。
+		//   Spark.pngは上が頭・下が尾なので、板の+Yを速度方向に合わせると
+		//   頭が前を向いて尾が後ろに残る＝飛んでいる粒の残像に見える。
+		//   ※ 画面ビルボード(ジェットと同じ)のままだと、筋が常に画面の上を向いて
+		//     進行方向と無関係になり不自然。板ポリはスタイルごとに別なので、
+		//     火花用だけ軸固定ビルボードにしてある(GetSharedPoly)
+		float length  = DebugParams::Instance().Float(U8("火花/長さ"),   0.35f, 0.02f, 3.0f);
+		float width   = DebugParams::Instance().Float(U8("火花/太さ"),   0.05f, 0.005f, 1.0f);
+		float stretch = DebugParams::Instance().Float(U8("火花/速さで伸びる量"), 0.02f, 0.0f, 0.2f);
+
+		// 速い粒ほど長く尾を引く。これがあると「弾けて散った」感じが強くなる
+		float speed = m_vel.Length();
+		pPoly->SetScale(Math::Vector2(width * shrink, length * (1.0f + speed * stretch) * shrink));
+
+		Math::Vector3 axis = m_vel;
+		if (!MathAPI::TryNormalize(axis))
+		{
+			axis = Math::Vector3::Up;   // 速度0＝向きが決まらないときの逃げ
+		}
+		world.Up(axis);
+	}
+	else
+	{
+		float baseSize = DebugParams::Instance().Float(U8("加速エフェクト/サイズ"), 0.18f, 0.02f, 3.0f);
+		float size = baseSize * shrink;
+		pPoly->SetScale(Math::Vector2(size, size));
+	}
+
 	world.Translation(m_pos);
 
 	// 【2026/07/31 訂正】ここには以前「色を決めているのは基本色ではなく emissive のほう」
