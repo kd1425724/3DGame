@@ -18,6 +18,14 @@ public:
 	Enemy()				{}
 	~Enemy()	override	{}
 
+	// 敵のモデルのパス。Init と Preload が同じものを指すよう1箇所にまとめてある
+	static constexpr const char* kAssetPath = "Asset/Models/Character/StoneGolem/StoneGolem.gltf";
+
+	// モデルとテクスチャを先読みしてキャッシュへ載せる。シーンのInitから1回呼ぶ。
+	// 【なぜ要るか】最初の1体が出現した瞬間に読み込みが走って画面がかくつくため。
+	//   実機で「出た瞬間だけ」と確認できたので、描画コストではなく読み込みが原因
+	static void Preload();
+
 	void Init()			override;
 	void Update()		override;
 	void PostUpdate()	override;
