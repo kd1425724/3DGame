@@ -23,20 +23,36 @@ void Enemy::DrawDebug()
 
 void Enemy::Init()
 {
-	// 【2026/07/30】戦闘メカ(W9231)から、暫定でテスト用の立方体へ戻した。
-	// メカが出現した瞬間に画面がかくつくため(ユーザー報告)、敵の見た目は
-	// 「石のゴーレム」へ差し替える方針が決まっている間の仮置きとして立方体に据える。
-	// メカのアセット(Asset/Models/Character/W9231Mech/)は消していないので、
-	// 下のコメントを入れ替えればいつでも戻せる。
-	SetAsset("Asset/Models/Test/Block/Block.gltf");
+	// 【2026/07/31】敵の見た目を石のゴーレムにした。
+	// 画像生成 → Meshyで3D化＋テクスチャ → Mixamoで自動リグ、という経路で作った。
+	// 制作手順は Desktop\Cloude\Project\3DGame\Doc\Golem_Pipeline.md
+	// ライセンスは CC BY 4.0(Meshyのクレジット必須) → THIRD_PARTY_LICENSES.txt
+	SetAsset("Asset/Models/Character/StoneGolem/StoneGolem.gltf");
 
-	// 他のオブジェクトと見分けが付くように赤色にする
-	m_color = kRedColor;
+	// ※ m_modelOriginIsFeet は既定の false のまま。
+	//   このモデルの原点は【足元ではなく体の中心】(glTFの頂点Y範囲が -0.951〜+0.948)。
+	//   プレイヤーやメカ(原点＝足元)とは違うので、ここを true にすると半身ぶん沈む
 
-	// Playerと同じ比率で縮小
-	SetScale(Math::Vector3(0.5f, 0.5f, 0.5f));
+	// モデルの実寸は高さ1.899m。街の実測から導いた目標は12〜18mで、
+	// 「通りを移動できる幅15mが上限、その比率だと高さ17〜18mが限界」なので既定15m。
+	// 実機で回して決められるようDebugParamsに出してある(出現し直すと反映される)
+	float targetHeight = DebugParams::Instance().Float(U8("敵/身長"), 15.0f, 1.0f, 30.0f);
+	float modelHeight = 1.899f;
 
-	// --- 戦闘メカ(W9231)を使う場合の設定。戻すときはここを有効にして上の3行を消す ---
+	m_bodyHeight = modelHeight;
+	SetScale(Math::Vector3::One * (targetHeight / modelHeight));
+
+	// 体の当たり半径。モデルは幅1.221m(腕を広げた全幅)なので、
+	// 胴に寄せて身長の1/4程度を初期値にする。実機で見て詰める値
+	m_hitRadius = targetHeight * 0.25f;
+
+	// 🔴 正面が -Z か +Z かは【実機で見て決める】こと。
+	//   データや軸変換から推論すると必ず逆になる(過去に2回外している)。
+	//   Mixamoでリグしたキャラ(GogglesChara)は true だったので、それに倣って true から始める。
+	//   進行方向のちょうど逆を向いていたら false にする
+	m_modelForwardIsMinusZ = true;
+
+	// --- 戦闘メカ(W9231)を使う場合の設定。戻すときはここを有効にして上を消す ---
 	// 部位破壊の題材として選んだモデル。骨が Arm_L / Minigun_L / Camera / Top_Leg_L … と
 	// 最初から機械の部位で分かれており、部位ごとの当たり判定を骨に追従させやすい。
 	// ライセンスは CC BY 4.0(作者クレジット必須) → THIRD_PARTY_LICENSES.txt
@@ -186,15 +202,17 @@ void Enemy::Update()
 	}
 	}
 
-	// 見た目：状態で色を変えて攻撃を予告する(黄=予備動作 / 明るい赤=突進 / 通常=赤)。
-	// 【2026/07/30】立方体へ戻したので通常時も赤に戻した。
-	//   メカを使う場合はここを kWhiteColor にすること(暗い金属＋発光部で見た目が
-	//   成立しているモデルを赤く染めると台無しになるため)。
+	// 見た目：状態で色を変えて攻撃を予告する(黄=予備動作 / 明るい赤=突進)。
+	// 【2026/07/31】通常時は白(＝色味を掛けない)。
+	//   ここは基本色テクスチャへの【乗算】なので、赤を入れるとゴーレム全体が赤く染まって
+	//   苔も割れ目の光も台無しになる。立方体だった頃は見分けるために赤くしていたが、
+	//   テクスチャを持つモデルでは白のままにすること。
+	//   予備動作と突進の色は攻撃の予告として機能するので残す
 	switch (m_state)
 	{
 	case State::Windup: m_color = Math::Color(1.0f, 0.9f, 0.2f, 1.0f); break;
 	case State::Strike: m_color = Math::Color(1.0f, 0.35f, 0.2f, 1.0f); break;
-	default:            m_color = kRedColor; break;
+	default:            m_color = kWhiteColor; break;
 	}
 }
 
