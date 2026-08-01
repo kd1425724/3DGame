@@ -32,7 +32,8 @@ namespace MathAPI
 		return true;
 	}
 
-	float RotateToDirection(float _nowAngleDeg, const Math::Vector3& _toDir, float _maxAngleSpeedDeg)
+	float RotateToDirection(float _nowAngleDeg, const Math::Vector3& _toDir, float _maxAngleSpeedDeg,
+		bool _forwardIsMinusZ)
 	{
 		// 【2026/07/27 実装を差し替えた】
 		// 旧実装は「①現在角から向きベクトルを作る ②内積をacosに通してなす角を出す
@@ -49,7 +50,9 @@ namespace MathAPI
 		const Math::Vector3 dir = GetSafeNormalXZ(_toDir);
 		if (dir == Math::Vector3::Zero) { return _nowAngleDeg; }
 
-		const float targetDeg = DirToYawDeg(dir);
+		// 【罠】ここで _forwardIsMinusZ を渡し忘れると、常に「正面＝+Z」になり
+		//   モデルがずっと逆を向く。CharaBase::UpdateFacing と同じ扱いにすること
+		const float targetDeg = DirToYawDeg(dir, _forwardIsMinusZ);
 
 		// 最短方向へ、1回の上限まで詰めてから 0〜360 に収める
 		return ClampAngleDeg(MoveTowardsAngleDeg(_nowAngleDeg, targetDeg, _maxAngleSpeedDeg));
