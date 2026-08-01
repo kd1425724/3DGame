@@ -34,9 +34,10 @@ void Enemy::Init()
 	//   プレイヤーやメカ(原点＝足元)とは違うので、ここを true にすると半身ぶん沈む
 
 	// モデルの実寸は高さ1.899m。街の実測から導いた目標は12〜18mで、
-	// 「通りを移動できる幅15mが上限、その比率だと高さ17〜18mが限界」なので既定15m。
+	// 「通りを移動できる幅15mが上限、その比率だと高さ17〜18mが限界」。
+	// 【2026/07/31】実機で15mを見て「もっと大きくてよい」となったので上限側の18mへ。
 	// 実機で回して決められるようDebugParamsに出してある(出現し直すと反映される)
-	float targetHeight = DebugParams::Instance().Float(U8("敵/身長"), 15.0f, 1.0f, 30.0f);
+	float targetHeight = DebugParams::Instance().Float(U8("敵/身長"), 18.0f, 1.0f, 40.0f);
 	float modelHeight = 1.899f;
 
 	m_bodyHeight = modelHeight;
@@ -46,11 +47,11 @@ void Enemy::Init()
 	// 胴に寄せて身長の1/4程度を初期値にする。実機で見て詰める値
 	m_hitRadius = targetHeight * 0.25f;
 
-	// 🔴 正面が -Z か +Z かは【実機で見て決める】こと。
-	//   データや軸変換から推論すると必ず逆になる(過去に2回外している)。
-	//   Mixamoでリグしたキャラ(GogglesChara)は true だったので、それに倣って true から始める。
-	//   進行方向のちょうど逆を向いていたら false にする
-	m_modelForwardIsMinusZ = true;
+	// 正面は +Z。実機で見て確定させた(2026/07/31)。
+	// 🔴 ここは【実機で見て決める】以外に方法が無い。データや軸変換から推論すると必ず逆になる。
+	//   同じMixamoリグのGogglesCharaが -Z(true) だったので true から始めたが、実機では逆だった。
+	//   「同じ経路で作ったモデルなら同じ向き」も成り立たない、ということ
+	m_modelForwardIsMinusZ = false;
 
 	// --- 戦闘メカ(W9231)を使う場合の設定。戻すときはここを有効にして上を消す ---
 	// 部位破壊の題材として選んだモデル。骨が Arm_L / Minigun_L / Camera / Top_Leg_L … と

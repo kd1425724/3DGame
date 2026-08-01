@@ -1443,16 +1443,12 @@
 		{
 			"doubleSided":true,
 			"name":"StoneGolem",
-			"normalTexture":{
-				"index":0
-			},
 			"pbrMetallicRoughness":{
 				"baseColorTexture":{
-					"index":1
+					"index":0
 				},
-				"metallicRoughnessTexture":{
-					"index":2
-				}
+				"metallicFactor":0,
+				"roughnessFactor":0.8899999856948853
 			}
 		}
 	],
@@ -1478,31 +1474,13 @@
 		{
 			"sampler":0,
 			"source":0
-		},
-		{
-			"sampler":0,
-			"source":1
-		},
-		{
-			"sampler":0,
-			"source":2
 		}
 	],
 	"images":[
 		{
 			"mimeType":"image/png",
-			"name":"normal",
-			"uri":"normal.png"
-		},
-		{
-			"mimeType":"image/png",
 			"name":"base_color",
 			"uri":"base_color.png"
-		},
-		{
-			"mimeType":"image/png",
-			"name":"metallic_roughness",
-			"uri":"metallic_roughness.png"
 		}
 	],
 	"skins":[
