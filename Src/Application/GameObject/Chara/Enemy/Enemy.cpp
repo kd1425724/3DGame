@@ -50,9 +50,12 @@ void Enemy::Init()
 
 	// モデルの実寸は高さ1.899m。街の実測から導いた目標は12〜18mで、
 	// 「通りを移動できる幅15mが上限、その比率だと高さ17〜18mが限界」。
-	// 【2026/07/31】実機で15mを見て「もっと大きくてよい」となったので上限側の18mへ。
+	// 【2026/07/31】実機で15m→18mと上げたが、まだ「もっとでかく」とのことで25mへ。
+	// ※ 街の実測から導いた当初の上限は「幅15m＝通りを通れる限界、比率で高さ17〜18m」だった。
+	//   25mだと幅が約16mになり通りを通り抜けられない可能性がある。
+	//   実機で通行を確かめること(通れないなら18m前後へ戻す)
 	// 実機で回して決められるようDebugParamsに出してある(出現し直すと反映される)
-	float targetHeight = DebugParams::Instance().Float(U8("敵/身長"), 18.0f, 1.0f, 40.0f);
+	float targetHeight = DebugParams::Instance().Float(U8("敵/身長"), 25.0f, 1.0f, 60.0f);
 	float modelHeight = 1.899f;
 
 	m_bodyHeight = modelHeight;
@@ -62,11 +65,15 @@ void Enemy::Init()
 	// 胴に寄せて身長の1/4程度を初期値にする。実機で見て詰める値
 	m_hitRadius = targetHeight * 0.25f;
 
-	// 正面は +Z。実機で見て確定させた(2026/07/31)。
-	// 🔴 ここは【実機で見て決める】以外に方法が無い。データや軸変換から推論すると必ず逆になる。
-	//   同じMixamoリグのGogglesCharaが -Z(true) だったので true から始めたが、実機では逆だった。
-	//   「同じ経路で作ったモデルなら同じ向き」も成り立たない、ということ
-	m_modelForwardIsMinusZ = false;
+	// 正面は -Z。プレイヤー(GogglesChara)と同じ。
+	// 骨から測って確定させた: つま先の向きも左肩の向きもプレイヤーと完全に一致していた
+	// (foot→toe が両方とも -Y優勢、右肩→左肩が両方とも +X)。
+	//
+	// 【なぜ実機で2回「逆」に見えたか】フラグの値のせいではなく、
+	//   敵の旋回が MathAPI::RotateToDirection にこのフラグを【渡していなかった】ため。
+	//   常に「正面＝+Z」で計算されていたので、true/false どちらでも同じ見た目だった。
+	//   敵が対称な立方体だった頃は向きが見えないので露見していなかった
+	m_modelForwardIsMinusZ = true;
 
 	// --- 戦闘メカ(W9231)を使う場合の設定。戻すときはここを有効にして上を消す ---
 	// 部位破壊の題材として選んだモデル。骨が Arm_L / Minigun_L / Camera / Top_Leg_L … と
@@ -145,7 +152,9 @@ void Enemy::Update()
 	{
 		float turnSpeedDeg = DebugParams::Instance().Float(U8("敵/旋回速度"), 180.0f, 0.0f, 720.0f);
 		Math::Vector3 rot = GetRot();
-		rot.y = MathAPI::RotateToDirection(rot.y, dirToTarget, turnSpeedDeg * dt);
+		// 🔴 m_modelForwardIsMinusZ を必ず渡すこと。渡さないと既定の「正面＝+Z」で
+		//   計算され、モデルがずっと逆を向く(2026/07/31にこれで2回外した)
+		rot.y = MathAPI::RotateToDirection(rot.y, dirToTarget, turnSpeedDeg * dt, m_modelForwardIsMinusZ);
 		SetRot(rot);
 	};
 

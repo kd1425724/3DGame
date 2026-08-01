@@ -257,5 +257,11 @@ namespace MathAPI
 	// 最大_maxAngleSpeedDeg度/回まで回転させた新しい角度を返す(敵がプレイヤー方向を向く等に使用)
 	// ※ 中身は DirToYawDeg + MoveTowardsAngleDeg。CharaBase::UpdateFacing と同じ計算になった
 	//    (以前は「内積でなす角・外積のY成分で回転方向」という別実装だった。理由は .cpp のコメント)
-	float RotateToDirection(float _nowAngleDeg, const Math::Vector3& _toDir, float _maxAngleSpeedDeg);
+	// ※ _forwardIsMinusZ … モデルの正面が -Z を向いているか。DirToYawDeg と同じ意味。
+	//   【2026/07/31 追加】以前はこの引数が無く、常に「正面＝+Z」として計算していた。
+	//   そのため CharaBase::m_modelForwardIsMinusZ が敵にはまったく効かず、
+	//   モデルを差し替えたら【ずっと逆を向いたまま】になった(フラグを反転しても変わらない)。
+	//   敵が対称な立方体だった頃は向きが見えないので露見していなかった
+	float RotateToDirection(float _nowAngleDeg, const Math::Vector3& _toDir, float _maxAngleSpeedDeg,
+		bool _forwardIsMinusZ = false);
 }
