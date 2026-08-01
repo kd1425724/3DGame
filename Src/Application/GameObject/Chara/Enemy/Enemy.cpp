@@ -21,13 +21,28 @@ void Enemy::DrawDebug()
 	KdGameObject::DrawDebug();
 }
 
+void Enemy::Preload()
+{
+	// モデルとテクスチャを先に読み込んでキャッシュへ載せる。
+	//
+	// 【なぜ必要か】KdAssetsはパス単位のキャッシュで、最初に要求した時に
+	//   glTFの解析・GPUバッファ生成・テクスチャ読み込み(＋ミップ生成)をまとめて行う。
+	//   そのため【最初の1体が出現した瞬間に画面がかくつく】。
+	//   メカ(W9231)でも同じ症状が出ていた(2026/07/30)。実機で「出た瞬間だけ」と
+	//   確認できたので、描画コストではなく読み込みが原因と判明した(2026/07/31)。
+	//
+	//   シーン開始時に一度読んでおけば、以降の出現は既にキャッシュにあるので無料になる。
+	//   ※ モデルを読むとマテリアル経由でテクスチャも一緒に読まれるので、これ1回で足りる
+	KdAssets::Instance().m_modeldatas.GetData(kAssetPath);
+}
+
 void Enemy::Init()
 {
 	// 【2026/07/31】敵の見た目を石のゴーレムにした。
 	// 画像生成 → Meshyで3D化＋テクスチャ → Mixamoで自動リグ、という経路で作った。
 	// 制作手順は Desktop\Cloude\Project\3DGame\Doc\Golem_Pipeline.md
 	// ライセンスは CC BY 4.0(Meshyのクレジット必須) → THIRD_PARTY_LICENSES.txt
-	SetAsset("Asset/Models/Character/StoneGolem/StoneGolem.gltf");
+	SetAsset(kAssetPath);
 
 	// ※ m_modelOriginIsFeet は既定の false のまま。
 	//   このモデルの原点は【足元ではなく体の中心】(glTFの頂点Y範囲が -0.951〜+0.948)。
