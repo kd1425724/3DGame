@@ -65,8 +65,10 @@ private:
 	void ShootJointWire();
 	// 敵の関節へワイヤーが出ているか(飛行中も含む)。段階の判定に使う
 	bool IsAnyJointWireActive() const;
-	// 突撃中に斬る(3回目)。押した時の間合いでクリティカル/通常/空振りが決まる
+	// 突撃中に斬る(3回目)。間合いの内なら即斬り、まだ遠ければ先行入力として覚える
 	void PerformDiveSlash();
+	// 実際に斬る処理。_isCritical はダメージ倍率と手応え(カメラ揺れ)を変える
+	void ExecuteSlash(const Math::Vector3& _aim, bool _isCritical);
 	// 斬撃が届く距離とクリティカルになる距離。判定とデバッグ表示の両方が読む
 	void GetSlashRanges(float& _outHitRange, float& _outCritRange) const;
 	// 通常移動(接地=入力に即セット/空中=エアアクセル。カメラの水平向き基準)
@@ -250,6 +252,10 @@ private:
 
 	// 今狙っている関節の添字(Enemy::kJointDefsの添字)。ロックし直すと0(首)に戻る
 	int m_lockedJointIndex = 0;
+
+	// 斬撃の先行入力。間合いの外で攻撃を押した時に立ち、届いた瞬間に【通常】で出る。
+	// 【なぜ通常止まりか】早押しでもクリティカルが出ると、間合いを見る意味が消えるため
+	bool m_slashBuffered = false;
 
 	// ワイヤー(物理＋見た目を内包)。立体機動装置に合わせて腰の左右から2本。
 	// ※ 添字0=左 / 1=右。2本同時に撃つ(DebugFlags「ワイヤー/2本掛け」でOFFにすると0番のみ)
