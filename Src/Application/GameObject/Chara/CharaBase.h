@@ -28,11 +28,6 @@ public:
 
 	void SetAsset(const std::string& assetName) override;
 
-	// [MATDBG] ★一時的な調査用★ 読み込まれたマテリアルの実値をDebugWatchへ出す。
-	// DebugFlags「調査/マテリアルを表示」がONの時だけ動く。
-	// 原因が分かったら "MATDBG" で grep して丸ごと消すこと
-	void WatchMaterialDebug(const char* _label) const;
-
 	void DrawLit() override;
 
 	// 影生成：光から見た深度マップに自分のモデルを描く(影を落とす側)。
