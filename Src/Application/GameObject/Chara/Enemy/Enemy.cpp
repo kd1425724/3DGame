@@ -4,7 +4,6 @@
 #include "../../../API/MathAPI/MathAPI.h"
 #include "../../../Scene/SceneManager.h"
 #include "../../../Debug/DebugParams/DebugParams.h"
-#include "../../../Debug/DebugFlags/DebugFlags.h"   // [MATDBG] 調査用の切り替え。原因が分かったら消す
 #include "../../../Debug/DebugDraw/DebugDraw.h"
 #include "../Player/Player.h"   // 突進命中時にPlayerの無敵判定/反撃通知/ノックバックを呼ぶため
 
@@ -43,28 +42,7 @@ void Enemy::Init()
 	// 画像生成 → Meshyで3D化＋テクスチャ → Mixamoで自動リグ、という経路で作った。
 	// 制作手順は Desktop\Cloude\Project\3DGame\Doc\Golem_Pipeline.md
 	// ライセンスは CC BY 4.0(Meshyのクレジット必須) → THIRD_PARTY_LICENSES.txt
-	// [MATDBG] ★一時的な調査用★
-	//   ゴーレムだけが暗い原因が、モデル・マテリアル・コードのどこを測っても
-	//   見つからなかった(実行時のマテリアル値までプレイヤーと一致していた)。
-	//   残る差はスケールだけなので、【プレイヤーのモデルを敵として同じ大きさで出す】
-	//   ことで「モデルが原因か、敵の経路(スケール)が原因か」を切り分ける。
-	//   ONにしたら敵を出し直すこと(TitleSceneへ戻ってGameSceneに入り直す)。
-	//   原因が分かったら "MATDBG" で grep して丸ごと消すこと。
-	const bool usePlayerModel = DebugFlags::Instance().Get(U8("調査/敵をプレイヤーのモデルにする"), false);
-	if (usePlayerModel)
-	{
-		SetAsset("Asset/Models/Character/GogglesChara/GogglesChara.gltf");
-
-		// 【条件を揃える】プレイヤーのモデルは原点が足元なので、これを立てないと
-		//   半身ぶん(約12m)浮いてしまい、屋根より上の日向に出てしまう。
-		//   それでは「明るいのはモデルのおかげか、位置のおかげか」が区別できない。
-		//   最初のA/Bはこれを忘れていて実験として不成立だった(ユーザーが浮きに気付いて発覚)
-		m_modelOriginIsFeet = true;
-	}
-	else
-	{
-		SetAsset(kAssetPath);
-	}
+	SetAsset(kAssetPath);
 
 	// ※ m_modelOriginIsFeet は既定の false のまま。
 	//   このモデルの原点は【足元ではなく体の中心】(glTFの頂点Y範囲が -0.951〜+0.948)。
@@ -155,9 +133,6 @@ void Enemy::Update()
 			m_wpTarget = spPlayer;
 		}
 	}
-
-	// [MATDBG] 一時的な調査用。原因が分かったら消す
-	WatchMaterialDebug("Enemy");
 
 	std::shared_ptr<KdGameObject> spTarget = m_wpTarget.lock();
 	if (!spTarget) { return; }
