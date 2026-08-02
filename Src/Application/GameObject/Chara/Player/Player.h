@@ -82,6 +82,10 @@ private:
 	// ステップの最大ストック数(DebugParams「回避/ストック数」)。
 	// UpdateDodgeとRespawnの両方で要るので、キー文字列を1箇所にまとめるための小さな包み
 	int GetMaxDodgeCharges() const;
+
+	// ステップの速さ(DebugParams「回避/速度」)。
+	// UpdateDodge(実行)とClampSpeed(その間だけ上限を緩める)の両方が読む
+	float GetDodgeSpeed() const;
 	// 加速/ステップ/ダッシュ(右クリック)。接地と空中で意味が変わる：
 	//   空中 … 長押しで加速し続ける／短く離して空中ステップ
 	//   地上 … 押した瞬間にステップ(回避・UpdateDodgeが担当)／押し続けているあいだダッシュ

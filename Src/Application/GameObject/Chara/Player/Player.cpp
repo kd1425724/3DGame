@@ -538,15 +538,13 @@ void Player::UpdateAccel(float dt)
 		// 単押し判定の時間を過ぎたら「長押し＝加速」に確定して、以降は加速し続ける
 		if (m_accelHoldTime >= tapTime)
 		{
-			// 【2026/08/02】ブーストを強くした(ユーザー指示「動きづらいのでもっと強力に」)。
-			//
-			// 🔴 【罠】ここの「加速/上限速度」を上げてもそれだけでは速くならない。
-			//   ClampSpeed が速度全体を「プレイヤー/最高速度」で頭打ちにしており、
-			//   そちらが 20 だったため、35でも45でも結果は20で止まっていた。
-			//   実際に効かせるには最高速度のほうを上げる必要がある(20→35にした)。
-			//   調整するときは必ず両方を見ること
+			// 🔴 【罠】ここの「加速/上限速度」を上げても、それだけでは速くならない。
+			//   ClampSpeed が速度全体を「プレイヤー/最高速度」(既定20)で頭打ちにしているので、
+			//   35でも45でも結果は20で止まる。調整するときは必ず両方を見ること。
+			//   ※ 2026/08/02に最高速度を35へ上げて試したが、ユーザー判断で20へ戻した。
+			//     移動の速さではなく【ステップを強くする】方向で伸ばす方針
 			float acc    = DebugParams::Instance().Float(U8("加速/加速度"),     60.0f, 0.0f, 150.0f);
-			float maxSpd = DebugParams::Instance().Float(U8("加速/上限速度"),   45.0f, 0.0f, 120.0f);
+			float maxSpd = DebugParams::Instance().Float(U8("加速/上限速度"),   35.0f, 0.0f, 120.0f);
 
 			Math::Vector3 dir = GetAccelDir();
 			if (dir.LengthSquared() > MathAPI::kSmallNumber && m_velocity.Length() < maxSpd)
@@ -585,6 +583,16 @@ void Player::ClampSpeed()
 	float maxSpeed = attacking
 		? DebugParams::Instance().Float(U8("プレイヤー/最高速度(攻撃中)"), 90.0f, 5.0f, 300.0f)
 		: DebugParams::Instance().Float(U8("プレイヤー/最高速度"),         45.0f, 5.0f, 200.0f);
+
+	// 🔴 ステップ中は通常の上限で削らない(2026/08/02)。
+	// 移動の上限は「ワイヤーを繋ぐほど際限なく速くならない」ための値で、
+	// 「一瞬だけ速い」ステップに掛けると行動の意味そのものが消える。
+	// 実際、回避/速度22 に対して通常上限が20だったため、ステップは常に削られていて
+	// 「ステップが弱い」という症状になっていた。上限はステップ速度そのものにする
+	if (m_isDodging)
+	{
+		maxSpeed = std::max(maxSpeed, GetDodgeSpeed());
+	}
 	float maxFall  = DebugParams::Instance().Float(U8("プレイヤー/最大落下速度"), 60.0f, 5.0f, 200.0f);
 
 	// 落下速度の頭打ち
@@ -949,7 +957,7 @@ void Player::UpdateDodge(float dt)
 	// === 回避ダッシュ実行中：水平にフラットに素早く移動(縦は止めて空中でもキレよく) ===
 	if (m_isDodging)
 	{
-		float dodgeSpeed = DebugParams::Instance().Float(U8("回避/速度"), 22.0f, 5.0f, 60.0f);
+		float dodgeSpeed = GetDodgeSpeed();
 		m_velocity.x = m_dodgeDir.x * dodgeSpeed;
 		m_velocity.z = m_dodgeDir.z * dodgeSpeed;
 		m_velocity.y = 0.0f;
@@ -1015,6 +1023,14 @@ void Player::UpdateDodge(float dt)
 	{
 		EffectManager::Instance().SpawnBoost(GetBoostSpawnPos(m_dodgeDir), m_dodgeDir);
 	}
+}
+
+float Player::GetDodgeSpeed() const
+{
+	// 【1箇所にまとめる理由】ステップの実行(UpdateDodge)と、その間だけ速度上限を
+	// 緩めるClampSpeedの両方が読む。別々に書くと既定値が食い違ったとき、
+	// 上限のほうが低ければステップが黙って削られる(実際にその状態だった)
+	return DebugParams::Instance().Float(U8("回避/速度"), 22.0f, 5.0f, 80.0f);
 }
 
 int Player::GetMaxDodgeCharges() const
@@ -1175,6 +1191,8 @@ void Player::UpdateDive(float dt)
 
 			DebugWatch& w = DebugWatch::Instance();
 			w.Watch(U8("Player/的までの距離"),     dist);
+			w.Watch(U8("Player/斬撃範囲(m)"),      hitRange);
+			w.Watch(U8("Player/クリティカル範囲(m)"), critRange);
 			w.Watch(U8("Player/斬れる"),           dist <= hitRange);
 			w.Watch(U8("Player/クリティカル圏内"), dist <= critRange);
 		}
@@ -1828,9 +1846,27 @@ void Player::DrawDebugRanges()
 	// ※ 呼び出し元(DrawDebug)で s_showColliderDebug と m_pDebugWire を確認済み
 	const Math::Vector3 pos = GetPos();
 
-	// 攻撃判定：落下攻撃の斬撃範囲(赤)。UpdateDiveと同じDebugParamsキーを読む
-	float slashR = DebugParams::Instance().Float(U8("落下攻撃/斬撃範囲"), 1.5f, 0.5f, 15.0f);
-	m_pDebugWire->AddDebugSphere(pos, slashR, Math::Color(1.0f, 0.2f, 0.2f, 1.0f));
+	// 攻撃判定：斬撃範囲(橙)とクリティカル範囲(赤)。
+	//
+	// 🔴 【2026/08/02】プレイヤーの位置ではなく【狙っている関節の位置】に描く。
+	//   判定は「関節までの距離」で行っているので、自分の周りに球を出しても
+	//   実際に斬れる範囲とは何の関係も無かった(古い落下攻撃時代の名残)。
+	//   実際の判定と同じ GetSlashRanges を読むので、見えている球＝そのまま判定
+	{
+		Math::Vector3 aim{};
+		if (GetLockedJointPos(aim))
+		{
+			float hitRange  = 0.0f;
+			float critRange = 0.0f;
+			GetSlashRanges(hitRange, critRange);
+
+			m_pDebugWire->AddDebugSphere(aim, hitRange,  Math::Color(1.0f, 0.55f, 0.1f, 1.0f));
+			m_pDebugWire->AddDebugSphere(aim, critRange, Math::Color(1.0f, 0.15f, 0.15f, 1.0f));
+
+			// 自分から狙点への線。今どれだけ離れているかが目で分かる
+			m_pDebugWire->AddDebugLine(pos, aim, Math::Color(1.0f, 0.8f, 0.3f, 1.0f));
+		}
+	}
 
 
 	// 索敵範囲：連続攻撃で次の敵を探す範囲(緑)
