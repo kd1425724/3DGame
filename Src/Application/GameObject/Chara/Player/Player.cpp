@@ -292,26 +292,33 @@ void Player::PerformDiveSlash()
 	// 遠すぎる＝空振り。突撃を打ち切って勢いだけ残す。
 	// 【なぜ空振りを用意するか】外しても何も起きないと連打が最適解になり、
 	// 「タイミングを計る」という狙いそのものが消えるため
+	// まだ届いていない＝先行入力として覚えておき、届いた瞬間に【通常】で出す。
+	//
+	// 【なぜ空振りにしないか】外して何も起きないと「押せていないのか外したのか」が
+	// プレイヤーに区別できず、ただの罰になる(ユーザー判断で空振りは廃止)。
+	// 早く押しても攻撃は当たるが【クリティカルにはならない】ようにすることで、
+	// 「間合いを見て押す」ことの価値だけを残している
 	if (dist > hitRange)
 	{
-		// 空振りしたことが分かるように軽く揺らす。
-		// 何も起きないと「押せていないのか外したのか」がプレイヤーに区別できない
-		CameraShake::Instance().AddTrauma(
-			DebugParams::Instance().Float(U8("突撃/空振りの揺れ"), 0.12f, 0.0f, 0.5f));
-
-		m_isDiving = false;
-		m_wpDiveTarget.reset();
-		m_comboWindowTimer = 0.0f;
+		m_slashBuffered = true;
 		return;
 	}
 
 	// 近いほど良い。クリティカル範囲は斬撃範囲の内側にある
-	const bool isCritical = (dist <= critRange);
+	ExecuteSlash(aim, dist <= critRange);
+}
+
+void Player::ExecuteSlash(const Math::Vector3& _aim, bool _isCritical)
+{
+	std::shared_ptr<KdGameObject> spTarget = m_wpDiveTarget.lock();
+	if (!spTarget) { return; }
+
+	m_slashBuffered = false;   // 出したので先行入力は消費する
 
 	float damage = Enemy::GetAttackPower();
-	if (isCritical)
+	if (_isCritical)
 	{
-		damage *= DebugParams::Instance().Float(U8("落下攻撃/クリティカル倍率"), 2.0f, 1.0f, 10.0f);
+		damage *= DebugParams::Instance().Float(U8("突撃/クリティカル倍率"), 2.0f, 1.0f, 10.0f);
 	}
 
 	// 関節を狙っていればその関節へ、そうでなければ本体へダメージが入る
@@ -328,13 +335,13 @@ void Player::PerformDiveSlash()
 
 	// クリティカルは手応えを強くする(揺れで成否が体で分かるようにする)
 	float trauma = std::clamp(0.2f + 0.05f * m_diveChainCount, 0.0f, 0.7f);
-	if (isCritical)
+	if (_isCritical)
 	{
 		trauma = std::clamp(trauma * 1.6f, 0.0f, 1.0f);
 	}
 	CameraShake::Instance().AddTrauma(trauma);
 
-	EffectManager::Instance().SpawnSlash(aim);   // 斬った位置に斬撃エフェクト
+	EffectManager::Instance().SpawnSlash(_aim);   // 斬った位置に斬撃エフェクト
 
 	// 斬った直後は減速する(0=止まる/1=減速なし)。
 	// ※ 0.4 は一撃ごとに6割を捨てる設定で、3連鎖すると 0.4^3 = 6% しか残らず
@@ -531,8 +538,15 @@ void Player::UpdateAccel(float dt)
 		// 単押し判定の時間を過ぎたら「長押し＝加速」に確定して、以降は加速し続ける
 		if (m_accelHoldTime >= tapTime)
 		{
-			float acc    = DebugParams::Instance().Float(U8("加速/加速度"),     30.0f, 0.0f, 150.0f);
-			float maxSpd = DebugParams::Instance().Float(U8("加速/上限速度"),   35.0f, 0.0f, 120.0f);
+			// 【2026/08/02】ブーストを強くした(ユーザー指示「動きづらいのでもっと強力に」)。
+			//
+			// 🔴 【罠】ここの「加速/上限速度」を上げてもそれだけでは速くならない。
+			//   ClampSpeed が速度全体を「プレイヤー/最高速度」で頭打ちにしており、
+			//   そちらが 20 だったため、35でも45でも結果は20で止まっていた。
+			//   実際に効かせるには最高速度のほうを上げる必要がある(20→35にした)。
+			//   調整するときは必ず両方を見ること
+			float acc    = DebugParams::Instance().Float(U8("加速/加速度"),     60.0f, 0.0f, 150.0f);
+			float maxSpd = DebugParams::Instance().Float(U8("加速/上限速度"),   45.0f, 0.0f, 120.0f);
 
 			Math::Vector3 dir = GetAccelDir();
 			if (dir.LengthSquared() > MathAPI::kSmallNumber && m_velocity.Length() < maxSpd)
@@ -1175,14 +1189,19 @@ void Player::UpdateDive(float dt)
 		// 通過とみなす距離も関節の球の半径を基準にする(斬撃範囲と同じ理由)。
 		// 斬撃範囲より内側でなければ「斬れる前に通り過ぎる」ことになるので、
 		// 必ず斬撃範囲の倍率より小さい値にすること
-		float passRange = 0.0f;
-		{
-			float hitRange  = 0.0f;
-			float critRange = 0.0f;
-			GetSlashRanges(hitRange, critRange);
+		float hitRange  = 0.0f;
+		float critRange = 0.0f;
+		GetSlashRanges(hitRange, critRange);
 
-			passRange = hitRange * DebugParams::Instance().Float(U8("突撃/通過とみなす割合"), 0.25f, 0.05f, 1.0f);
+		// 先行入力が入っていて、届いたら【通常】で斬る。
+		// 早押しは当たるがクリティカルにはならない、というのがここの肝
+		if (m_slashBuffered && dist <= hitRange)
+		{
+			ExecuteSlash(aim, false);
+			return;
 		}
+
+		float passRange = hitRange * DebugParams::Instance().Float(U8("突撃/通過とみなす割合"), 0.25f, 0.05f, 1.0f);
 
 		if (dist <= passRange)
 		{
@@ -1233,6 +1252,7 @@ void Player::StartDive()
 
 	m_isDiving = true;
 	m_comboWindowTimer = 0.0f;
+	m_slashBuffered = false;   // 前の突撃の押しっぱなしを持ち越さない
 
 	// この攻撃に入った時の速さを覚えておく。チェインが続く間はリセットしないので、
 	// 勢いを付けて始めた連続攻撃は最後まで速いまま繋がる
