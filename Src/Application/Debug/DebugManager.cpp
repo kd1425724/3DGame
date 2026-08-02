@@ -4,6 +4,7 @@
 #include "DebugWatch/DebugWatch.h"
 #include "DebugParams/DebugParams.h"
 #include "DebugEffect/DebugEffect.h"
+#include "DebugDraw/DebugDraw.h"
 #include "../Editor/LevelEditor/LevelEditorManager.h"
 #include "../Editor/HudEditor/HudEditorManager.h"
 
@@ -16,6 +17,9 @@ void DebugManager::BeginFrame()
 	}
 
 	DebugWatch::Instance().BeginFrame();
+
+	// ワールド座標に出す文字は毎フレーム積み直す(前フレームぶんが残ると二重に出る)
+	DebugDraw::ClearText3D();
 }
 
 void DebugManager::Draw()
@@ -25,6 +29,10 @@ void DebugManager::Draw()
 
 	// 上部メニューバー(各ウィンドウの個別ON/OFF)
 	DrawMenuBar();
+
+	// ワールド座標に積まれた文字(関節のHPなど)。
+	// ウィンドウの下に来るよう、他のパネルより先に描く
+	DebugDraw::DrawText3D();
 
 	if (m_showFlags)
 	{
