@@ -56,6 +56,33 @@ public:
 	// 追従・接触判定の対象を設定する
 	void SetTarget(const std::shared_ptr<KdGameObject>& target) { m_wpTarget = target; }
 
+	//----------------------------------------
+	// 部位破壊：部位の定義
+	//----------------------------------------
+
+	// 部位は「骨の線分(A→B)＋半径」＝カプセルで表す。
+	// 【なぜ球ではなくカプセルか】このモデルの腕は1.06m・脚は0.95mある(glTFの骨座標を実測)。
+	//   球1個では細長い部位に形が合わず、当たっていない場所を「当たった」と誤判定する。
+	//   カプセルは「点と線分の距離 - 半径」だけで判定できるので、球とほとんど同じコストで済む
+	struct PartDef
+	{
+		const char* name;           // 表示用の部位名
+		const char* boneA;          // カプセルの始点になる骨
+		const char* boneB;          // 終点になる骨
+		const char* radiusKey;      // 半径のDebugParamsキー(実機で見ながら詰めるため外に出す)
+		float       defaultRadius;  // 半径の既定値【モデル座標系】。ワールドで使う側がスケールを掛ける
+		float       damageScale;    // ダメージ倍率。弱点ほど大きい
+		float       maxHp;          // 部位HP。本体HPとは別勘定(モンハン方式)
+		const char* collapseBone;   // 破壊時に潰す骨。nullptr = 破壊できない部位(胴)
+	};
+
+	// 部位の数。表の実体はEnemy.cppにある
+	static constexpr int kPartCount = 6;
+
+	// このモデル(StoneGolem)の部位表。
+	// 骨名は推測せずglTFのskins[0].jointsを直接読んで確認した実在の名前(2026/08/02)
+	static const PartDef kPartDefs[kPartCount];
+
 private:
 
 	// ※ 移動速度・旋回速度・攻撃系の数値はDebugParams("敵/…")で調整する
@@ -74,6 +101,14 @@ private:
 	State m_state = State::Chase;
 	float m_stateTimer = 0.0f;          // 現在状態の残り時間(Windup/Strike/Recoverで使用)
 	Math::Vector3 m_lungeDir = {};      // 突進方向。Windup終了時に固定する(以後は追尾しない=回避で避けられる)
+
+	// 部位のカプセルをデバッグ表示する(両端に球＋芯の線)。
+	// 半径が妥当かは目で見ないと決められないので、命中判定を書く【前】に用意する
+	void DrawPartCapsuleDebug();
+
+	// 部位のカプセルの端点をワールド座標で取り出す。半径もワールド(スケール済み)で返す。
+	// 骨が見つからなければfalse(モデルを差し替えて骨名が変わっても落ちない)
+	bool GetPartCapsule(const PartDef& _part, Math::Vector3& _outA, Math::Vector3& _outB, float& _outRadius) const;
 
 	// 突進が命中した瞬間の処理(無敵なら反撃成立で自滅／無防備ならノックバック)
 	void ResolveStrikeHit(const std::shared_ptr<KdGameObject>& _target);
