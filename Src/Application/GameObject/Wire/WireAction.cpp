@@ -4,6 +4,7 @@
 #include "../../Debug/DebugParams/DebugParams.h"// リール速度・引き込み力などの調整値
 #include "../../Debug/DebugFlags/DebugFlags.h"  // 漕ぎ(ポンプ)のON/OFF
 #include "../Chara/CharaBase.h"                 // スイングで動かすキャラ(速度・位置・当たり解決)
+#include "../Chara/Enemy/Enemy.h"               // 関節アンカーの追従(GetJointSphereAt)
 #include "../../Collision/CollisionGrid.h"      // IsWallBetween(手元〜アンカー間の遮蔽判定)
 #include "../../API/MathAPI/MathAPI.h"          // 安全な正規化・水平化
 
@@ -160,6 +161,10 @@ void WireAction::UpdateSwingAll(CharaBase& _body, float _dt, const Math::Vector2
 		WireAction* w = _wires[i];
 		if (!w || !w->m_isAttached) { continue; }
 
+		// 敵の関節に刺さっているものは、拘束を解く【前】にアンカーを今の関節位置へ合わせる。
+		// 相手が消えた／関節が壊れたら、このフレームから除外する
+		if (!w->UpdateAnchorFollow()) { continue; }
+
 		// 遮蔽で外れたものはこのフレームから除外する
 		if (!w->UpdateOcclusion(_body, _dt)) { continue; }
 
@@ -180,7 +185,21 @@ void WireAction::UpdateSwingAll(CharaBase& _body, float _dt, const Math::Vector2
 
 	const bool winchMode   = DebugFlags::Instance().Get(U8("ワイヤー/引き寄せモード"), true);
 	const bool mergeSphere = DebugFlags::Instance().Get(U8("ワイヤー/2本を1つの球にする"), true);
-	const bool merged      = (n >= 2) && mergeSphere;
+
+	// 🔴 関節に刺さっているワイヤーがある間は合体させない。
+	// 合体は「支点を1回だけ決めて以後固定する」のが肝だが、関節アンカーは毎フレーム動くので
+	// 固定した支点が関節に付いていかない(掛けた場所と拘束の中心がずれていく)
+	bool hasJointAnchor = false;
+	for (int i = 0; i < n; ++i)
+	{
+		if (live[i]->m_anchorJointIndex >= 0)
+		{
+			hasJointAnchor = true;
+			break;
+		}
+	}
+
+	const bool merged = (n >= 2) && mergeSphere && !hasJointAnchor;
 
 	// 【2本を1つの球にまとめる】支点と半径は2本が揃った瞬間に1回だけ決める。
 	// 毎フレーム2本の長さから計算し直すと、左右の長さの差のぶん支点がじわじわ動き、
@@ -612,8 +631,76 @@ bool WireAction::Shoot(const Math::Vector3& _from, const Math::Vector3& _dir, fl
 	return true;
 }
 
+bool WireAction::ShootAtJoint(const Math::Vector3& _from, const std::shared_ptr<KdGameObject>& _spTarget,
+	int _jointIndex, const Math::Vector3& _jointPos)
+{
+	if (!_spTarget) { return false; }
+	if (_jointIndex < 0) { return false; }
+
+	// 前の状態(繋がっていた／飛んでいた)を確実に畳んでから撃ち直す。
+	// ※ Releaseは関節の紐付けも消すので、その【後】に設定すること
+	Release();
+
+	m_anchor         = _jointPos;
+	m_anchorIsGround = false;   // 敵は地面ではない(ワイヤー中の着地判定に使う)
+
+	m_wpAnchorTarget   = _spTarget;
+	m_anchorJointIndex = _jointIndex;
+
+	// 飛行を開始する。ここではまだ繋がない(地形へ撃つShootと同じ理由)。
+	// 長さは着弾した瞬間の実距離で決める(UpdateHookMotion)
+	m_launchPos      = _from;
+	m_flightTime     = 0.0f;
+	m_flightDuration = FlightDuration(Math::Vector3::Distance(_from, _jointPos));
+	m_isFlying       = true;
+
+	m_hookPos = _from;
+
+	return true;
+}
+
+bool WireAction::UpdateAnchorFollow()
+{
+	// 地形に刺さっているなら追従の必要はない(動かないので)
+	if (m_anchorJointIndex < 0) { return true; }
+
+	std::shared_ptr<KdGameObject> spTarget = m_wpAnchorTarget.lock();
+	if (!spTarget || spTarget->IsExpired())
+	{
+		// 相手が消えた(倒した)。刺さったままにはできないので外す
+		Release();
+		return false;
+	}
+
+	// dynamic_castの代わりにタグで判定する(この作品の既定の見分け方)
+	if (spTarget->GetObjectTag() != ObjectTag::Enemy)
+	{
+		Release();
+		return false;
+	}
+
+	Enemy* pEnemy = static_cast<Enemy*>(spTarget.get());
+
+	Math::Vector3 center{};
+	float radius = 0.0f;
+	if (!pEnemy->GetJointSphereAt(m_anchorJointIndex, center, radius))
+	{
+		// 関節が壊れた＝掛かっていた場所そのものが消えたので外す
+		Release();
+		return false;
+	}
+
+	m_anchor = center;
+	return true;
+}
+
 bool WireAction::UpdateHookMotion(const Math::Vector3& _bodyPos, const Math::Vector3& _muzzlePos, float _dt)
 {
+	// 関節に刺さっている/刺さりに飛んでいる間は、到達点を毎フレーム今の関節位置へ更新する。
+	// 【なぜ飛行中も要るか】飛んでいる0.2秒ほどの間にもゴーレムは歩き、関節はアニメで動く。
+	// 撃った瞬間の座標へ飛ばすと、着弾した時にはもうそこに関節が無い
+	if (!UpdateAnchorFollow()) { return false; }
+
 	// --- 巻き戻し中(見た目だけ)。拘束は Release の時点で既に切れている ---
 	if (m_isRetracting)
 	{
@@ -704,6 +791,10 @@ void WireAction::Release(bool _animate)
 	m_isAttached = false;
 	m_occludedTime = 0.0f;   // 遮蔽デバウンスをリセット
 	m_hasMerged = false;     // 2本を1つの球にまとめた状態も破棄(次に揃ったとき作り直す)
+
+	// 敵の関節への紐付けも解く。残すと次に地形へ撃った時まで追従しようとする
+	m_wpAnchorTarget.reset();
+	m_anchorJointIndex = -1;
 
 	// 飛行中のフックも取り消す。これが無いと「飛行時間より短くタップした」場合に
 	// 離した後で着弾して勝手に繋がる(キャラ側は離した時にReleaseを呼ぶだけなので、
