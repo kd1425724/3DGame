@@ -112,6 +112,9 @@ void Player::Update()
 	// ワイヤーの発射/解除(入力・狙いはPlayer側。スイング物理はWireActionに委譲)
 	UpdateWireInput();
 
+	// 攻撃(右クリック)。ワイヤーとは独立した入力になった(2026/08/02 入力のAoT2化)
+	UpdateAttackInput();
+
 	// 発射したフックの飛行を進める(着弾したらここで拘束が始まる)。
 	// ※ 下の「ワイヤー中か」の分岐より前に置くこと。後ろに置くと、着弾したフレームの
 	//   スイングが1フレーム遅れる。またWireAction::UpdateSwingAllは繋がっている
@@ -205,29 +208,33 @@ void Player::Update()
 	UpdateDive(dt);
 }
 
+void Player::UpdateAttackInput()
+{
+	// === 攻撃（右クリック） ===
+	// 【2026/08/02 入力のAoT2化】左クリックから独立させた。
+	// 突撃中／連続攻撃の受付中の押下は UpdateDive 側が持っているので、ここでは扱わない
+	if (m_isDiving || m_comboWindowTimer > 0.0f) { return; }
+	if (!KdInputManager::Instance().IsPress("Attack")) { return; }
+
+	// ロックオンしていて対象がいる時だけ攻撃になる
+	if (!IsAttackInput()) { return; }
+
+	StartDive();
+}
+
 void Player::UpdateWireInput()
 {
-	// === アンカー射出 / 攻撃（左クリックに統一） ===
-	// 進撃の巨人2に寄せた入力(2026/07/19)。同じボタンで文脈により役割が変わる：
-	//   ・E(Focus)でターゲットを取っている、または連続攻撃の受付中 → 攻撃(突撃)
-	//   ・それ以外                                                  → ワイヤーを撃つ(移動)
-	// 押した時にどちらだったかを m_anchorPressWasWire に覚えておき、
-	// 「ワイヤーを撃った時に限り」離したら外す。攻撃で押した時は離しても何もしない
+	// === アンカー射出（左クリック＝常にワイヤー） ===
+	// 【2026/08/02 入力のAoT2化】以前は同じボタンで文脈により攻撃/ワイヤーが変わっていたが、
+	// 進撃の巨人2に合わせて用途別に分けた。左は常にワイヤー、攻撃は右(UpdateAttackInput)。
+	// これで「攻撃したいのにワイヤーが出た」「その逆」が起きなくなった
 	if (KdInputManager::Instance().IsPress("Anchor"))
 	{
-		// 突撃中／連続攻撃の受付中は、この押下の扱いを UpdateDive 側が持っている
-		// (受付中は最寄りの敵を探して繋ぐ処理があるため、ここで横取りしない)
+		// 突撃中／連続攻撃の受付中はワイヤーを撃たせない。
+		// StartDiveがワイヤーを畳む設計なので、突撃中に繋ぐと突撃が止まって固まる
 		if (m_isDiving || m_comboWindowTimer > 0.0f)
 		{
 			m_anchorPressWasWire = false;
-			return;
-		}
-
-		// E(Focus)でターゲットを取れていれば攻撃、そうでなければワイヤー
-		if (IsAttackInput())
-		{
-			m_anchorPressWasWire = false;
-			StartDive();
 			return;
 		}
 
@@ -322,52 +329,43 @@ void Player::UpdateWireInput()
 
 void Player::UpdateAccel(float dt)
 {
-	// 右クリックは接地と空中で意味が変わる。
-	//   空中 … 長押しで加速し続ける／単押し(短く離す)で空中ステップ
+	// 【2026/08/02 入力のAoT2化】右クリックからSpaceへ移した。Spaceは接地と空中で意味が変わる。
+	//   接地 … ジャンプ(UpdateJumpの担当)。ここでは何もしない
+	//   空中 … 単押しでステップ(UpdateDodgeの担当。無敵つき)／長押しでブースト(ここ)
 	//          進撃の巨人2の×ボタン(加速・空中ステップ)にあたる、プレイヤー側の推進力。
-	//          方向は移動入力(カメラ基準)、無入力なら進行方向。Jump併用で上向き成分も足す
-	//   地上 … 押した瞬間にステップ(回避)、押し続けているあいだダッシュ(原神と同じ形)
+	//          方向は移動入力(カメラ基準)、無入力なら進行方向
 	//
-	// 【なぜ地上だけ「押した瞬間」なのか】
-	// 空中ステップは離した時に出している。単押しか長押しかを単押し判定の時間で見分けてから
-	// 出す必要があるためで、その分だけ反応が遅れる。地上ではこの遅れがそのままキレの無さになる。
-	// 地上は「押したら必ずステップが出る／押し続けていたらダッシュへ移る」にすることで、
-	// 事前に単押しと長押しを見分ける必要そのものを無くしている。
-	// 逆に空中を押下発火に揃えてはいけない：空中は長押しの加速が主役なので、
-	// 加速しようとするたび毎回ステップが暴発してしまう
+	// 【なぜ空中は押下発火にしないのか】空中は長押しのブーストが主役なので、
+	// 押下でステップを出すと、加速しようとするたび毎回ステップが暴発してしまう。
+	// 単押しか長押しかを見分けてから出す必要があるので、ステップは離した時に出す
 	const float tapTime = DebugParams::Instance().Float(U8("加速/単押しとみなす時間"), 0.18f, 0.05f, 0.6f);
 
-	if (KdInputManager::Instance().IsPress("Accel"))
+	if (KdInputManager::Instance().IsPress("Jump"))
 	{
 		m_accelHoldTime = 0.0f;
-		m_accelPressWasGround = m_isGrounded;
 
-		// ※ 地上ステップ(回避)の発動は UpdateDodge が同じ押下を見て行う。
-		//   無敵・クールダウン・速度の上書きが既にあちらに揃っているため、二重に持たない
+		// 【重要】この押下が別の行動に消費されたなら、同じ押下をブースト/ステップに使わない。
+		//   ・接地中     … ジャンプが出る。押しっぱなしのまま浮くとそのままブーストへ流れ、
+		//                   「ジャンプすると必ず加速する」ことになる
+		//   ・壁走り中   … 壁ジャンプが出る(WallAction)。放置すると壁ジャンプ直後に
+		//                   空中ステップまで二重に出る
+		// 離すまでこの押下を無視することで切り離す
+		const bool onWall = m_upWall && (m_upWall->IsRunning() || m_upWall->IsClimbing());
+		m_accelPressWasGround = m_isGrounded || onWall;
 	}
 
-	bool holding = KdInputManager::Instance().IsHold("Accel");
+	bool holding = KdInputManager::Instance().IsHold("Jump");
 	if (holding)
 	{
 		m_accelHoldTime += dt;
 	}
 
-	// 地上で押しっぱなし＝ダッシュ。実際の速度切り替えは UpdateMove が行う。
-	//
-	// 【単押し判定の時間で待ってはいけない】2026/07/20 に一度
-	// 「m_accelHoldTime >= tapTime になってからダッシュ」にしたが、これは誤りだった。
-	// ボタンを離すと押し時間が0に戻るので、ステップ中に離して押し直すと
-	// そこから0.18秒だけ歩き速度に落ちる("一瞬歩きに戻ってからダッシュに入る")。
-	// 原神はステップが終わった瞬間そのままダッシュへ繋がり、この隙間が無い。
-	//
-	// 正しくは「接地して押していて、ステップ中でなければダッシュ」。
-	// 押した瞬間はステップ(UpdateDodge)が速度を握っているので歩き速度は挟まらず、
-	// ステップが明けた時にまだ押していればそのままダッシュへ移る
-	m_isSprinting = m_isGrounded && holding && !m_isDodging;
+	// ※ 地上ダッシュ(m_isSprinting)は 2026/08/02 に廃止した(ユーザー指示)。
+	//   「歩きを無くして最初からダッシュ」にしたので、速度を切り替える対象そのものが無くなった。
+	//   地上の移動速度は UpdateMove が常にダッシュ速度で走らせる
 
-	// 空中の加速は接地中には効かせない。地上で押している間はダッシュが担当なので、
-	// ここで加速度まで足すと二重に効いて地上だけ異常に伸びる
-	if (holding && !m_isGrounded)
+	// 空中でのみブーストする。接地中の押下はジャンプなので、ここでは推進しない
+	if (holding && !m_isGrounded && !m_accelPressWasGround)
 	{
 		// 単押し判定の時間を過ぎたら「長押し＝加速」に確定して、以降は加速し続ける
 		if (m_accelHoldTime >= tapTime)
@@ -386,26 +384,14 @@ void Player::UpdateAccel(float dt)
 		}
 	}
 
-	// 短く離したら空中ステップ(その場から入力方向へ一気に飛ぶ)。
-	// ※ 地上で押し始めた場合は出さない。押した瞬間に地上ステップ(回避)が既に出ているので、
-	//   段差から落ちながら離すとステップが二重に出てしまうため
-	if (KdInputManager::Instance().IsRelease("Accel"))
+	// 短く離したら空中ステップ。実行(無敵・ストック・速度)は UpdateDodge が持っているので、
+	// ここでは「単押しだった」ことを先行入力として渡すだけにする。
+	// ※ 接地中に押し始めた場合は出さない。その押下はジャンプとして消費されているため
+	if (KdInputManager::Instance().IsRelease("Jump"))
 	{
 		if (m_accelHoldTime < tapTime && !m_isGrounded && !m_accelPressWasGround)
 		{
-			float step = DebugParams::Instance().Float(U8("加速/空中ステップの速さ"), 18.0f, 0.0f, 60.0f);
-			Math::Vector3 dir = GetAccelDir();
-			if (dir.LengthSquared() > MathAPI::kSmallNumber)
-			{
-				m_velocity += dir * step;
-
-				// ステップは一瞬なので、まとめて数粒出して"バッ"と見せる
-				int burst = DebugParams::Instance().Int(U8("加速エフェクト/ステップの粒数"), 6, 0, 30);
-				for (int i = 0; i < burst; ++i)
-				{
-					EffectManager::Instance().SpawnBoost(GetBoostSpawnPos(dir), dir);
-				}
-			}
+			m_dodgeBufferTimer = DebugParams::Instance().Float(U8("回避/先行入力"), 0.2f, 0.0f, 1.0f);
 		}
 		m_accelHoldTime = 0.0f;
 		m_accelPressWasGround = false;
@@ -544,13 +530,16 @@ Math::Vector3 Player::GetAccelDir() const
 		}
 	}
 
-	// Jump併用で上向きを足す
-	if (KdInputManager::Instance().IsHold("Jump"))
-	{
-		float upRate = DebugParams::Instance().Float(U8("加速/Jump併用の上向き割合"), 0.8f, 0.0f, 2.0f);
-		dir.y += upRate;
-		MathAPI::TryNormalize(dir);
-	}
+	// ブーストに上向き成分を混ぜる。
+	//
+	// 【2026/08/02 入力のAoT2化】以前は「Jumpを併用したら上向きを足す」だったが、
+	// ブースト自体がSpaceへ移った＝押しているボタンが同じになったので、条件として成立しなくなった。
+	// 上向きを足すか否かの選択肢が消えたので、常に一定量を混ぜる形に変えてある。
+	// 混ぜないと水平にしか飛べず、ワイヤーを掛け直す高さを稼げない。
+	// 上向きが不要なら「加速/上向きの割合」を0にすれば水平だけになる
+	float upRate = DebugParams::Instance().Float(U8("加速/上向きの割合"), 0.8f, 0.0f, 2.0f);
+	dir.y += upRate;
+	MathAPI::TryNormalize(dir);
 
 	return dir;
 }
@@ -658,12 +647,11 @@ void Player::UpdateMove(float dt)
 	// === 通常移動(velocityベース。接地=キビキビ、空中=勢いを保つ) ===
 	Math::Vector3 wishDir = GetWishDir();
 
-	// 地上ダッシュ中は速度の定数を差し替えるだけ。接地中は下で水平速度を入力へ即セットするので、
-	// これだけで「速く走る・離せば即止まる・向きも即変わる」が手に入る(追加の計算が要らない)。
-	// ※ 空中では m_isSprinting は立たないので、空中の推進は従来どおり加速(UpdateAccel)が担当する
-	float moveSpeed = m_isSprinting
-		? DebugParams::Instance().Float(U8("プレイヤー/ダッシュ速度"), 11.0f, 0.0f, 40.0f)
-		: DebugParams::Instance().Float(U8("プレイヤー/移動速度"),     5.0f, 0.0f, 20.0f);
+	// 【2026/08/02 入力のAoT2化】歩きを廃止し、最初からダッシュ速度で動く(ユーザー指示)。
+	// 以前は「歩き5.0 / 押しっぱなしでダッシュ11.0」を m_isSprinting で切り替えていたが、
+	// 切り替えるボタン(旧Accel=右クリック)が攻撃になったので、遅いほうを捨てた。
+	// ※ 旧キー「プレイヤー/移動速度」はもう読まれない(JSONには残る)
+	float moveSpeed = DebugParams::Instance().Float(U8("プレイヤー/ダッシュ速度"), 11.0f, 0.0f, 40.0f);
 	Math::Vector3 wishVel = Math::Vector3::Zero;
 	if (wishDir.LengthSquared() > 0.0f)
 	{
@@ -780,10 +768,8 @@ void Player::UpdateDodge(float dt)
 		m_dodgeBufferTimer -= dt;
 	}
 
-	if (KdInputManager::Instance().IsPress("Accel"))
-	{
-		m_dodgeBufferTimer = DebugParams::Instance().Float(U8("回避/先行入力"), 0.2f, 0.0f, 1.0f);
-	}
+	// ※ 先行入力を張るのは UpdateAccel の「空中でSpaceを短く離した」判定に移した
+	//   (2026/08/02 入力のAoT2化)。押下では張らない：接地中の押下はジャンプだから
 
 	// === 回避ダッシュ実行中：水平にフラットに素早く移動(縦は止めて空中でもキレよく) ===
 	if (m_isDodging)
@@ -807,17 +793,17 @@ void Player::UpdateDodge(float dt)
 	}
 
 	// === 開始判定 ===
-	// トリガーは右クリック(Accel)の押下＋接地。地上ダッシュの初動がそのまま回避になる形で、
-	// 押し続けているとこのステップが終わったあとダッシュ(UpdateAccel/UpdateMove)へ流れる。
-	// ※ 2026/07/20にShift("Dodge")から移した。無敵は反撃(ジャスト回避カウンター)の唯一の
-	//   入口なので、トリガーを移してもここを消してはいけない
-	// ※ 空中で押した時は回避せず、従来どおり空中ステップ／加速(UpdateAccel)に任せる
-	// ※ 入力は上で先行入力タイマーに変換済み。押した瞬間もタイマーを張るので、
-	//   ここは「押された or ステップ中に押されていた」をまとめて見ていることになる
+	// トリガーは【空中でSpaceを短く離した】こと(UpdateAccelが先行入力に変換して渡す)。
+	//
+	// 🔴 【2026/08/02 入力のAoT2化】地上ステップを廃止し、空中ステップへ一本化した。
+	//   ユーザー指示「歩きを廃止、デフォルトでダッシュにしてダッシュ、ステップを無くす」。
+	//   **無敵(iフレーム)は反撃(ジャスト回避カウンター)の唯一の入口なので、
+	//   地上ステップを消すぶんの無敵をここ(空中ステップ)へ引き継いである。**
+	//   これを消すと反撃システムに入る手段が無くなる
 	if (m_isDiving) { return; }                                      // 突撃中は回避しない
 	if (m_dodgeCharges <= 0) { return; }                             // ストックを使い切っている
-	if (!m_isGrounded) { return; }                                   // 空中は空中ステップ/加速の担当
-	if (m_dodgeBufferTimer <= 0.0f) { return; }                      // 押していない(先行入力も切れている)
+	if (m_isGrounded) { return; }                                    // 接地中の押下はジャンプ
+	if (m_dodgeBufferTimer <= 0.0f) { return; }                      // 単押しが来ていない(先行入力も切れている)
 
 	// 方向：移動入力があればその向き(カメラ基準)、無ければカメラ前方(水平)
 	Math::Vector2 moveAxis = KdInputManager::Instance().GetAxisState("Move");
@@ -846,6 +832,14 @@ void Player::UpdateDodge(float dt)
 	m_isDodging       = true;
 	m_dodgeTimer      = DebugParams::Instance().Float(U8("回避/時間"),     0.18f, 0.05f, 1.0f);
 	m_invincibleTimer = DebugParams::Instance().Float(U8("回避/無敵時間"), 0.2f,  0.0f,  1.0f);
+
+	// ステップは一瞬なので、まとめて数粒出して"バッ"と見せる
+	// (空中ステップが持っていた見た目を、こちらへ引き継いだ)
+	int burst = DebugParams::Instance().Int(U8("加速エフェクト/ステップの粒数"), 6, 0, 30);
+	for (int i = 0; i < burst; ++i)
+	{
+		EffectManager::Instance().SpawnBoost(GetBoostSpawnPos(m_dodgeDir), m_dodgeDir);
+	}
 }
 
 int Player::GetMaxDodgeCharges() const
@@ -943,7 +937,8 @@ void Player::UpdateDive(float dt)
 
 			// ※ 2026/07/19の入力再設計で「離した瞬間」→「押した瞬間」に変更。
 			//    狙い(スロー)がEへ移り、長押しで溜める必要がなくなったため
-			if (KdInputManager::Instance().IsPress("Anchor"))
+			// ※ 2026/08/02の入力のAoT2化で、攻撃ボタンが左クリック→右クリックへ移った
+			if (KdInputManager::Instance().IsPress("Attack"))
 			{
 				spTarget = FindNearestEnemy(GetPos(), chainRange);   // 押した瞬間に次の敵へ
 				if (spTarget)
@@ -1121,7 +1116,6 @@ void Player::Respawn()
 	m_isDodging = false;
 	m_dodgeTimer = 0.0f;
 	m_invincibleTimer = 0.0f;
-	m_isSprinting = false;
 	m_accelPressWasGround = false;
 	m_dodgeCharges = GetMaxDodgeCharges();   // ステップのストックは満タンで再開する
 	m_dodgeRechargeTimer = 0.0f;
@@ -1598,9 +1592,8 @@ void Player::WatchDebug() const
 	// 綴り違いを疑う(Scifi_girlは "01 idle" のように番号＋半角スペース＋英字)
 	w.Watch(U8("Player/アニメ"), GetCurrentAnimName());
 
-	// 地上ダッシュまわり(右クリック押下でステップ=回避、押しっぱなしでダッシュ)。
+	// 空中ステップまわり(空中でSpaceを短く離すと出る。無敵つき)。
 	// ステップが出ない時は「ステップの残り」が0になっていないかを見る
-	w.Watch(U8("Player/ダッシュ中"),     m_isSprinting);
 	w.Watch(U8("Player/ステップ中"),     m_isDodging);
 	w.Watch(U8("Player/ステップの残り"),   m_dodgeCharges);
 	w.Watch(U8("Player/ステップ再充填"),   m_dodgeRechargeTimer);
@@ -1794,8 +1787,9 @@ void Player::UpdateCounter()
 		Application::Instance().SetTimeScale(slow);
 		m_counterWindowTimer -= Application::Instance().GetRealDeltaTime();
 
-		// 攻撃ボタン(左クリック)を押したら突撃へ移行する(狙いはauto-target、無ければ最寄りの敵)
-		if (KdInputManager::Instance().IsPress("Anchor"))
+		// 攻撃ボタン(右クリック)を押したら突撃へ移行する(狙いはauto-target、無ければ最寄りの敵)
+		// ※ 2026/08/02の入力のAoT2化で左クリック→右クリックへ移った
+		if (KdInputManager::Instance().IsPress("Attack"))
 		{
 			std::shared_ptr<KdGameObject> spTarget = m_upTargeting->GetTarget();
 			if (!spTarget)
