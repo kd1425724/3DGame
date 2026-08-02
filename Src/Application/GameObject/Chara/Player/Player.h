@@ -69,8 +69,10 @@ private:
 	void PerformDiveSlash();
 	// 実際に斬る処理。_isCritical はダメージ倍率と手応え(カメラ揺れ)を変える
 	void ExecuteSlash(const Math::Vector3& _aim, bool _isCritical);
-	// 斬撃が届く距離とクリティカルになる距離。判定とデバッグ表示の両方が読む
-	void GetSlashRanges(float& _outHitRange, float& _outCritRange) const;
+	// クリティカルになる間合い(m)。判定とデバッグ表示の両方が読む。
+	// ※ 「斬撃範囲」は 2026/08/02 に廃止した。空振りを先行入力に変えた時点で、
+	//   その内で押しても外で押しても結果は同じ通常ヒットになり、意味を持たなくなったため
+	float GetCriticalRange() const;
 	// 通常移動(接地=入力に即セット/空中=エアアクセル。カメラの水平向き基準)
 	void UpdateMove(float dt);
 	// SPACEでジャンプ。コヨーテタイム(接地を離れた直後の猶予)＋先行入力(着地寸前の入力先読み)つき
