@@ -4,6 +4,7 @@
 #include "../../../API/MathAPI/MathAPI.h"
 #include "../../../Scene/SceneManager.h"
 #include "../../../Debug/DebugParams/DebugParams.h"
+#include "../../../Debug/DebugFlags/DebugFlags.h"   // [MATDBG] 調査用の切り替え。原因が分かったら消す
 #include "../../../Debug/DebugDraw/DebugDraw.h"
 #include "../Player/Player.h"   // 突進命中時にPlayerの無敵判定/反撃通知/ノックバックを呼ぶため
 
@@ -42,7 +43,21 @@ void Enemy::Init()
 	// 画像生成 → Meshyで3D化＋テクスチャ → Mixamoで自動リグ、という経路で作った。
 	// 制作手順は Desktop\Cloude\Project\3DGame\Doc\Golem_Pipeline.md
 	// ライセンスは CC BY 4.0(Meshyのクレジット必須) → THIRD_PARTY_LICENSES.txt
-	SetAsset(kAssetPath);
+	// [MATDBG] ★一時的な調査用★
+	//   ゴーレムだけが暗い原因が、モデル・マテリアル・コードのどこを測っても
+	//   見つからなかった(実行時のマテリアル値までプレイヤーと一致していた)。
+	//   残る差はスケールだけなので、【プレイヤーのモデルを敵として同じ大きさで出す】
+	//   ことで「モデルが原因か、敵の経路(スケール)が原因か」を切り分ける。
+	//   ONにしたら敵を出し直すこと(TitleSceneへ戻ってGameSceneに入り直す)。
+	//   原因が分かったら "MATDBG" で grep して丸ごと消すこと。
+	if (DebugFlags::Instance().Get(U8("調査/敵をプレイヤーのモデルにする"), false))
+	{
+		SetAsset("Asset/Models/Character/GogglesChara/GogglesChara.gltf");
+	}
+	else
+	{
+		SetAsset(kAssetPath);
+	}
 
 	// ※ m_modelOriginIsFeet は既定の false のまま。
 	//   このモデルの原点は【足元ではなく体の中心】(glTFの頂点Y範囲が -0.951〜+0.948)。
