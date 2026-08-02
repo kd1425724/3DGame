@@ -57,31 +57,33 @@ public:
 	void SetTarget(const std::shared_ptr<KdGameObject>& target) { m_wpTarget = target; }
 
 	//----------------------------------------
-	// 部位破壊：部位の定義
+	// 狙える関節(部位破壊とワイヤーの掛け先を兼ねる)
 	//----------------------------------------
 
-	// 部位は「骨の線分(A→B)＋半径」＝カプセルで表す。
-	// 【なぜ球ではなくカプセルか】このモデルの腕は1.06m・脚は0.95mある(glTFの骨座標を実測)。
-	//   球1個では細長い部位に形が合わず、当たっていない場所を「当たった」と誤判定する。
-	//   カプセルは「点と線分の距離 - 半径」だけで判定できるので、球とほとんど同じコストで済む
-	struct PartDef
+	// 狙える場所は【関節だけ】で、1関節あたり球ひとつ。首・左右の肘・左右の膝の5つ。
+	//
+	// 【なぜ部位全体ではなく関節か】ワイヤーは関節の引っ掛かりにしか打てない仕様なので、
+	//   ワイヤーの掛け先と部位破壊の的が同じものになる。表をひとつにすれば両方が同じ点を指す。
+	//   腕や脚を丸ごと包むより判定も表現もはるかに単純で、狙う楽しさも関節に集まる。
+	//
+	// 【潰す骨を別に持たない理由】関節の骨をそのまま潰せば配下が道連れで消える。
+	//   肘(ForeArm)を潰せば前腕と手、膝(Leg)なら脛と足、首(Neck)なら頭が消える＝関節の骨で足りる
+	struct JointDef
 	{
-		const char* name;           // 表示用の部位名
-		const char* boneA;          // カプセルの始点になる骨
-		const char* boneB;          // 終点になる骨
+		const char* name;           // 表示用の関節名
+		const char* bone;           // 判定の中心になる骨。破壊時に潰す骨も兼ねる
 		const char* radiusKey;      // 半径のDebugParamsキー(実機で見ながら詰めるため外に出す)
 		float       defaultRadius;  // 半径の既定値【モデル座標系】。ワールドで使う側がスケールを掛ける
 		float       damageScale;    // ダメージ倍率。弱点ほど大きい
-		float       maxHp;          // 部位HP。本体HPとは別勘定(モンハン方式)
-		const char* collapseBone;   // 破壊時に潰す骨。nullptr = 破壊できない部位(胴)
+		float       maxHp;          // 関節のHP。本体HPとは別勘定(モンハン方式)
 	};
 
-	// 部位の数。表の実体はEnemy.cppにある
-	static constexpr int kPartCount = 6;
+	// 関節の数。表の実体はEnemy.cppにある
+	static constexpr int kJointCount = 5;
 
-	// このモデル(StoneGolem)の部位表。
+	// このモデル(StoneGolem)の関節表。
 	// 骨名は推測せずglTFのskins[0].jointsを直接読んで確認した実在の名前(2026/08/02)
-	static const PartDef kPartDefs[kPartCount];
+	static const JointDef kJointDefs[kJointCount];
 
 private:
 
@@ -102,13 +104,13 @@ private:
 	float m_stateTimer = 0.0f;          // 現在状態の残り時間(Windup/Strike/Recoverで使用)
 	Math::Vector3 m_lungeDir = {};      // 突進方向。Windup終了時に固定する(以後は追尾しない=回避で避けられる)
 
-	// 部位のカプセルをデバッグ表示する(両端に球＋芯の線)。
-	// 半径が妥当かは目で見ないと決められないので、命中判定を書く【前】に用意する
-	void DrawPartCapsuleDebug();
-
-	// 部位のカプセルの端点をワールド座標で取り出す。半径もワールド(スケール済み)で返す。
+	// 関節の球(中心と半径)をワールド座標で取り出す。半径もワールド(スケール済み)で返す。
 	// 骨が見つからなければfalse(モデルを差し替えて骨名が変わっても落ちない)
-	bool GetPartCapsule(const PartDef& _part, Math::Vector3& _outA, Math::Vector3& _outB, float& _outRadius) const;
+	bool GetJointSphere(const JointDef& _joint, Math::Vector3& _outCenter, float& _outRadius) const;
+
+	// 関節の球をデバッグ表示する。
+	// 半径が妥当かは目で見ないと決められないので、命中判定を書く【前】に用意する
+	void DrawJointDebug();
 
 	// 突進が命中した瞬間の処理(無敵なら反撃成立で自滅／無防備ならノックバック)
 	void ResolveStrikeHit(const std::shared_ptr<KdGameObject>& _target);

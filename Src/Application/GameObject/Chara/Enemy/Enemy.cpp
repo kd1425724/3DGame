@@ -7,19 +7,19 @@
 #include "../../../Debug/DebugDraw/DebugDraw.h"
 #include "../Player/Player.h"   // 突進命中時にPlayerの無敵判定/反撃通知/ノックバックを呼ぶため
 
-// 部位表。半径はglTFの骨座標の実測から決めた初期値【モデル座標系】(身長1.899m)。
-//   腕は肩(Y=0.625)から手(Y=-0.415)まで1.06m、脚は腿(Y=0.174)から足(Y=-0.775)まで0.95m。
-//   実機で見て詰められるよう、半径だけDebugParamsに出してある
-// ※ 胴のcollapseBoneはnullptr。胴の骨を潰すと配下の全部位が道連れで消えるので破壊対象にしない
-const Enemy::PartDef Enemy::kPartDefs[Enemy::kPartCount] =
+// 関節表。狙えるのはこの5つだけ。
+// 骨の対応はMixamoリグの作りに沿っている(この経路のモデルなら他でもそのまま使える)：
+//   肘 = ForeArm の根元／膝 = Leg の根元／首 = Neck。いずれも「その関節から先」を配下に持つ
+// 半径はglTFの骨座標の実測から決めた初期値【モデル座標系】(身長1.899m)。
+// 実機で見て詰められるよう、半径だけDebugParamsに出してある(左右は同じキーを共有)
+const Enemy::JointDef Enemy::kJointDefs[Enemy::kJointCount] =
 {
-	// 頭は弱点。小さい判定＋大きい倍率という業界標準の作り方にしてある
-	{ U8("頭"),   "mixamorig:Head",       "mixamorig:HeadTop_End", U8("部位/半径_頭"),   0.17f, 2.0f, 20.0f, "mixamorig:Head"       },
-	{ U8("胴"),   "mixamorig:Spine",      "mixamorig:Neck",        U8("部位/半径_胴"),   0.28f, 1.0f,  0.0f, nullptr                },
-	{ U8("左腕"), "mixamorig:LeftArm",    "mixamorig:LeftHand",    U8("部位/半径_腕"),   0.16f, 1.0f, 30.0f, "mixamorig:LeftArm"    },
-	{ U8("右腕"), "mixamorig:RightArm",   "mixamorig:RightHand",   U8("部位/半径_腕"),   0.16f, 1.0f, 30.0f, "mixamorig:RightArm"   },
-	{ U8("左脚"), "mixamorig:LeftUpLeg",  "mixamorig:LeftFoot",    U8("部位/半径_脚"),   0.20f, 0.8f, 40.0f, "mixamorig:LeftUpLeg"  },
-	{ U8("右脚"), "mixamorig:RightUpLeg", "mixamorig:RightFoot",   U8("部位/半径_脚"),   0.20f, 0.8f, 40.0f, "mixamorig:RightUpLeg" },
+	// 首は弱点。潰すと頭が落ちるので、小さい判定＋大きい倍率という業界標準の作り方にしてある
+	{ U8("首"),   "mixamorig:Neck",         U8("関節/半径_首"), 0.15f, 2.0f, 20.0f },
+	{ U8("左肘"), "mixamorig:LeftForeArm",  U8("関節/半径_肘"), 0.13f, 1.0f, 30.0f },
+	{ U8("右肘"), "mixamorig:RightForeArm", U8("関節/半径_肘"), 0.13f, 1.0f, 30.0f },
+	{ U8("左膝"), "mixamorig:LeftLeg",      U8("関節/半径_膝"), 0.14f, 1.0f, 40.0f },
+	{ U8("右膝"), "mixamorig:RightLeg",     U8("関節/半径_膝"), 0.14f, 1.0f, 40.0f },
 };
 
 DebugDraw::Category Enemy::GetDebugCategory() const
@@ -27,37 +27,33 @@ DebugDraw::Category Enemy::GetDebugCategory() const
 	return DebugDraw::Category::Enemy;
 }
 
-bool Enemy::GetPartCapsule(const PartDef& _part, Math::Vector3& _outA, Math::Vector3& _outB, float& _outRadius) const
+bool Enemy::GetJointSphere(const JointDef& _joint, Math::Vector3& _outCenter, float& _outRadius) const
 {
-	if (!GetBoneWorldPos(_part.boneA, _outA)) { return false; }
-	if (!GetBoneWorldPos(_part.boneB, _outB)) { return false; }
+	if (!GetBoneWorldPos(_joint.bone, _outCenter)) { return false; }
 
-	// 【罠】GetBoneWorldPosはGetDrawMatrix経由なので端点は既にスケール済みのワールド座標。
-	//   一方PartDefの半径は【モデル座標系】なので、ここで拡大率を掛けないと
-	//   身長25mのゴーレムに0.2m弱のカプセルが並ぶことになる。
-	//   逆に端点側でスケールを掛けると先日の「足元補正の二重掛け」と同じ事故になる
-	_outRadius = DebugParams::Instance().Float(_part.radiusKey, _part.defaultRadius, 0.01f, 1.0f) * GetScale().y;
+	// 【罠】GetBoneWorldPosはGetDrawMatrix経由なので中心は既にスケール済みのワールド座標。
+	//   一方JointDefの半径は【モデル座標系】なので、ここで拡大率を掛けないと
+	//   身長25mのゴーレムに0.15m弱の球が並ぶことになる。
+	//   逆に中心側でスケールを掛けると先日の「足元補正の二重掛け」と同じ事故になる
+	_outRadius = DebugParams::Instance().Float(_joint.radiusKey, _joint.defaultRadius, 0.01f, 1.0f) * GetScale().y;
 	return true;
 }
 
-void Enemy::DrawPartCapsuleDebug()
+void Enemy::DrawJointDebug()
 {
 	if (!m_pDebugWire) { return; }
 
-	// カプセルを描く線が無いので、両端の球と芯の線で代用する。
-	// 見たいのは「部位を包めているか」なので、これで足りる
-	const Math::Color kPartColor = Math::Color(1.0f, 0.85f, 0.2f, 1.0f);
+	// 狙える的なので目立つ色にする。見たいのは「関節を包めているか」と
+	// 「5つが互いに離れていて狙い分けられるか」の2点
+	const Math::Color kJointColor = Math::Color(1.0f, 0.85f, 0.2f, 1.0f);
 
-	for (const PartDef& part : kPartDefs)
+	for (const JointDef& joint : kJointDefs)
 	{
-		Math::Vector3 a{};
-		Math::Vector3 b{};
+		Math::Vector3 center{};
 		float radius = 0.0f;
-		if (!GetPartCapsule(part, a, b, radius)) { continue; }
+		if (!GetJointSphere(joint, center, radius)) { continue; }
 
-		m_pDebugWire->AddDebugSphere(a, radius, kPartColor);
-		m_pDebugWire->AddDebugSphere(b, radius, kPartColor);
-		m_pDebugWire->AddDebugLine(a, b, kPartColor);
+		m_pDebugWire->AddDebugSphere(center, radius, kJointColor);
 	}
 }
 
@@ -434,7 +430,7 @@ void Enemy::PostUpdate()
 		// 接触判定(m_hitRadius)を可視化
 		m_pDebugWire->AddDebugSphere(GetPos(), m_hitRadius, kRedColor);
 
-		// 部位のカプセル(半径を目で見て決めるため)
-		DrawPartCapsuleDebug();
+		// 狙える関節の球(半径を目で見て決めるため)
+		DrawJointDebug();
 	}
 }
