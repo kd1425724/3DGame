@@ -250,8 +250,25 @@ void Player::GetSlashRanges(float& _outHitRange, float& _outCritRange) const
 	// 【1箇所にまとめる理由】斬撃の判定(PerformDiveSlash)と、今どの間合いにいるかの
 	// デバッグ表示(UpdateDive)の両方が読む。別々に書くと既定値が食い違ったとき、
 	// 先に呼ばれたほうが黙って勝つ(敵の移動速度で同じ形の問題を踏んでいる)
-	_outHitRange  = DebugParams::Instance().Float(U8("落下攻撃/斬撃範囲"),         1.5f, 0.5f, 15.0f);
-	_outCritRange = DebugParams::Instance().Float(U8("落下攻撃/クリティカル範囲"), 0.6f, 0.1f, 15.0f);
+	//
+	// 🔴 【2026/08/02】固定の距離(m)ではなく【狙っている関節の球の半径に対する倍率】にした。
+	//   身長25mのゴーレムだと関節の球は半径2m前後ある。そこへ固定1.5mを使うと
+	//   「球のさらに内側に入らないと当たらない」ことになり、引き寄せ速度45m/sでは
+	//   1フレームに0.75m進むので通り抜けてしまい、ほぼ必ず空振りになっていた(実機で確認)。
+	//   半径に対する倍率で持てば、敵の大きさを変えても手触りが変わらない
+	float radius = 1.0f;
+	if (Enemy* pEnemy = GetLockedEnemy())
+	{
+		Math::Vector3 center{};
+		float r = 0.0f;
+		if (pEnemy->GetJointSphereAt(m_lockedJointIndex, center, r))
+		{
+			radius = r;
+		}
+	}
+
+	_outHitRange  = radius * DebugParams::Instance().Float(U8("突撃/斬撃範囲の倍率"),         1.5f, 0.2f, 5.0f);
+	_outCritRange = radius * DebugParams::Instance().Float(U8("突撃/クリティカル範囲の倍率"), 0.7f, 0.1f, 3.0f);
 }
 
 void Player::PerformDiveSlash()
@@ -277,6 +294,11 @@ void Player::PerformDiveSlash()
 	// 「タイミングを計る」という狙いそのものが消えるため
 	if (dist > hitRange)
 	{
+		// 空振りしたことが分かるように軽く揺らす。
+		// 何も起きないと「押せていないのか外したのか」がプレイヤーに区別できない
+		CameraShake::Instance().AddTrauma(
+			DebugParams::Instance().Float(U8("突撃/空振りの揺れ"), 0.12f, 0.0f, 0.5f));
+
 		m_isDiving = false;
 		m_wpDiveTarget.reset();
 		m_comboWindowTimer = 0.0f;
@@ -1150,7 +1172,18 @@ void Player::UpdateDive(float dt)
 		//
 		// そのぶん「通り過ぎたら終わり」をここで見る。これが無いと的の上で
 		// 引き寄せられ続けて永久に振り回されることになる
-		float passRange = DebugParams::Instance().Float(U8("落下攻撃/通過とみなす距離"), 0.5f, 0.05f, 5.0f);
+		// 通過とみなす距離も関節の球の半径を基準にする(斬撃範囲と同じ理由)。
+		// 斬撃範囲より内側でなければ「斬れる前に通り過ぎる」ことになるので、
+		// 必ず斬撃範囲の倍率より小さい値にすること
+		float passRange = 0.0f;
+		{
+			float hitRange  = 0.0f;
+			float critRange = 0.0f;
+			GetSlashRanges(hitRange, critRange);
+
+			passRange = hitRange * DebugParams::Instance().Float(U8("突撃/通過とみなす割合"), 0.25f, 0.05f, 1.0f);
+		}
+
 		if (dist <= passRange)
 		{
 			// 斬らずに到達した＝空振り。勢いは残したまま突撃だけ終える
@@ -1668,12 +1701,21 @@ void Player::DrawWire()
 	}
 	if (anyActive) { return; }
 
-	// 突撃(グラップル)中：引き寄せている対象へ線を引く(1本でよい)
+	// 突撃(グラップル)中：引き寄せている先へ線を引く(1本でよい)
 	if (m_isDiving)
 	{
 		if (std::shared_ptr<KdGameObject> spTarget = m_wpDiveTarget.lock())
 		{
-			m_upWires[0]->Draw(GetWireMuzzlePos(0), spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f));
+			// 🔴 終点は【狙っている関節】。UpdateDiveが実際に引き寄せている点と同じにする。
+			// 以前は対象のGetPos()(=モデルの中心)へ引いていたので、
+			// 関節に掛けたはずの線が突撃に移った瞬間に体の中心へ飛んで見えていた
+			Math::Vector3 aim{};
+			if (!GetLockedJointPos(aim))
+			{
+				aim = spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f);
+			}
+
+			m_upWires[0]->Draw(GetWireMuzzlePos(0), aim);
 		}
 	}
 }
