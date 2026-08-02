@@ -202,35 +202,6 @@ namespace MathAPI
 	}
 
 	//------------------------------------------------
-	// 線分との距離(カプセル判定の土台)
-	//------------------------------------------------
-
-	// 線分_a→_b上で、_pointに最も近い点を返す。
-	// 「点とカプセルの距離」は【この点までの距離 - カプセルの半径】で求まるので、
-	// カプセル判定はこの関数1本で書ける(部位ごとの当たり判定に使う)
-	// ※ Unreal の FMath::ClosestPointOnSegment / Unity の内部実装と同じ式
-	// ※ 線分が退化(_a==_b)している場合は _a を返す。0除算を踏まない
-	inline Math::Vector3 ClosestPointOnSegment(const Math::Vector3& _point,
-		const Math::Vector3& _a, const Math::Vector3& _b)
-	{
-		const Math::Vector3 ab = _b - _a;
-		const float lenSq = ab.LengthSquared();
-		if (lenSq <= kSmallNumber) { return _a; }
-
-		// _aを原点として ab 方向へどれだけ進んだ位置かを 0〜1 に収める
-		const float t = std::clamp((_point - _a).Dot(ab) / lenSq, 0.0f, 1.0f);
-		return _a + ab * t;
-	}
-
-	// 点と線分の距離。ClosestPointOnSegment の結果までの距離を返すだけ
-	// ※ 大小比較しかしない場面では、平方根を避けるため呼び出し側で LengthSquared を使ってよい
-	inline float DistanceToSegment(const Math::Vector3& _point,
-		const Math::Vector3& _a, const Math::Vector3& _b)
-	{
-		return (_point - ClosestPointOnSegment(_point, _a, _b)).Length();
-	}
-
-	//------------------------------------------------
 	// 目標値への追従(フレームレート非依存)
 	//------------------------------------------------
 
