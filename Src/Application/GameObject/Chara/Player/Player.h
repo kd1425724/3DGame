@@ -127,8 +127,9 @@ private:
 	// 空中スロー(エアフォーカス)：空中でE(Focus)長押し中は時間をスローにして狙う。
 	// フォーカスゲージで制限する
 	void UpdateAirFocus();
-	// 落下攻撃：対象へワイヤーで引き寄せ突撃(未ロックは真下ダイブ)。
-	// 斬ったら受付窓中にもう一度押して周りの敵へ続けて突撃する連続攻撃
+	// 突撃：対象へワイヤーで引き寄せる。斬るのは右クリックの3回目(PerformDiveSlash)で、
+	// 斬ったら受付窓中にもう一度押して周りの敵へ続けて突撃する連続攻撃になる。
+	// ※ 未ロック時の「真下ダイブ(落下攻撃)」は 2026/08/02 に撤去(到達できないため)
 	void UpdateDive(float dt);
 	// 範囲内で最も近い生きている敵を返す(連続攻撃の次の突撃先選び)。いなければnull
 	std::shared_ptr<KdGameObject> FindNearestEnemy(const Math::Vector3& center, float range) const;

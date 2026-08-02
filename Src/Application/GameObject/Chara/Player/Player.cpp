@@ -1097,8 +1097,13 @@ void Player::UpdateDive(float dt)
 			// 次の対象が決まった → 下のダッシュへ流れる
 		}
 
-		// 対象がいない(受付窓もない)=真下ダイブ：そのまま落下(着地でPostUpdateが終了処理)
-		if (!spTarget) { return; }
+		// 対象がいない(受付窓もない)＝突撃を続ける相手がいないので終わる。
+		// ※ 以前はここから「真下ダイブ(落下攻撃)」へ落ちていたが、2026/08/02に撤去した
+		if (!spTarget)
+		{
+			m_isDiving = false;
+			return;
+		}
 
 		float pullAccel = DebugParams::Instance().Float(U8("落下攻撃/引き寄せ加速"),     80.0f, 5.0f, 300.0f);
 		float pullMax   = DebugParams::Instance().Float(U8("落下攻撃/引き寄せ上限速度"), 45.0f, 5.0f, 150.0f);
@@ -1200,19 +1205,14 @@ void Player::StartDive()
 	// 勢いを付けて始めた連続攻撃は最後まで速いまま繋がる
 	m_diveEntrySpeed = m_velocity.Length();
 
-	// 自動ターゲットがいれば「対象へワイヤーで引き寄せ」、いなければ従来の真下ダイブ
-	std::shared_ptr<KdGameObject> spLock = m_upTargeting->GetTarget();
-	if (spLock)
-	{
-		// 以降UpdateDiveが対象へ引き寄せ、ワイヤーの線はDrawWireが手元→対象に描く
-		m_wpDiveTarget = spLock;
-	}
-	else
-	{
-		m_wpDiveTarget.reset();
-		float diveSpeed = DebugParams::Instance().Float(U8("落下攻撃/降下速度"), 30.0f, 5.0f, 100.0f);
-		m_velocity.y = -diveSpeed;   // 真下(水平の勢いは残す)
-	}
+	// 対象へワイヤーで引き寄せる。以降UpdateDiveが引き寄せ、
+	// ワイヤーの線はDrawWireが手元→対象に描く
+	//
+	// 🔴 【2026/08/02】対象がいない時の「真下ダイブ(落下攻撃)」は撤去した(ユーザー指示)。
+	//   右クリックを3段階にした結果、突撃に入るには必ずロックオン中の的が要る
+	//   (UpdateAttackInputがIsAttackInput()を通す)。つまりこの分岐は【到達できない】。
+	//   反撃窓からの突撃も最寄りの敵を探してから入るので、対象なしでは始まらない
+	m_wpDiveTarget = m_upTargeting->GetTarget();
 }
 
 std::shared_ptr<KdGameObject> Player::FindNearestEnemy(const Math::Vector3& center, float range) const
@@ -1278,8 +1278,8 @@ void Player::PostUpdate()
 		GroundCheck();
 	}
 
-	// 突撃中に着地したとき：対象も継続受付窓も無い(=真下ダイブが空振りして着地)なら終了する。
-	// ダッシュ中(対象あり)や継続受付中(窓あり=キー入力待ち)は着地しても打ち切らない
+	// 突撃中に着地したとき：対象も継続受付窓も無いなら終了する。
+	// 突撃中(対象あり)や継続受付中(窓あり=入力待ち)は着地しても打ち切らない
 	if (m_isDiving && IsGrounded() && m_wpDiveTarget.expired() && m_comboWindowTimer <= 0.0f)
 	{
 		m_isDiving = false;
