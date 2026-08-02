@@ -1,6 +1,7 @@
 ﻿#include "DebugDraw.h"
 
 #include "../DebugFlags/DebugFlags.h"
+#include "../DebugWatch/DebugWatch.h"   // [TEXT3D] 切り分け用の計測。原因が確定したら外す
 
 namespace
 {
@@ -89,6 +90,10 @@ namespace DebugDraw
 
 	void DrawText3D()
 	{
+		// [TEXT3D] 切り分け用の計測。原因が確定したらこのタグで grep して撤去する。
+		//   ここが0なら「積む側(AddText3D)まで届いていない」、0以外なら「描く側の問題」
+		DebugWatch::Instance().Watch("[TEXT3D] 積まれた数", static_cast<int>(s_texts3D.size()));
+
 		if (s_texts3D.empty()) { return; }
 
 		// 【なぜカメラを引数で受け取らないか】この関数はImGuiのフレーム内(描画の後)から
@@ -120,6 +125,20 @@ namespace DebugDraw
 			const ImVec2 screenPos(
 				(ndcX * 0.5f + 0.5f) * screenSize.x,
 				(-ndcY * 0.5f + 0.5f) * screenSize.y + kOffsetY);
+
+			// [TEXT3D] 切り分け用。文字と同じ座標に塗り潰しの丸を出す。
+			//   丸は出るのに文字が出ない → AddText(フォント)側の問題
+			//   丸も出ない                → 座標変換か、この関数まで来ていない
+			//   丸が変な場所に出る        → 座標変換の問題
+			pDrawList->AddCircleFilled(screenPos, 4.0f, IM_COL32(255, 0, 255, 255));
+
+			// [TEXT3D] 1件目の画面座標を出す(画面外に飛んでいないかを数値で見る)
+			if (&entry == &s_texts3D.front())
+			{
+				DebugWatch::Instance().Watch("[TEXT3D] 1件目X", screenPos.x);
+				DebugWatch::Instance().Watch("[TEXT3D] 1件目Y", screenPos.y);
+				DebugWatch::Instance().Watch("[TEXT3D] 画面幅", screenSize.x);
+			}
 
 			pDrawList->AddText(screenPos, IM_COL32(255, 220, 60, 255), entry.text.c_str());
 		}
