@@ -44,9 +44,16 @@ void Enemy::Init()
 	// ライセンスは CC BY 4.0(Meshyのクレジット必須) → THIRD_PARTY_LICENSES.txt
 	SetAsset(kAssetPath);
 
-	// ※ m_modelOriginIsFeet は既定の false のまま。
-	//   このモデルの原点は【足元ではなく体の中心】(glTFの頂点Y範囲が -0.951〜+0.948)。
-	//   プレイヤーやメカ(原点＝足元)とは違うので、ここを true にすると半身ぶん沈む
+	// 【2026/08/02】歩行アニメを再生するようにしたので false → true へ変えた。
+	//   このモデルは【バインドポーズと歩行クリップで足元の高さが違う】。
+	//   ・バインドポーズ(アニメを当てない状態)…つま先Y=-0.933／頭頂Y=+0.934＝原点は体の中心
+	//   ・歩行クリップを当てた状態         …つま先Y≒0     ／頭頂Y=+1.81 ＝原点は足元
+	//   スキン行列は「逆バインド行列×ボーンの現在位置」(KdStandardShader.cpp:310)なので、
+	//   アニメを流し始めた瞬間に見た目が骨のほうへ移り、原点の意味が中心から足元へ変わる。
+	//   falseのままだと約12m(0.93×拡大率13.2)浮くので、必ずtrueとセットで有効にすること。
+	//   ※ glTFを直接読んで前方運動学で測った値(2026/08/02)。頂点のY範囲から推論すると
+	//     バインドポーズしか見えず「原点＝中心」と読み違える
+	m_modelOriginIsFeet = true;
 
 	// モデルの実寸は高さ1.899m。街の実測から導いた目標は12〜18mで、
 	// 「通りを移動できる幅15mが上限、その比率だと高さ17〜18mが限界」。
@@ -56,6 +63,9 @@ void Enemy::Init()
 	//   実機で通行を確かめること(通れないなら18m前後へ戻す)
 	// 実機で回して決められるようDebugParamsに出してある(出現し直すと反映される)
 	float targetHeight = DebugParams::Instance().Float(U8("敵/身長"), 25.0f, 1.0f, 60.0f);
+	// 直立(バインドポーズ)での実寸。歩行中は膝が曲がるので実際に立つ高さは
+	// この95%前後(実測1.58〜1.81)になる。基準を直立のままにしてあるのは、
+	// ここを歩行時の高さに変えると今まで詰めた「敵/身長」の見え方が変わってしまうため
 	float modelHeight = 1.899f;
 
 	m_bodyHeight = modelHeight;
@@ -172,7 +182,7 @@ void Enemy::Update()
 		}
 
 		// 追従移動(対象へゆっくり近づく)
-		float moveSpeed = DebugParams::Instance().Float(U8("敵/移動速度"), 1.5f, 0.0f, 20.0f);
+		float moveSpeed = GetMoveSpeed();
 		pos += dirToTarget * moveSpeed * dt;
 		SetPos(pos);
 		faceTarget();
@@ -195,7 +205,7 @@ void Enemy::Update()
 	case State::Strike:
 	{
 		// 固定方向へ高速で突っ込む
-		float lungeSpeed = DebugParams::Instance().Float(U8("敵/突進速度"), 14.0f, 1.0f, 40.0f);
+		float lungeSpeed = GetLungeSpeed();
 		pos += m_lungeDir * lungeSpeed * dt;
 		SetPos(pos);
 		m_stateTimer -= dt;
@@ -261,6 +271,67 @@ void Enemy::ResolveStrikeHit(const std::shared_ptr<KdGameObject>& _target)
 	}
 }
 
+float Enemy::GetMoveSpeed() const
+{
+	return DebugParams::Instance().Float(U8("敵/移動速度"), 1.5f, 0.0f, 40.0f);
+}
+
+float Enemy::GetLungeSpeed() const
+{
+	return DebugParams::Instance().Float(U8("敵/突進速度"), 14.0f, 1.0f, 40.0f);
+}
+
+std::string Enemy::SelectAnimation() const
+{
+	// 持っているアニメが歩行1本だけなので、どの状態でもこれを流し、違いは再生速度で付ける。
+	// 攻撃・被弾・死亡が揃ったら、ここを状態で分岐させる(Player::SelectAnimationと同じ形)
+	return kWalkAnimName;
+}
+
+float Enemy::SelectAnimationSpeed() const
+{
+	// 【足を滑らせないための計算】
+	// この歩行はその場歩き(腰の水平移動が±0.14mしかない=ルートモーション無し)なので、
+	// 接地している足は体に対して「実際の歩行速度」ぶんだけ後ろへ流れる。
+	// その速さをglTFから前方運動学で実測すると、等倍スケールで 1.544 m/s だった
+	// (接地している間につま先が後退する量 1.028m ÷ 0.666秒。2026/08/02計測)。
+	// モデルは身長25mへ拡大しているので、滑らない速さも同じ倍率だけ上がる
+	constexpr float kWalkGroundSpeedAtScaleOne = 1.544f;
+
+	float noSlideSpeed = kWalkGroundSpeedAtScaleOne * GetScale().y;
+	if (noSlideSpeed <= 0.0f) { return 1.0f; }
+
+	// いま実際に出している水平の速さ。この敵は状態で速度が決まっている
+	float currentSpeed = 0.0f;
+	switch (m_state)
+	{
+	case State::Strike:
+		currentSpeed = GetLungeSpeed();
+		break;
+	case State::Chase:
+		currentSpeed = GetMoveSpeed();
+		break;
+	default:
+		// 予備動作(Windup)と硬直(Recover)はその場に止まっている
+		break;
+	}
+
+	// 見た目の重さは好みなので、計算どおり(=1.0)から外せるようにしておく。
+	// 大きくすると同じ移動速度でも足の回転が速くなり、軽い生き物に見える
+	float weight = DebugParams::Instance().Float(U8("敵/歩行アニメ倍率"), 1.0f, 0.1f, 5.0f);
+
+	// 止まっている間に完全な0にすると歩幅の途中で固まり「バグで止まった」ように見える。
+	// ごく遅く動かし続けて、重心を移し替えているように見せる
+	constexpr float kMinAnimSpeed = 0.05f;
+
+	float speed = currentSpeed / noSlideSpeed * weight;
+	if (speed < kMinAnimSpeed)
+	{
+		speed = kMinAnimSpeed;
+	}
+	return speed;
+}
+
 void Enemy::EnterRecover()
 {
 	m_state = State::Recover;
@@ -284,4 +355,8 @@ void Enemy::PostUpdate()
 
 	// 地面(KdCollider::TypeGround)に立つ
 	GroundCheck();
+
+	// アニメーションを進める。接地・位置・状態が全て確定したあとで呼ぶ
+	// (Playerと同じくPostUpdateの最後。CLAUDE.mdの「PostUpdate＝world状態の解決」に合わせる)
+	UpdateAnimation();
 }
