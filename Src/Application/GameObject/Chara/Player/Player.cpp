@@ -245,17 +245,20 @@ void Player::UpdateAttackInput()
 	ShootJointWire();
 }
 
-void Player::GetSlashRanges(float& _outHitRange, float& _outCritRange) const
+float Player::GetCriticalRange() const
 {
-	// 【1箇所にまとめる理由】斬撃の判定(PerformDiveSlash)と、今どの間合いにいるかの
-	// デバッグ表示(UpdateDive)の両方が読む。別々に書くと既定値が食い違ったとき、
+	// 【1箇所にまとめる理由】斬撃の判定(PerformDiveSlash / UpdateDiveの先行入力)と
+	// デバッグ表示の両方が読む。別々に書くと既定値が食い違ったとき、
 	// 先に呼ばれたほうが黙って勝つ(敵の移動速度で同じ形の問題を踏んでいる)
 	//
-	// 🔴 【2026/08/02】固定の距離(m)ではなく【狙っている関節の球の半径に対する倍率】にした。
-	//   身長25mのゴーレムだと関節の球は半径2m前後ある。そこへ固定1.5mを使うと
-	//   「球のさらに内側に入らないと当たらない」ことになり、引き寄せ速度45m/sでは
-	//   1フレームに0.75m進むので通り抜けてしまい、ほぼ必ず空振りになっていた(実機で確認)。
-	//   半径に対する倍率で持てば、敵の大きさを変えても手触りが変わらない
+	// 🔴 【2026/08/02】「斬撃範囲」を廃止し、間合いの基準はこれ1つにした。
+	//   空振りをやめて先行入力にした時点で、斬撃範囲の内で押しても外で押しても
+	//   結果は同じ「通常ヒット」になり、あの境界は何も決めていない値になっていた。
+	//   残すのは「ここで押せたらクリティカル」という1本の線だけでよい。
+	//
+	// 🔴 距離(m)ではなく【狙っている関節の球の半径に対する倍率】で持つ。
+	//   身長25mのゴーレムだと関節の球は半径2m前後あり、固定の距離では
+	//   敵の大きさを変えるたびに手触りが変わってしまう
 	float radius = 1.0f;
 	if (Enemy* pEnemy = GetLockedEnemy())
 	{
@@ -267,8 +270,7 @@ void Player::GetSlashRanges(float& _outHitRange, float& _outCritRange) const
 		}
 	}
 
-	_outHitRange  = radius * DebugParams::Instance().Float(U8("突撃/斬撃範囲の倍率"),         1.5f, 0.2f, 5.0f);
-	_outCritRange = radius * DebugParams::Instance().Float(U8("突撃/クリティカル範囲の倍率"), 0.7f, 0.1f, 3.0f);
+	return radius * DebugParams::Instance().Float(U8("突撃/クリティカル範囲の倍率"), 3.0f, 0.1f, 8.0f);
 }
 
 void Player::PerformDiveSlash()
@@ -285,27 +287,20 @@ void Player::PerformDiveSlash()
 
 	const float dist = Math::Vector3::Distance(aim, GetPos());
 
-	float hitRange  = 0.0f;
-	float critRange = 0.0f;
-	GetSlashRanges(hitRange, critRange);
-
-	// 遠すぎる＝空振り。突撃を打ち切って勢いだけ残す。
-	// 【なぜ空振りを用意するか】外しても何も起きないと連打が最適解になり、
-	// 「タイミングを計る」という狙いそのものが消えるため
-	// まだ届いていない＝先行入力として覚えておき、届いた瞬間に【通常】で出す。
+	// まだ間合いの外＝先行入力として覚えておき、届いた瞬間に【通常】で出す。
 	//
 	// 【なぜ空振りにしないか】外して何も起きないと「押せていないのか外したのか」が
 	// プレイヤーに区別できず、ただの罰になる(ユーザー判断で空振りは廃止)。
 	// 早く押しても攻撃は当たるが【クリティカルにはならない】ようにすることで、
 	// 「間合いを見て押す」ことの価値だけを残している
-	if (dist > hitRange)
+	if (dist > GetCriticalRange())
 	{
 		m_slashBuffered = true;
 		return;
 	}
 
-	// 近いほど良い。クリティカル範囲は斬撃範囲の内側にある
-	ExecuteSlash(aim, dist <= critRange);
+	// 間合いの中で押せた＝クリティカル
+	ExecuteSlash(aim, true);
 }
 
 void Player::ExecuteSlash(const Math::Vector3& _aim, bool _isCritical)
@@ -1185,16 +1180,12 @@ void Player::UpdateDive(float dt)
 		// 「どこからがクリティカルか」を数字で見られないと調整のしようがない
 		// (ここで読むことでDebugParamsのキーが起動直後から一覧に並ぶ効果もある)
 		{
-			float hitRange  = 0.0f;
-			float critRange = 0.0f;
-			GetSlashRanges(hitRange, critRange);
+			const float critRange = GetCriticalRange();
 
 			DebugWatch& w = DebugWatch::Instance();
-			w.Watch(U8("Player/的までの距離"),     dist);
-			w.Watch(U8("Player/斬撃範囲(m)"),      hitRange);
+			w.Watch(U8("Player/的までの距離"),        dist);
 			w.Watch(U8("Player/クリティカル範囲(m)"), critRange);
-			w.Watch(U8("Player/斬れる"),           dist <= hitRange);
-			w.Watch(U8("Player/クリティカル圏内"), dist <= critRange);
+			w.Watch(U8("Player/クリティカル圏内"),    dist <= critRange);
 		}
 
 		// 🔴 【2026/08/02】ここにあった「近づいたら自動で斬る」は撤去した(ユーザーの設計)。
@@ -1204,22 +1195,20 @@ void Player::UpdateDive(float dt)
 		//
 		// そのぶん「通り過ぎたら終わり」をここで見る。これが無いと的の上で
 		// 引き寄せられ続けて永久に振り回されることになる
-		// 通過とみなす距離も関節の球の半径を基準にする(斬撃範囲と同じ理由)。
-		// 斬撃範囲より内側でなければ「斬れる前に通り過ぎる」ことになるので、
-		// 必ず斬撃範囲の倍率より小さい値にすること
-		float hitRange  = 0.0f;
-		float critRange = 0.0f;
-		GetSlashRanges(hitRange, critRange);
+		const float critRange = GetCriticalRange();
 
-		// 先行入力が入っていて、届いたら【通常】で斬る。
+		// 先行入力が入っていて、間合いに入ったら【通常】で斬る。
 		// 早押しは当たるがクリティカルにはならない、というのがここの肝
-		if (m_slashBuffered && dist <= hitRange)
+		if (m_slashBuffered && dist <= critRange)
 		{
 			ExecuteSlash(aim, false);
 			return;
 		}
 
-		float passRange = hitRange * DebugParams::Instance().Float(U8("突撃/通過とみなす割合"), 0.25f, 0.05f, 1.0f);
+		// 通過とみなす距離も同じ基準から作る。
+		// 【必ずクリティカル範囲より内側にすること】外側にすると、押していないのに
+		// 間合いへ入る前に突撃が終わってしまい、斬る機会そのものが無くなる
+		float passRange = critRange * DebugParams::Instance().Float(U8("突撃/通過とみなす割合"), 0.25f, 0.05f, 0.9f);
 
 		if (dist <= passRange)
 		{
@@ -1846,22 +1835,24 @@ void Player::DrawDebugRanges()
 	// ※ 呼び出し元(DrawDebug)で s_showColliderDebug と m_pDebugWire を確認済み
 	const Math::Vector3 pos = GetPos();
 
-	// 攻撃判定：斬撃範囲(橙)とクリティカル範囲(赤)。
+	// 攻撃判定：クリティカル範囲(赤)と、通過とみなす距離(灰)。
 	//
 	// 🔴 【2026/08/02】プレイヤーの位置ではなく【狙っている関節の位置】に描く。
 	//   判定は「関節までの距離」で行っているので、自分の周りに球を出しても
 	//   実際に斬れる範囲とは何の関係も無かった(古い落下攻撃時代の名残)。
-	//   実際の判定と同じ GetSlashRanges を読むので、見えている球＝そのまま判定
+	//   実際の判定と同じ GetCriticalRange を読むので、見えている球＝そのまま判定
 	{
 		Math::Vector3 aim{};
 		if (GetLockedJointPos(aim))
 		{
-			float hitRange  = 0.0f;
-			float critRange = 0.0f;
-			GetSlashRanges(hitRange, critRange);
+			const float critRange = GetCriticalRange();
 
-			m_pDebugWire->AddDebugSphere(aim, hitRange,  Math::Color(1.0f, 0.55f, 0.1f, 1.0f));
+			// 赤：この中で押せばクリティカル。外で押しても先行入力で通常は当たる
 			m_pDebugWire->AddDebugSphere(aim, critRange, Math::Color(1.0f, 0.15f, 0.15f, 1.0f));
+
+			// 灰：ここまで来ても押していなければ通過(突撃終了)
+			float passRate = DebugParams::Instance().Float(U8("突撃/通過とみなす割合"), 0.25f, 0.05f, 0.9f);
+			m_pDebugWire->AddDebugSphere(aim, critRange * passRate, Math::Color(0.5f, 0.5f, 0.5f, 1.0f));
 
 			// 自分から狙点への線。今どれだけ離れているかが目で分かる
 			m_pDebugWire->AddDebugLine(pos, aim, Math::Color(1.0f, 0.8f, 0.3f, 1.0f));
