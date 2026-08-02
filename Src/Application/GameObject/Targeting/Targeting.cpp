@@ -7,15 +7,10 @@
 #include "../../Collision/CollisionGrid.h"       // IsWallBetween(敵が建物の陰にいるか)
 #include "../../API/MathAPI/MathAPI.h"           // 安全な正規化
 
-// 板ポリ(KdSquarePolygon)はPch経由で見える。unique_ptr(前方宣言)の生成/破棄を
-// ここ(完全な型が見える.cpp)で行うため、ctor/dtorを定義する
 Targeting::Targeting()
 {
-	// 照準テクスチャの板ポリ(カメラを向く点ビルボード)。テクスチャはKdAssetsキャッシュから取る
-	std::shared_ptr<KdTexture> spTex = KdAssets::Instance().m_textures.GetData("Asset/Textures/UI/Reticle.png");
-	m_upMarkerPoly = std::make_unique<KdSquarePolygon>(spTex);
-	m_upMarkerPoly->Set2DObject(false);
-	m_upMarkerPoly->SetBillboardMode(KdPolygon::BillboardMode::eScreen);
+	// 照準テクスチャ。テクスチャはKdAssetsキャッシュから取る
+	m_spMarkerTex = KdAssets::Instance().m_textures.GetData("Asset/Textures/UI/Reticle.png");
 }
 
 Targeting::~Targeting() = default;
@@ -24,6 +19,9 @@ void Targeting::Update(const std::shared_ptr<CameraBase>& _spCamera, float _dt, 
 {
 	// マーカーのアニメ用に時間を進める
 	m_time += _dt;
+
+	// マーカーを2Dで描くのに要るので覚えておく(DrawMarkerは引数を取らないため)
+	m_wpCamera = _spCamera;
 
 	// カメラの向き(=画面中心の方向)に一番近い敵を選ぶ。カメラ自体は回さない。
 	if (!_spCamera)
@@ -102,38 +100,38 @@ void Targeting::Update(const std::shared_ptr<CameraBase>& _spCamera, float _dt, 
 
 void Targeting::DrawMarker()
 {
-	if (!m_upMarkerPoly) { return; }
+	if (!m_spMarkerTex) { return; }
 
 	std::shared_ptr<KdGameObject> spTarget = m_wpTarget.lock();
 	if (!spTarget) { return; }
 
-	// マーカーサイズ＋脈動(sinで軽く拡縮=ロック中の呼吸感)
-	float baseSize  = DebugParams::Instance().Float(U8("照準/マーカーサイズ"), 0.7f, 0.1f, 3.0f);
-	float pulseAmp  = DebugParams::Instance().Float(U8("照準/脈動"),          0.15f, 0.0f, 1.0f);
-	float size = baseSize * (1.0f + pulseAmp * sinf(m_time * 6.0f));
-	m_upMarkerPoly->SetScale(Math::Vector2(size, size));
+	std::shared_ptr<CameraBase> spCamera = m_wpCamera.lock();
+	if (!spCamera || !spCamera->GetCamera()) { return; }
 
-	// 回転角(照準がゆっくり回る)
-	float rotSpeed = DebugParams::Instance().Float(U8("照準/回転速度"), 60.0f, 0.0f, 360.0f);
-	float rotRad   = DirectX::XMConvertToRadians(m_time * rotSpeed);
-
-	// 面内回転(local Z軸まわり)だけ作って配置。カメラへの正対はeScreenビルボードに任せる。
-	// 狙う関節が指定されていればそこに、無ければ従来どおり敵の少し上に出す
-	Math::Matrix world = Math::Matrix::CreateRotationZ(rotRad);
-	world.Translation(m_hasMarkerOverride
+	// 出す位置：狙う関節が指定されていればそこ、無ければ従来どおり敵の少し上
+	const Math::Vector3 worldPos = m_hasMarkerOverride
 		? m_markerOverridePos
-		: spTarget->GetPos() + Math::Vector3(0.0f, 0.9f, 0.0f));
+		: spTarget->GetPos() + Math::Vector3(0.0f, 0.9f, 0.0f);
 
-	// 発光色つきで描く(DrawPolygonはCullNoneなので裏表は不問。テクスチャの透過で照準形に抜ける)
-	Math::Color   col(1.0f, 0.5f, 0.25f, 1.0f);
-	Math::Vector3 emissive(0.8f, 0.35f, 0.1f);
+	// ワールド座標 → スクリーン座標(原点は画面中央。2D描画の座標系と一致する)
+	Math::Vector3 screen{};
+	spCamera->GetCamera()->ConvertWorldToScreenDetail(worldPos, screen);
 
-	// 【常に手前に出す】狙う関節(首・肘・膝)は体の【内側】にあるので、
-	// 深度テストを効かせたままだと必ずモデルに埋まって見えなくなる。
-	// ロックオンのマーカーや敵のHPバーを「壁や体の向こうでも見せる」のは
-	// 深度テストを切って描くのが定石(この作品ではKdDepthStencilState::ZDisable)。
-	// ※ Changeした分は必ずUndoで戻す。戻さないと以降の描画が全部深度無視になる
-	KdShaderManager::Instance().ChangeDepthStencilState(KdDepthStencilState::ZDisable);
-	KdShaderManager::Instance().m_StandardShader.DrawPolygon(*m_upMarkerPoly, world, col, emissive);
-	KdShaderManager::Instance().UndoDepthStencilState();
+	// zにはw(カメラから見た奥行き)が入っている。0以下＝カメラの後ろなので描かない
+	// (割った後の値は符号が反転していて、画面の反対側に出てしまう)
+	if (screen.z <= 0.0f) { return; }
+
+	// マーカーサイズ(px)＋脈動(sinで軽く拡縮=ロック中の呼吸感)。
+	// ※ 3Dで描いていた頃は距離で自然に小さくなったが、2Dでは画面上の大きさが一定になる。
+	//   ロックしている的の位置を見せるのが目的なので、一定のほうがむしろ見失いにくい
+	float baseSize = DebugParams::Instance().Float(U8("照準/マーカーサイズpx"), 48.0f, 8.0f, 256.0f);
+	float pulseAmp = DebugParams::Instance().Float(U8("照準/脈動"),             0.15f, 0.0f, 1.0f);
+	int   size     = static_cast<int>(baseSize * (1.0f + pulseAmp * sinf(m_time * 6.0f)));
+
+	// ※ 回転(照準がゆっくり回る)は落とした。DrawTexに回転を渡す口が無いため。
+	//   脈動だけでもロック中であることは分かるので、回転のために自前で板ポリを
+	//   組み直すほどの価値は無いと判断した
+	Math::Color col(1.0f, 0.5f, 0.25f, 1.0f);
+	KdShaderManager::Instance().m_spriteShader.DrawTex(
+		m_spMarkerTex.get(), static_cast<int>(screen.x), static_cast<int>(screen.y), size, size, nullptr, &col);
 }

@@ -30,10 +30,6 @@ void DebugManager::Draw()
 	// 上部メニューバー(各ウィンドウの個別ON/OFF)
 	DrawMenuBar();
 
-	// ワールド座標に積まれた文字(関節のHPなど)。
-	// ウィンドウの下に来るよう、他のパネルより先に描く
-	DebugDraw::DrawText3D();
-
 	if (m_showFlags)
 	{
 		DebugFlags::Instance().Draw();

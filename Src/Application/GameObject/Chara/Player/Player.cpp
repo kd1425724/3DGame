@@ -1334,12 +1334,20 @@ float Player::SelectTurnSpeed() const
 	return DebugParams::Instance().Float(U8("プレイヤー/向き直る速さ"), 720.0f, 90.0f, 2880.0f);
 }
 
+void Player::DrawSprite()
+{
+	// ロックオンのマーカー。ワールド座標をスクリーン座標へ変換して2Dで描く
+	// (2Dパスは3Dの絵が全部出た後・深度テスト無しなので、体の内側の関節でも埋まらない)
+	m_upTargeting->DrawMarker();
+}
+
 void Player::DrawUnLit()
 {
 	// キャラのモデルは CharaBase::DrawLit が描く。ここ(陰影なしパス)では
-	// ワイヤーの見た目・自動ターゲットのマーカーを描く(斬撃VFXはEffectManagerが描く)。
+	// ワイヤーの見た目を描く(斬撃VFXはEffectManagerが描く)。
+	// ※ ロックオンのマーカーは2D描画パス(DrawSprite)へ移した。
+	//   狙う関節は体の内側にあるため、3Dで描くと深度テストでモデルに埋まる
 	DrawWire();
-	m_upTargeting->DrawMarker();
 }
 
 bool Player::IsAnyWireAttached() const
