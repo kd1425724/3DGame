@@ -302,19 +302,25 @@ bool Application::Init(int w, int h)
 
 		// ※ スキル「振り回し一掃」(旧"Skill"=E)は2026/07/19に廃止。Eは下記のFocusへ回した
 
-		// Playerのジャンプ。ワイヤー中は上への噴射、空中ステップ中は上向き成分の追加を兼ねる
+		// Playerのジャンプ＋空中の推進(2026/08/02に旧"Accel"の役割を統合)
+		//   接地中 … ジャンプ
+		//   空中   … 単押しでステップ(無敵つき) / 長押しでブースト(加速)
 		pKeyboardMouse->AddButton("Jump", new KdInputButtonForWindows(VK_SPACE));
 
 		// Playerの照準＋スロー：E(押している間だけターゲットを取り、世界がスローになる)
 		// 進撃の巨人2に寄せた入力再設計(2026/07/19)で追加
 		pKeyboardMouse->AddButton("Focus", new KdInputButtonForWindows('E'));
 
-		// Playerのアンカー射出＋攻撃：左クリック(移動用ワイヤーと攻撃を1つに統一)
-		// ターゲットがいる/連続攻撃の受付中なら攻撃、そうでなければワイヤーを撃つ
+		// Playerのアンカー射出：左クリック
+		// 【2026/08/02 入力のAoT2化】以前は「文脈で攻撃かワイヤーか変わる」形だったが、
+		//   進撃の巨人2に合わせて用途別に分けた。左は【常にワイヤー】で、攻撃は右へ移した
 		pKeyboardMouse->AddButton("Anchor", new KdInputButtonForWindows(VK_LBUTTON));
 
-		// Playerの加速：右クリック(長押しで加速し続ける／単押しで空中ステップ)
-		pKeyboardMouse->AddButton("Accel", new KdInputButtonForWindows(VK_RBUTTON));
+		// Playerの攻撃：右クリック(ロックオン中の関節へ突撃する)
+		pKeyboardMouse->AddButton("Attack", new KdInputButtonForWindows(VK_RBUTTON));
+
+		// ※ 旧"Accel"(右クリックの加速)は 2026/08/02 に廃止し、Spaceへ統合した。
+		//   Space = 接地中はジャンプ／空中は単押しでステップ・長押しでブースト
 
 		// Playerのロックオン：中クリック(未使用)
 		pKeyboardMouse->AddButton("LockOn", new KdInputButtonForWindows(VK_MBUTTON));
@@ -323,8 +329,9 @@ bool Application::Init(int w, int h)
 		pKeyboardMouse->AddButton("Respawn", new KdInputButtonForWindows('R'));
 
 		// ※ Playerの回避ダッシュのShift("Dodge")は 2026/07/20 に廃止(ユーザー指示)。
-		//    回避は地上ダッシュの入り(ステップ)に統合し、右クリック("Accel")の押下で出る。
-		//    原神と同じく「ダッシュの初動がそのまま回避になる」形
+		//    その後、地上ステップ(回避)も 2026/08/02 の入力のAoT2化で廃止した
+		//    (歩きを無くして最初からダッシュにしたため)。
+		//    **無敵(反撃の唯一の入口)は空中ステップ＝Spaceの空中単押しへ引き継いである。**
 
 		// 加速(EditorCamera)
 		pKeyboardMouse->AddButton("Boost", new KdInputButtonForWindows(VK_SHIFT));
