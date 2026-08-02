@@ -104,6 +104,10 @@ private:
 	float m_stateTimer = 0.0f;          // 現在状態の残り時間(Windup/Strike/Recoverで使用)
 	Math::Vector3 m_lungeDir = {};      // 突進方向。Windup終了時に固定する(以後は追尾しない=回避で避けられる)
 
+	// 【確認用】DebugFlags「敵/動きを止める」。AIと移動を止め、アニメも姿勢を凍らせる。
+	// 関節の球や部位破壊を見比べるとき、敵が歩き回っていると確認しづらいため
+	bool IsFrozenForDebug() const;
+
 	// 関節の球(中心と半径)をワールド座標で取り出す。半径もワールド(スケール済み)で返す。
 	// 骨が見つからなければfalse(モデルを差し替えて骨名が変わっても落ちない)
 	bool GetJointSphere(const JointDef& _joint, Math::Vector3& _outCenter, float& _outRadius) const;

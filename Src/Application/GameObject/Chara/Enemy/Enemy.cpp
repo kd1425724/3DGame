@@ -5,6 +5,7 @@
 #include "../../../Scene/SceneManager.h"
 #include "../../../Debug/DebugParams/DebugParams.h"
 #include "../../../Debug/DebugDraw/DebugDraw.h"
+#include "../../../Debug/DebugFlags/DebugFlags.h"
 #include "../Player/Player.h"   // 突進命中時にPlayerの無敵判定/反撃通知/ノックバックを呼ぶため
 
 // 関節表。狙えるのはこの5つだけ。
@@ -54,6 +55,10 @@ void Enemy::DrawJointDebug()
 		if (!GetJointSphere(joint, center, radius)) { continue; }
 
 		m_pDebugWire->AddDebugSphere(center, radius, kJointColor);
+
+		// HPをその関節の位置に出す。どの関節がどの値かは、別ウィンドウに数値が並んでも
+		// 対応が取れない(5つとも似た名前になる)ので、位置の上に直接重ねる
+		DebugDraw::AddText3D(center, std::to_string(static_cast<int>(joint.maxHp)));
 	}
 }
 
@@ -188,6 +193,11 @@ void Enemy::Update()
 			m_wpTarget = spPlayer;
 		}
 	}
+
+	// 【確認用】動いていると関節の球を見比べられないので、その場に固定できるようにする。
+	// AIと移動だけを止め、接地(PostUpdateのGroundCheck)は生かして立たせたままにする。
+	// ※ アニメはSelectAnimationSpeedが0を返して凍る。呼ぶのをやめてはいけない → そちらのコメント
+	if (IsFrozenForDebug()) { return; }
 
 	std::shared_ptr<KdGameObject> spTarget = m_wpTarget.lock();
 	if (!spTarget) { return; }
@@ -351,8 +361,21 @@ std::string Enemy::SelectAnimation() const
 	return kWalkAnimName;
 }
 
+bool Enemy::IsFrozenForDebug() const
+{
+	return DebugFlags::Instance().Get(U8("敵/動きを止める"), false);
+}
+
 float Enemy::SelectAnimationSpeed() const
 {
+	// 【確認用】止めているときは再生速度0で姿勢を凍らせる。
+	// 【罠】「UpdateAnimationを呼ばない」で止めてはいけない。このモデルはバインドポーズと
+	//   歩行クリップで足元の高さが0.93違い、m_modelOriginIsFeet=true はクリップを当てている
+	//   前提の設定なので、一度も姿勢を当てないと約12m浮く。
+	//   KdAnimator::AdvanceTime は【先に姿勢を当ててから時間を進める】(KdAnimation.cpp:171→177)
+	//   ので、速度0で呼び続ければ姿勢はそのまま保たれる
+	if (IsFrozenForDebug()) { return 0.0f; }
+
 	// 【足を滑らせないための計算】
 	// この歩行はその場歩き(腰の水平移動が±0.14mしかない=ルートモーション無し)なので、
 	// 接地している足は体に対して「実際の歩行速度」ぶんだけ後ろへ流れる。
@@ -427,10 +450,14 @@ void Enemy::PostUpdate()
 			m_pDebugWire = std::make_unique<KdDebugWireFrame>();
 		}
 
-		// 接触判定(m_hitRadius)を可視化
-		m_pDebugWire->AddDebugSphere(GetPos(), m_hitRadius, kRedColor);
-
 		// 狙える関節の球(半径を目で見て決めるため)
 		DrawJointDebug();
+
+		// 体全体の接触判定(m_hitRadius)。身長25mだと半径6.25mの球になり、
+		// 関節の球(1.7〜2m)を完全に飲み込んで狙い分けが見えなくなるので既定はOFF
+		if (DebugFlags::Instance().Get(U8("敵/体の判定も出す"), false))
+		{
+			m_pDebugWire->AddDebugSphere(GetPos(), m_hitRadius, kRedColor);
+		}
 	}
 }

@@ -39,6 +39,27 @@ namespace DebugDraw
 	// 未登録のカテゴリをここで登録するので、起動直後から一覧に並ぶ
 	void RegisterAll();
 
+	//------------------------------------------------
+	// ワールド座標に文字を出す(値を「その場所」で読みたいとき用)
+	//------------------------------------------------
+	// KdDebugWireFrameは線しか描けず、DebugWatchは別ウィンドウに数値が並ぶだけなので、
+	// 「どの関節がどのHPか」のように【位置と値の対応】を見たい用途に応えられない。
+	//
+	// ImGuiはNewFrame〜Renderの間でしか描画を積めない一方、値を持っているのは
+	// Update/PostUpdateなので、ここで1フレーム分ためてからImGuiのフレーム内で描く。
+	//  ・AddText3D  … 更新中どこからでも積む
+	//  ・DrawText3D … DebugManager::Draw から呼ぶ(ImGuiのフレーム内)
+	//  ・ClearText3D… DebugManager::BeginFrame から呼ぶ(DebugWatchと同じ流儀)
+
+	// ワールド座標に文字を積む(実際に描かれるのはこのフレームのImGui描画時)
+	void AddText3D(const Math::Vector3& _worldPos, const std::string& _text);
+
+	// 積まれた文字をスクリーン座標へ変換して描く
+	void DrawText3D();
+
+	// 前フレームぶんを捨てる
+	void ClearText3D();
+
 	// KdGameObject::DrawDebug() は s_showColliderDebug しか見ないため、
 	// 登録済みコライダーの可視化(KdColliderが緑の球などで描く)がカテゴリを無視して
 	// 全部出てしまう。基底を呼ぶ前後でフラグを一時的に絞るための入れ物。
