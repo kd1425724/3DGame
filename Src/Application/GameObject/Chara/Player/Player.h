@@ -58,8 +58,17 @@ private:
 	// --- Update()の中身を仕事ごとに分けたもの(挙動は分割前と同じ。Updateは流れだけ) ---
 	// ワイヤーの発射/解除の入力を処理する(スイング物理はWireAction::UpdateSwingAllに委譲)
 	void UpdateWireInput();
-	// 攻撃(右クリック)の入力を処理する。ロックオン中に押すと関節へ突撃する
+	// 攻撃(右クリック)の入力を処理する。3段階：
+	//   1回目=的へアンカー射出 / 2回目=突撃 / 3回目=突撃中に斬る
 	void UpdateAttackInput();
+	// 的へアンカーを射出する(1回目)。地形ワイヤーは畳んでから撃つ
+	void ShootJointWire();
+	// 敵の関節へワイヤーが出ているか(飛行中も含む)。段階の判定に使う
+	bool IsAnyJointWireActive() const;
+	// 突撃中に斬る(3回目)。押した時の間合いでクリティカル/通常/空振りが決まる
+	void PerformDiveSlash();
+	// 斬撃が届く距離とクリティカルになる距離。判定とデバッグ表示の両方が読む
+	void GetSlashRanges(float& _outHitRange, float& _outCritRange) const;
 	// 通常移動(接地=入力に即セット/空中=エアアクセル。カメラの水平向き基準)
 	void UpdateMove(float dt);
 	// SPACEでジャンプ。コヨーテタイム(接地を離れた直後の猶予)＋先行入力(着地寸前の入力先読み)つき

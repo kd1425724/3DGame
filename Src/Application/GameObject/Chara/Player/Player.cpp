@@ -210,16 +210,155 @@ void Player::Update()
 
 void Player::UpdateAttackInput()
 {
-	// === 攻撃（右クリック） ===
-	// 【2026/08/02 入力のAoT2化】左クリックから独立させた。
-	// 突撃中／連続攻撃の受付中の押下は UpdateDive 側が持っているので、ここでは扱わない
-	if (m_isDiving || m_comboWindowTimer > 0.0f) { return; }
+	// === 右クリック＝3段階（射出 → 突撃 → 斬撃） ===
+	//
+	//   1回目 … 的(ロック中の関節)へアンカーを射出する。突撃はしない
+	//   2回目 … その的へ突撃する(引き寄せ)。まだ斬らない
+	//   3回目 … 突撃中に押すと斬る。【押した時の間合いでクリティカルが決まる】
+	//
+	// 【なぜ3段階か】斬撃を自動命中にすると、当たるかどうかがプレイヤーの操作と無関係になる。
+	// 最後の一撃を自分で入れさせ、間合いで威力が変わるようにすることで、
+	// 上手さがそのまま結果に出る(ユーザーの設計)。
+	//
+	// ※ 連続攻撃の受付中の押下は UpdateDive 側が持っているので、ここでは扱わない
+	if (m_comboWindowTimer > 0.0f) { return; }
 	if (!KdInputManager::Instance().IsPress("Attack")) { return; }
 
-	// ロックオンしていて対象がいる時だけ攻撃になる
+	// 3回目＝突撃中に押した → 斬る(ロック解除後でも突撃中なら斬れる)
+	if (m_isDiving)
+	{
+		PerformDiveSlash();
+		return;
+	}
+
+	// ここから先はロックオンしていて対象がいる時だけ効く
 	if (!IsAttackInput()) { return; }
 
-	StartDive();
+	// 2回目＝既に的へ掛かっている(飛行中も含む) → 突撃
+	if (IsAnyJointWireActive())
+	{
+		StartDive();
+		return;
+	}
+
+	// 1回目＝的へアンカーを射出する(突撃はしない)
+	ShootJointWire();
+}
+
+void Player::GetSlashRanges(float& _outHitRange, float& _outCritRange) const
+{
+	// 【1箇所にまとめる理由】斬撃の判定(PerformDiveSlash)と、今どの間合いにいるかの
+	// デバッグ表示(UpdateDive)の両方が読む。別々に書くと既定値が食い違ったとき、
+	// 先に呼ばれたほうが黙って勝つ(敵の移動速度で同じ形の問題を踏んでいる)
+	_outHitRange  = DebugParams::Instance().Float(U8("落下攻撃/斬撃範囲"),         1.5f, 0.5f, 15.0f);
+	_outCritRange = DebugParams::Instance().Float(U8("落下攻撃/クリティカル範囲"), 0.6f, 0.1f, 15.0f);
+}
+
+void Player::PerformDiveSlash()
+{
+	std::shared_ptr<KdGameObject> spTarget = m_wpDiveTarget.lock();
+	if (!spTarget) { return; }
+
+	// 狙い先は UpdateDive と同じ求め方にする(ずれると判定と見た目が食い違う)
+	Math::Vector3 aim{};
+	if (!GetLockedJointPos(aim))
+	{
+		aim = spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f);
+	}
+
+	const float dist = Math::Vector3::Distance(aim, GetPos());
+
+	float hitRange  = 0.0f;
+	float critRange = 0.0f;
+	GetSlashRanges(hitRange, critRange);
+
+	// 遠すぎる＝空振り。突撃を打ち切って勢いだけ残す。
+	// 【なぜ空振りを用意するか】外しても何も起きないと連打が最適解になり、
+	// 「タイミングを計る」という狙いそのものが消えるため
+	if (dist > hitRange)
+	{
+		m_isDiving = false;
+		m_wpDiveTarget.reset();
+		m_comboWindowTimer = 0.0f;
+		return;
+	}
+
+	// 近いほど良い。クリティカル範囲は斬撃範囲の内側にある
+	const bool isCritical = (dist <= critRange);
+
+	float damage = Enemy::GetAttackPower();
+	if (isCritical)
+	{
+		damage *= DebugParams::Instance().Float(U8("落下攻撃/クリティカル倍率"), 2.0f, 1.0f, 10.0f);
+	}
+
+	// 関節を狙っていればその関節へ、そうでなければ本体へダメージが入る
+	if (Enemy* pEnemy = GetLockedEnemy())
+	{
+		pEnemy->ApplyJointDamage(m_lockedJointIndex, damage);
+	}
+	else
+	{
+		spTarget->OnHit(this);
+	}
+
+	m_diveChainCount++;
+
+	// クリティカルは手応えを強くする(揺れで成否が体で分かるようにする)
+	float trauma = std::clamp(0.2f + 0.05f * m_diveChainCount, 0.0f, 0.7f);
+	if (isCritical)
+	{
+		trauma = std::clamp(trauma * 1.6f, 0.0f, 1.0f);
+	}
+	CameraShake::Instance().AddTrauma(trauma);
+
+	EffectManager::Instance().SpawnSlash(aim);   // 斬った位置に斬撃エフェクト
+
+	// 斬った直後は減速する(0=止まる/1=減速なし)。
+	// ※ 0.4 は一撃ごとに6割を捨てる設定で、3連鎖すると 0.4^3 = 6% しか残らず
+	//    「攻撃するたびに勢いがリセットされる」原因になっていた。
+	//    勢いを繋ぐ方針にしたので 0.85(=一撃あたり15%減)へ緩めた
+	float slowRate = DebugParams::Instance().Float(U8("連続攻撃/斬り後の速度残し"), 0.85f, 0.0f, 1.0f);
+	m_velocity *= slowRate;
+
+	// 斬った対象を解除し、次の突撃を受け付ける窓を開く(この間に押せば継続突撃)
+	m_wpDiveTarget.reset();
+	m_comboWindowTimer = DebugParams::Instance().Float(U8("連続攻撃/継続受付時間"), 0.5f, 0.05f, 2.0f);
+}
+
+bool Player::IsAnyJointWireActive() const
+{
+	for (const std::unique_ptr<WireAction>& w : m_upWires)
+	{
+		if (!w) { continue; }
+
+		// 飛行中も「もう撃った」とみなす。でないと着弾までの間に押した2回目が
+		// また射出になってしまい、連打で永久に攻撃できない
+		if (w->IsJointAnchor() && (w->IsAttached() || w->IsFlying())) { return true; }
+	}
+
+	return false;
+}
+
+void Player::ShootJointWire()
+{
+	Enemy* pEnemy = GetLockedEnemy();
+	if (!pEnemy) { return; }
+
+	Math::Vector3 jointPos{};
+	if (!GetLockedJointPos(jointPos)) { return; }
+
+	std::shared_ptr<KdGameObject> spTarget = m_upTargeting->GetTarget();
+	if (!spTarget) { return; }
+
+	// 地形へ掛かっているワイヤーは畳む。
+	// 【なぜ混在させないか】2本掛けの合体は「支点を1回決めて固定する」設計で、
+	// 動く関節アンカーと噛み合わない。掛け先は地形か関節かのどちらか一方にする
+	ReleaseAllWires(false);
+
+	// 関節へは1本だけ撃つ。2本を同じ点へ撃っても支点は同じで得るものが無く、
+	// 合体の経路を通すぶん動くアンカーとの相性問題を抱え込むだけになる
+	m_upWires[0]->ShootAtJoint(GetWireMuzzlePos(0), spTarget, m_lockedJointIndex, jointPos);
 }
 
 void Player::UpdateWireInput()
@@ -909,7 +1048,6 @@ void Player::UpdateAirFocus()
 
 void Player::UpdateDive(float dt)
 {
-	float radius     = DebugParams::Instance().Float(U8("落下攻撃/斬撃範囲"), 1.5f, 0.5f, 15.0f);
 	float chainRange = DebugParams::Instance().Float(U8("連続攻撃/範囲"),   8.0f, 1.0f, 30.0f);
 
 	// === 突撃中(対象へ引き寄せ、斬ったあとはキー入力で次の敵へ続ける＝連続攻撃) ===
@@ -986,32 +1124,34 @@ void Player::UpdateDive(float dt)
 		Math::Vector3 to  = aim - GetPos();
 		float dist = to.Length();
 
-		if (dist <= radius)
+		// 今どの間合いにいるかを出す。斬るタイミングを自分で計る操作にしたので、
+		// 「どこからがクリティカルか」を数字で見られないと調整のしようがない
+		// (ここで読むことでDebugParamsのキーが起動直後から一覧に並ぶ効果もある)
 		{
-			// 斬る。関節を狙っていればその関節へ、そうでなければ本体へダメージが入る。
-			// ※ 以前はOnHitが即 m_isExpired = true で「一撃で消滅」だった
-			if (Enemy* pEnemy = GetLockedEnemy())
-			{
-				pEnemy->ApplyJointDamage(m_lockedJointIndex, Enemy::GetAttackPower());
-			}
-			else
-			{
-				spTarget->OnHit(this);
-			}
-			m_diveChainCount++;
-			CameraShake::Instance().AddTrauma(std::clamp(0.2f + 0.05f * m_diveChainCount, 0.0f, 0.7f));
-			EffectManager::Instance().SpawnSlash(aim);   // 斬った位置に斬撃エフェクト
+			float hitRange  = 0.0f;
+			float critRange = 0.0f;
+			GetSlashRanges(hitRange, critRange);
 
-			// 斬った直後は減速する(0=止まる/1=減速なし)。
-			// ※ 0.4 は一撃ごとに6割を捨てる設定で、3連鎖すると 0.4^3 = 6% しか残らず
-			//    「攻撃するたびに勢いがリセットされる」原因になっていた。
-			//    勢いを繋ぐ方針にしたので 0.85(=一撃あたり15%減)へ緩めた
-			float slowRate = DebugParams::Instance().Float(U8("連続攻撃/斬り後の速度残し"), 0.85f, 0.0f, 1.0f);
-			m_velocity *= slowRate;
+			DebugWatch& w = DebugWatch::Instance();
+			w.Watch(U8("Player/的までの距離"),     dist);
+			w.Watch(U8("Player/斬れる"),           dist <= hitRange);
+			w.Watch(U8("Player/クリティカル圏内"), dist <= critRange);
+		}
 
-			// 斬った対象を解除し、次の突撃を受け付ける窓を開く(この間にキーを押せば継続突撃)
+		// 🔴 【2026/08/02】ここにあった「近づいたら自動で斬る」は撤去した(ユーザーの設計)。
+		// 斬るのは右クリックの3回目＝PerformDiveSlash が行い、押した時の間合いで
+		// クリティカルかどうかが決まる。自動命中だと当たるかどうかが操作と無関係になり、
+		// 「タイミングを計る上手さ」を出す余地が無くなるため。
+		//
+		// そのぶん「通り過ぎたら終わり」をここで見る。これが無いと的の上で
+		// 引き寄せられ続けて永久に振り回されることになる
+		float passRange = DebugParams::Instance().Float(U8("落下攻撃/通過とみなす距離"), 0.5f, 0.05f, 5.0f);
+		if (dist <= passRange)
+		{
+			// 斬らずに到達した＝空振り。勢いは残したまま突撃だけ終える
+			m_isDiving = false;
 			m_wpDiveTarget.reset();
-			m_comboWindowTimer = DebugParams::Instance().Float(U8("連続攻撃/継続受付時間"), 0.5f, 0.05f, 2.0f);
+			m_comboWindowTimer = 0.0f;
 			return;
 		}
 
