@@ -1,7 +1,6 @@
 ﻿#include "DebugDraw.h"
 
 #include "../DebugFlags/DebugFlags.h"
-#include "../DebugWatch/DebugWatch.h"   // [TEXT3D] 切り分け用の計測。原因が確定したら外す
 
 namespace
 {
@@ -43,6 +42,9 @@ namespace
 		std::string		text;
 	};
 	std::vector<Text3DEntry> s_texts3D;
+
+	// ワールド→スクリーン変換に使うカメラ(CameraBase::PreDrawが毎フレーム設定する)
+	std::weak_ptr<KdCamera> s_wpCamera;
 }
 
 namespace DebugDraw
@@ -88,76 +90,37 @@ namespace DebugDraw
 		s_texts3D.clear();
 	}
 
+	void SetCamera(const std::shared_ptr<KdCamera>& _spCamera)
+	{
+		s_wpCamera = _spCamera;
+	}
+
 	void DrawText3D()
 	{
-		// [TEXT3D] 切り分け用の計測。原因が確定したらこのタグで grep して撤去する。
-		//   ここが0なら「積む側(AddText3D)まで届いていない」、0以外なら「描く側の問題」
-		DebugWatch::Instance().Watch("[TEXT3D] 積まれた数", static_cast<int>(s_texts3D.size()));
-
 		if (s_texts3D.empty()) { return; }
 
-		// 【なぜカメラを引数で受け取らないか】この関数はImGuiのフレーム内(描画の後)から
-		//   呼ばれるので、そこまでカメラを渡す配線が要る。GPUへ送るカメラ用の定数バッファは
-		//   CameraBase::PreDrawが毎フレーム更新していて中身が同じものなので、そこから読む。
-		//   ※ 影の深度パスはこのバッファを書き換えないので、ここで読めるのは常にゲームのカメラ
-		const KdShaderManager::cbCamera& camera = KdShaderManager::Instance().GetCameraCB();
-		const Math::Matrix viewProj = camera.mView * camera.mProj;
+		std::shared_ptr<KdCamera> spCamera = s_wpCamera.lock();
+		if (!spCamera) { return; }
 
-		// 【常に手前に出す】前景の描画リストに積む。
-		// ImGuiの描画は3D描画が全部終わった後に行われ、深度テストを使わないので、
-		// ワールド座標をスクリーン座標へ落として2Dで描けば【必ず一番手前に出る】。
-		// 体の内側にある関節の値でもモデルに埋まらない、というのがこの方式の利点。
-		// ※ 背景(Background)ではなくFrontにするのは、デバッグウィンドウの下に潜らせないため
-		ImDrawList* pDrawList = ImGui::GetForegroundDrawList();
-		const ImVec2 screenSize = ImGui::GetIO().DisplaySize;
+		const Math::Color kTextColor(1.0f, 0.86f, 0.24f, 1.0f);
 
-		// 画面サイズが取れていないと 0 除算ではなく「全部が左上に重なる」誤表示になる
-		if (screenSize.x <= 0.0f || screenSize.y <= 0.0f) { return; }
-
-		// 文字が点のど真ん中に乗ると読みにくいので少し上へずらす
-		constexpr float kOffsetY = -8.0f;
+		// 文字が点のど真ん中に乗ると読みにくいので少し上へずらす(2Dなので画面上方向は-Y)
+		constexpr float kOffsetY = -10.0f;
 
 		for (const Text3DEntry& entry : s_texts3D)
 		{
-			const Math::Vector4 clip = Math::Vector4::Transform(
-				Math::Vector4(entry.worldPos.x, entry.worldPos.y, entry.worldPos.z, 1.0f), viewProj);
+			// ワールド座標 → スクリーン座標。原点は画面中央で、2D描画の座標系と一致する
+			Math::Vector3 screen{};
+			spCamera->ConvertWorldToScreenDetail(entry.worldPos, screen);
 
-			// カメラの後ろにある点は捨てる。wが負のまま割ると符号が反転して
-			// 「振り向くと背後の文字が画面の反対側に出る」という誤表示になる
-			if (clip.w <= 0.0f) { continue; }
+			// zにはw(カメラから見た奥行き)が入っている。0以下＝カメラの後ろ。
+			// 割った後の値は符号が反転していて、画面の反対側に出てしまうので捨てる
+			if (screen.z <= 0.0f) { continue; }
 
-			const float ndcX = clip.x / clip.w;
-			const float ndcY = clip.y / clip.w;
-
-			// NDC(-1〜1・Yは上が正) → スクリーン座標(左上原点・Yは下が正)
-			const ImVec2 screenPos(
-				(ndcX * 0.5f + 0.5f) * screenSize.x,
-				(-ndcY * 0.5f + 0.5f) * screenSize.y + kOffsetY);
-
-			// [TEXT3D] 切り分け用。文字と同じ座標に塗り潰しの丸を出す。
-			//   丸は出るのに文字が出ない → AddText(フォント)側の問題
-			//   丸も出ない                → 座標変換か、この関数まで来ていない
-			//   丸が変な場所に出る        → 座標変換の問題
-			pDrawList->AddCircleFilled(screenPos, 4.0f, IM_COL32(255, 0, 255, 255));
-
-			// [TEXT3D] 1件目の画面座標を出す(画面外に飛んでいないかを数値で見る)
-			if (&entry == &s_texts3D.front())
-			{
-				DebugWatch::Instance().Watch("[TEXT3D] 1件目X", screenPos.x);
-				DebugWatch::Instance().Watch("[TEXT3D] 1件目Y", screenPos.y);
-				DebugWatch::Instance().Watch("[TEXT3D] 画面幅", screenSize.x);
-			}
-
-			// 背景の板を敷いてから文字を置く。3Dの絵の上に直接文字を置くと、
-			// 明るい壁や空の上では白飛びして読めなくなるため
-			const ImVec2 textSize = ImGui::CalcTextSize(entry.text.c_str());
-			constexpr float kPad = 2.0f;
-			pDrawList->AddRectFilled(
-				ImVec2(screenPos.x - kPad, screenPos.y - kPad),
-				ImVec2(screenPos.x + textSize.x + kPad, screenPos.y + textSize.y + kPad),
-				IM_COL32(0, 0, 0, 160));
-
-			pDrawList->AddText(screenPos, IM_COL32(255, 220, 60, 255), entry.text.c_str());
+			// 【書式文字列に文字列を直接渡さない】DrawFontはprintf形式なので、
+			// 文字に % が含まれると書式指定として解釈されて壊れる
+			KdShaderManager::Instance().m_spriteShader.DrawFont(
+				Math::Vector2(screen.x, screen.y + kOffsetY), &kTextColor, "%s", entry.text.c_str());
 		}
 	}
 

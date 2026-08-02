@@ -13,7 +13,6 @@
 //
 //====================================================
 class CameraBase;
-class KdSquarePolygon;
 
 // ※ KdGameObjectはPch.hの強制インクルードで見えているため、継承でも明示includeは不要
 class Targeting : public KdGameObject
@@ -39,7 +38,10 @@ public:
 	}
 	void ClearMarkerOverridePos() { m_hasMarkerOverride = false; }
 
-	// 選択中の敵にマーカー(カメラを向く板ポリ)を描く。陰影なしパスから呼ぶ
+	// 選択中の関節(または敵)にマーカーを描く。
+	// 【2D描画パスから呼ぶ】ワールド座標をスクリーン座標へ変換して2Dで描く。
+	// 3Dの板ポリで描いていた頃は、狙う関節(首・肘・膝)が体の【内側】にあるため
+	// 深度テストで必ずモデルに埋まって見えなかった
 	void DrawMarker();
 
 	// 現在のターゲット(いなければ空)。落下攻撃の突撃先に使う
@@ -57,8 +59,11 @@ private:
 	// (毎フレームvectorを確保し直さないためメンバに持つ)
 	std::vector<Candidate> m_candidates;
 
-	// マーカーの見た目(照準テクスチャ・カメラを向く点ビルボード)
-	std::unique_ptr<KdSquarePolygon> m_upMarkerPoly;
+	// マーカーの見た目(照準テクスチャ)。2Dで描くので板ポリは要らない
+	std::shared_ptr<KdTexture> m_spMarkerTex;
+
+	// 座標変換に使うカメラ(Updateで受け取ったものを覚えておく)
+	std::weak_ptr<CameraBase> m_wpCamera;
 
 	// マーカーの回転/脈動アニメ用の経過時間
 	float m_time = 0.0f;

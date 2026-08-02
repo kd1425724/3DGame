@@ -45,20 +45,28 @@ namespace DebugDraw
 	// KdDebugWireFrameは線しか描けず、DebugWatchは別ウィンドウに数値が並ぶだけなので、
 	// 「どの関節がどのHPか」のように【位置と値の対応】を見たい用途に応えられない。
 	//
-	// ImGuiはNewFrame〜Renderの間でしか描画を積めない一方、値を持っているのは
-	// Update/PostUpdateなので、ここで1フレーム分ためてからImGuiのフレーム内で描く。
+	// 【描き方】ワールド座標を KdCamera::ConvertWorldToScreenDetail でスクリーン座標へ
+	// 変換し、2D描画パス(KdSpriteShader)で文字を出す。2D描画は3Dの絵が全部出た後に
+	// 深度テスト無しで行われるので、【体の内側にある関節でもモデルに埋まらない】。
+	//
+	// 値を持っているのは更新中(Update/PostUpdate)で、描けるのは2Dパスなので、
+	// 1フレーム分ためてから描く。
 	//  ・AddText3D  … 更新中どこからでも積む
-	//  ・DrawText3D … DebugManager::Draw から呼ぶ(ImGuiのフレーム内)
+	//  ・DrawText3D … Application::DrawSprite から呼ぶ(2D描画パス)
 	//  ・ClearText3D… DebugManager::BeginFrame から呼ぶ(DebugWatchと同じ流儀)
 
-	// ワールド座標に文字を積む(実際に描かれるのはこのフレームのImGui描画時)
+	// ワールド座標に文字を積む(実際に描かれるのはこのフレームの2D描画パス)
 	void AddText3D(const Math::Vector3& _worldPos, const std::string& _text);
 
-	// 積まれた文字をスクリーン座標へ変換して描く
+	// 積まれた文字をスクリーン座標へ変換して描く。2D描画パスから呼ぶ
 	void DrawText3D();
 
 	// 前フレームぶんを捨てる
 	void ClearText3D();
+
+	// 座標変換に使うカメラを渡す。CameraBase::PreDrawから毎フレーム設定する
+	// (Effekseerへカメラを渡しているのと同じ場所・同じ理由)
+	void SetCamera(const std::shared_ptr<KdCamera>& _spCamera);
 
 	// KdGameObject::DrawDebug() は s_showColliderDebug しか見ないため、
 	// 登録済みコライダーの可視化(KdColliderが緑の球などで描く)がカテゴリを無視して

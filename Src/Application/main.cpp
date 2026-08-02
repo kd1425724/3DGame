@@ -169,6 +169,10 @@ void Application::DrawSprite()
 
 	// HUD(画面2D)スプライトをシーンのスプライトの上に重ねて描画する
 	HudEditorManager::Instance().DrawSprites();
+
+	// ワールド座標に積まれたデバッグ文字(関節のHPなど)を2Dへ変換して描く。
+	// 2Dパスは3Dの絵が全部出た後・深度テスト無しなので、体の内側の関節でも埋まらない
+	DebugDraw::DrawText3D();
 }
 
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
@@ -240,6 +244,11 @@ bool Application::Init(int w, int h)
 	// フォント初期化
 	//===================================================================
 	KdFontManager::Instance().Init(GetWindowHandle());
+
+	// 【必須】番号0のフォントを登録する。KdSpriteShader::DrawFont は番号0を使うが、
+	// Init() は DC を取るだけでフォントを1つも登録しないため、ここを書かないと
+	// SelectObject に nullptr が渡り、DCの既定フォントで描かれてしまう
+	KdFontManager::Instance().AddFont(0, "MS Gothic", 20);
 
 	//===================================================================
 	// Effekseer初期化

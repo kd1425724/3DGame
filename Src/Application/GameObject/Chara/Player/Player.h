@@ -29,6 +29,7 @@ public:
 	void Update()		override;
 	void PostUpdate()	override;
 	void DrawUnLit()	override;   // ワイヤーの見た目(陰影なしパス)。中身は DrawWire() に委譲
+	void DrawSprite()	override;   // ロックオンのマーカー(2Dパス)。関節は体の内側なので3Dだと埋まる
 	void DrawDebug()	override;
 
 	// 状態に応じた再生アニメ名を返す(CharaBase::UpdateAnimationが毎フレーム呼ぶ)
