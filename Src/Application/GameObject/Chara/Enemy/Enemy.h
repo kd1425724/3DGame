@@ -21,6 +21,10 @@ public:
 	// 敵のモデルのパス。Init と Preload が同じものを指すよう1箇所にまとめてある
 	static constexpr const char* kAssetPath = "Asset/Models/Character/StoneGolem/StoneGolem.gltf";
 
+	// このモデルが持つアニメの名前。glTFのanimationsは【この1本だけ】(2026/08/02にファイルを直接読んで確認)。
+	// 攻撃・被弾・死亡はまだMixamoから取っていない
+	static constexpr const char* kWalkAnimName = "walk";
+
 	// モデルとテクスチャを先読みしてキャッシュへ載せる。シーンのInitから1回呼ぶ。
 	// 【なぜ要るか】最初の1体が出現した瞬間に読み込みが走って画面がかくつくため。
 	//   実機で「出た瞬間だけ」と確認できたので、描画コストではなく読み込みが原因
@@ -29,6 +33,12 @@ public:
 	void Init()			override;
 	void Update()		override;
 	void PostUpdate()	override;
+
+	// 再生するアニメ名(CharaBase::UpdateAnimationが毎フレーム呼ぶ)
+	std::string SelectAnimation() const override;
+
+	// 再生速度の倍率。足が地面を滑らないよう、実際の移動速度から計算する
+	float SelectAnimationSpeed() const override;
 
 	// 当たり判定デバッグ表示は「敵」カテゴリに出す(接地/壁判定はCharaBaseが描くので、
 	// ここで種類を教えないとプレイヤーと一緒くたに出てしまう)
@@ -69,4 +79,10 @@ private:
 	void ResolveStrikeHit(const std::shared_ptr<KdGameObject>& _target);
 	// 硬直状態へ移行する(突進の後隙)
 	void EnterRecover();
+
+	// 移動速度・突進速度(DebugParams)。Update(実際に動かす)と
+	// SelectAnimationSpeed(足を滑らせない再生倍率)の両方から読むので、キーと既定値を
+	// ここに集約する。別々に書くと既定値が食い違ったとき、先に呼ばれたほうが黙って勝つ
+	float GetMoveSpeed() const;
+	float GetLungeSpeed() const;
 };
