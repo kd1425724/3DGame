@@ -172,8 +172,17 @@ void Enemy::Update()
 	{
 	case State::Chase:
 	{
-		// 攻撃開始距離まで近づいたら予備動作へ(その場で予告)
-		float atkStart = DebugParams::Instance().Float(U8("敵/攻撃開始距離"), 2.5f, 0.5f, 20.0f);
+		// 攻撃開始距離まで近づいたら予備動作へ(その場で予告)。
+		//
+		// 【体の表面から測ること】(2026/08/02)
+		//   ここを中心からの距離にすると、25mのゴーレム(体の半径6.25m)では
+		//   プレイヤーが体の【内側】へ入るまで近づき続ける。誰も敵をTypeBumpに
+		//   登録していないので押し戻されず、カメラ(地上2.3m)がゴーレムの股の間に入り、
+		//   裏面カリングで【敵が消えたように見える】。
+		//   実測: 停止時の水平距離が0.35〜0.8mで、体の半径6.25mの中に完全に埋まっていた。
+		//   敵が1辺1mの立方体だった頃の2.5mがそのまま残っていたのが原因
+		float atkStart = m_hitRadius
+			+ DebugParams::Instance().Float(U8("敵/攻撃開始の間合い"), 2.5f, 0.5f, 20.0f);
 		if (distXZ <= atkStart)
 		{
 			m_state = State::Windup;
@@ -210,9 +219,18 @@ void Enemy::Update()
 		SetPos(pos);
 		m_stateTimer -= dt;
 
-		// 命中判定：対象に十分近ければ命中処理(反撃 or ノックバック)して硬直へ
+		// 命中判定：対象に十分近ければ命中処理(反撃 or ノックバック)して硬直へ。
+		//
+		// 【必ず水平距離で測ること】(2026/08/02に実測で判明)
+		//   ここは3D距離だった。位置(GetPos)は【体の中心】なので、身長25mのゴーレムでは
+		//   中心が地上13.1m、プレイヤーは1.55m＝【縦だけで11.55m離れている】。
+		//   3D距離は絶対に6.75mを下回れず、突進が永遠に命中しなかった。
+		//   命中しない＝硬直→追従→また突進を繰り返して前進し続け、最後はプレイヤーに
+		//   完全に重なる(実測: 停止時の水平距離0.03〜2.8m)。カメラが体の内側に入るので
+		//   【敵が消えたように見える】という症状になっていた。
+		//   追従側(distXZ)は最初からFlattenYで水平を見ており、ここだけ揃っていなかった
 		float hitDist = m_hitRadius + 0.5f;   // プレイヤー半径ぶん少し余裕を持たせる
-		if (Math::Vector3::Distance(GetPos(), targetPos) <= hitDist)
+		if (MathAPI::FlattenY(targetPos - GetPos()).Length() <= hitDist)
 		{
 			ResolveStrikeHit(spTarget);
 			EnterRecover();
