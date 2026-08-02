@@ -7,10 +7,44 @@
 #include "../../Collision/CollisionGrid.h"   // 静的コリジョンのbroadphase(近傍の建物だけ問い合わせる)
 #include "../../API/MathAPI/MathAPI.h"        // 安全な正規化・水平化などの共通計算
 #include "../../Debug/DebugDraw/DebugDraw.h"  // デバッグ表示のカテゴリ判定
+#include "../../Debug/DebugWatch/DebugWatch.h" // [MATDBG] 一時的な調査用。原因が分かったら消す
 
 DebugDraw::Category CharaBase::GetDebugCategory() const
 {
 	return DebugDraw::Category::Player;
+}
+
+// [MATDBG] ★一時的な調査用★
+//   ゴーレムだけが暗い原因が、glTFやテクスチャを何度測っても特定できなかったため、
+//   「エンジンが実際に読み込んだ値」を画面に出して直接見るために入れた。
+//   原因が分かったら "MATDBG" で grep して丸ごと消すこと。
+void CharaBase::WatchMaterialDebug(const char* _label) const
+{
+	if (!DebugFlags::Instance().Get(U8("調査/マテリアルを表示"), false)) { return; }
+
+	const std::shared_ptr<KdModelData> spData = m_modelWork.GetData();
+	if (!spData) { return; }
+
+	const std::vector<KdMaterial>& mats = spData->GetMaterials();
+
+	std::string head = std::string(_label) + "/";
+	DebugWatch::Instance().Watch(head + U8("マテリアル数"), (int)mats.size());
+	DebugWatch::Instance().Watch(head + U8("m_color"),
+		Math::Vector3(m_color.R(), m_color.G(), m_color.B()));
+	DebugWatch::Instance().Watch(head + U8("scale.y"), GetScale().y);
+
+	if (mats.empty()) { return; }
+
+	const KdMaterial& m = mats[0];
+	DebugWatch::Instance().Watch(head + U8("基本色の倍率"),
+		Math::Vector3(m.m_baseColorRate.x, m.m_baseColorRate.y, m.m_baseColorRate.z));
+	DebugWatch::Instance().Watch(head + U8("金属性"), m.m_metallicRate);
+	DebugWatch::Instance().Watch(head + U8("粗さ"), m.m_roughnessRate);
+	DebugWatch::Instance().Watch(head + U8("発光の倍率"), m.m_emissiveRate);
+	DebugWatch::Instance().Watch(head + U8("基本色テクスチャ"), m.m_baseColorTex != nullptr);
+	DebugWatch::Instance().Watch(head + U8("金属粗さテクスチャ"), m.m_metallicRoughnessTex != nullptr);
+	DebugWatch::Instance().Watch(head + U8("発光テクスチャ"), m.m_emissiveTex != nullptr);
+	DebugWatch::Instance().Watch(head + U8("法線テクスチャ"), m.m_normalTex != nullptr);
 }
 
 void CharaBase::SetAsset(const std::string& assetName)
