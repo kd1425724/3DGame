@@ -22,8 +22,16 @@ Math::Matrix CharaBase::GetDrawMatrix() const
 {
 	// 原点が足元のモデル(GogglesCharaは頂点のYが0〜1.899)は、そのまま描くと
 	// 足が pos の高さに来て半身ぶん浮く。半身下げて体の中心を pos に合わせる。
-	// 原点が中心のモデル(Block等)は下げない
-	float half = m_modelOriginIsFeet ? GetBodyHalfHeight() : 0.0f;
+	// 原点が中心のモデル(Block等)は下げない。
+	//
+	// 【スケールを掛けないこと】(2026/08/02)
+	//   この平行移動は下の m_mWorld より【手前】に掛かる＝モデル座標系での移動なので、
+	//   拡大率は m_mWorld 側が後から掛ける。ここで GetBodyHalfHeight()
+	//   (＝m_bodyHeight × スケール ÷ 2)を渡すと拡大率が【二重に】掛かる。
+	//   実際に身長25mのゴーレム(スケール13.16)で 12.5m 下げるつもりが
+	//   12.5 × 13.16 = 164.5m 下がり、【地下160mに描かれて見えなくなった】。
+	//   プレイヤーは SetScale が 1.0 なので差が出ず、ずっと露見していなかった
+	float half = m_modelOriginIsFeet ? (m_bodyHeight * 0.5f) : 0.0f;
 
 	// 斜面に合わせた傾きは【足元】を軸に回す。そのためTranslateより手前に置く。
 	// (原点が足元のモデルなら、この時点で足はまだ原点にいる)
