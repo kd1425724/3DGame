@@ -855,6 +855,17 @@ int Player::GetMaxDodgeCharges() const
 
 void Player::UpdateAirFocus()
 {
+	// 【2026/08/02】空中スローを既定OFFにした(ユーザー指示「一旦切って。多分消す」)。
+	//   ロックオンをトグル化した結果、Eは「タップ＝ロック」になったのに
+	//   スローだけ「長押し」のまま残り、1つのキーに2つの意味が乗っていた。
+	//   消すかどうかは未確定なのでフラグで殺すに留める。消すと決まったらこの関数ごと撤去する
+	if (!DebugFlags::Instance().Get(U8("プレイヤー/空中スローを使う"), false))
+	{
+		// 掛けっぱなしで抜けないよう、等速へ戻してからreturnする
+		Application::Instance().SetTimeScale(1.0f);
+		return;
+	}
+
 	float maxGauge = DebugParams::Instance().Float(U8("空中スロー/最大時間"), 1.5f, 0.2f, 5.0f);
 	float slowVal  = DebugParams::Instance().Float(U8("空中スロー/遅さ"),     0.3f, 0.05f, 1.0f);
 	float refill   = DebugParams::Instance().Float(U8("空中スロー/回復速度"), 0.5f, 0.0f, 3.0f);
