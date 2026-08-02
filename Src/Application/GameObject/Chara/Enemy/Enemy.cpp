@@ -7,9 +7,58 @@
 #include "../../../Debug/DebugDraw/DebugDraw.h"
 #include "../Player/Player.h"   // 突進命中時にPlayerの無敵判定/反撃通知/ノックバックを呼ぶため
 
+// 部位表。半径はglTFの骨座標の実測から決めた初期値【モデル座標系】(身長1.899m)。
+//   腕は肩(Y=0.625)から手(Y=-0.415)まで1.06m、脚は腿(Y=0.174)から足(Y=-0.775)まで0.95m。
+//   実機で見て詰められるよう、半径だけDebugParamsに出してある
+// ※ 胴のcollapseBoneはnullptr。胴の骨を潰すと配下の全部位が道連れで消えるので破壊対象にしない
+const Enemy::PartDef Enemy::kPartDefs[Enemy::kPartCount] =
+{
+	// 頭は弱点。小さい判定＋大きい倍率という業界標準の作り方にしてある
+	{ U8("頭"),   "mixamorig:Head",       "mixamorig:HeadTop_End", U8("部位/半径_頭"),   0.17f, 2.0f, 20.0f, "mixamorig:Head"       },
+	{ U8("胴"),   "mixamorig:Spine",      "mixamorig:Neck",        U8("部位/半径_胴"),   0.28f, 1.0f,  0.0f, nullptr                },
+	{ U8("左腕"), "mixamorig:LeftArm",    "mixamorig:LeftHand",    U8("部位/半径_腕"),   0.16f, 1.0f, 30.0f, "mixamorig:LeftArm"    },
+	{ U8("右腕"), "mixamorig:RightArm",   "mixamorig:RightHand",   U8("部位/半径_腕"),   0.16f, 1.0f, 30.0f, "mixamorig:RightArm"   },
+	{ U8("左脚"), "mixamorig:LeftUpLeg",  "mixamorig:LeftFoot",    U8("部位/半径_脚"),   0.20f, 0.8f, 40.0f, "mixamorig:LeftUpLeg"  },
+	{ U8("右脚"), "mixamorig:RightUpLeg", "mixamorig:RightFoot",   U8("部位/半径_脚"),   0.20f, 0.8f, 40.0f, "mixamorig:RightUpLeg" },
+};
+
 DebugDraw::Category Enemy::GetDebugCategory() const
 {
 	return DebugDraw::Category::Enemy;
+}
+
+bool Enemy::GetPartCapsule(const PartDef& _part, Math::Vector3& _outA, Math::Vector3& _outB, float& _outRadius) const
+{
+	if (!GetBoneWorldPos(_part.boneA, _outA)) { return false; }
+	if (!GetBoneWorldPos(_part.boneB, _outB)) { return false; }
+
+	// 【罠】GetBoneWorldPosはGetDrawMatrix経由なので端点は既にスケール済みのワールド座標。
+	//   一方PartDefの半径は【モデル座標系】なので、ここで拡大率を掛けないと
+	//   身長25mのゴーレムに0.2m弱のカプセルが並ぶことになる。
+	//   逆に端点側でスケールを掛けると先日の「足元補正の二重掛け」と同じ事故になる
+	_outRadius = DebugParams::Instance().Float(_part.radiusKey, _part.defaultRadius, 0.01f, 1.0f) * GetScale().y;
+	return true;
+}
+
+void Enemy::DrawPartCapsuleDebug()
+{
+	if (!m_pDebugWire) { return; }
+
+	// カプセルを描く線が無いので、両端の球と芯の線で代用する。
+	// 見たいのは「部位を包めているか」なので、これで足りる
+	const Math::Color kPartColor = Math::Color(1.0f, 0.85f, 0.2f, 1.0f);
+
+	for (const PartDef& part : kPartDefs)
+	{
+		Math::Vector3 a{};
+		Math::Vector3 b{};
+		float radius = 0.0f;
+		if (!GetPartCapsule(part, a, b, radius)) { continue; }
+
+		m_pDebugWire->AddDebugSphere(a, radius, kPartColor);
+		m_pDebugWire->AddDebugSphere(b, radius, kPartColor);
+		m_pDebugWire->AddDebugLine(a, b, kPartColor);
+	}
 }
 
 void Enemy::DrawDebug()
@@ -358,16 +407,6 @@ void Enemy::EnterRecover()
 
 void Enemy::PostUpdate()
 {
-	// デバッグ表示：接触判定(m_hitRadius)を可視化
-	if (KdGameObject::s_showColliderDebug && DebugDraw::IsOn(DebugDraw::Category::Enemy))
-	{
-		if (!m_pDebugWire)
-		{
-			m_pDebugWire = std::make_unique<KdDebugWireFrame>();
-		}
-		m_pDebugWire->AddDebugSphere(GetPos(), m_hitRadius, kRedColor);
-	}
-
 	// ※ 以前は「対象に接触したら敵が消滅」する仮処理だったが、攻撃(突進)に一本化したため撤去。
 	//    敵はプレイヤーの攻撃(OnHit)か反撃でのみ消滅する
 
@@ -381,4 +420,21 @@ void Enemy::PostUpdate()
 	// 【部位破壊の方式確認】ボーンを潰すと部位が消えるかを実機で確かめる。
 	// UpdateAnimationが毎フレーム骨を書き戻すので、必ずその【後】に呼ぶ(前だと塗り潰される)
 	UpdateBoneCollapseTest();
+
+	// デバッグ表示は最後にまとめる。
+	// 【なぜ最後か】接地(GroundCheck)で位置が、アニメ(UpdateAnimation)で骨が動くので、
+	//   ここより前で描くと1フレーム古い位置に線が出て、モデルからずれて見える
+	if (KdGameObject::s_showColliderDebug && DebugDraw::IsOn(DebugDraw::Category::Enemy))
+	{
+		if (!m_pDebugWire)
+		{
+			m_pDebugWire = std::make_unique<KdDebugWireFrame>();
+		}
+
+		// 接触判定(m_hitRadius)を可視化
+		m_pDebugWire->AddDebugSphere(GetPos(), m_hitRadius, kRedColor);
+
+		// 部位のカプセル(半径を目で見て決めるため)
+		DrawPartCapsuleDebug();
+	}
 }
