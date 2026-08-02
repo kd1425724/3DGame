@@ -127,5 +127,13 @@ void Targeting::DrawMarker()
 	// 発光色つきで描く(DrawPolygonはCullNoneなので裏表は不問。テクスチャの透過で照準形に抜ける)
 	Math::Color   col(1.0f, 0.5f, 0.25f, 1.0f);
 	Math::Vector3 emissive(0.8f, 0.35f, 0.1f);
+
+	// 【常に手前に出す】狙う関節(首・肘・膝)は体の【内側】にあるので、
+	// 深度テストを効かせたままだと必ずモデルに埋まって見えなくなる。
+	// ロックオンのマーカーや敵のHPバーを「壁や体の向こうでも見せる」のは
+	// 深度テストを切って描くのが定石(この作品ではKdDepthStencilState::ZDisable)。
+	// ※ Changeした分は必ずUndoで戻す。戻さないと以降の描画が全部深度無視になる
+	KdShaderManager::Instance().ChangeDepthStencilState(KdDepthStencilState::ZDisable);
 	KdShaderManager::Instance().m_StandardShader.DrawPolygon(*m_upMarkerPoly, world, col, emissive);
+	KdShaderManager::Instance().UndoDepthStencilState();
 }

@@ -103,8 +103,16 @@ namespace DebugDraw
 		const KdShaderManager::cbCamera& camera = KdShaderManager::Instance().GetCameraCB();
 		const Math::Matrix viewProj = camera.mView * camera.mProj;
 
-		ImDrawList* pDrawList = ImGui::GetBackgroundDrawList();
+		// 【常に手前に出す】前景の描画リストに積む。
+		// ImGuiの描画は3D描画が全部終わった後に行われ、深度テストを使わないので、
+		// ワールド座標をスクリーン座標へ落として2Dで描けば【必ず一番手前に出る】。
+		// 体の内側にある関節の値でもモデルに埋まらない、というのがこの方式の利点。
+		// ※ 背景(Background)ではなくFrontにするのは、デバッグウィンドウの下に潜らせないため
+		ImDrawList* pDrawList = ImGui::GetForegroundDrawList();
 		const ImVec2 screenSize = ImGui::GetIO().DisplaySize;
+
+		// 画面サイズが取れていないと 0 除算ではなく「全部が左上に重なる」誤表示になる
+		if (screenSize.x <= 0.0f || screenSize.y <= 0.0f) { return; }
 
 		// 文字が点のど真ん中に乗ると読みにくいので少し上へずらす
 		constexpr float kOffsetY = -8.0f;
@@ -139,6 +147,15 @@ namespace DebugDraw
 				DebugWatch::Instance().Watch("[TEXT3D] 1件目Y", screenPos.y);
 				DebugWatch::Instance().Watch("[TEXT3D] 画面幅", screenSize.x);
 			}
+
+			// 背景の板を敷いてから文字を置く。3Dの絵の上に直接文字を置くと、
+			// 明るい壁や空の上では白飛びして読めなくなるため
+			const ImVec2 textSize = ImGui::CalcTextSize(entry.text.c_str());
+			constexpr float kPad = 2.0f;
+			pDrawList->AddRectFilled(
+				ImVec2(screenPos.x - kPad, screenPos.y - kPad),
+				ImVec2(screenPos.x + textSize.x + kPad, screenPos.y + textSize.y + kPad),
+				IM_COL32(0, 0, 0, 160));
 
 			pDrawList->AddText(screenPos, IM_COL32(255, 220, 60, 255), entry.text.c_str());
 		}
