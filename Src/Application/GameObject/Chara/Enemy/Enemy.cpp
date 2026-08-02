@@ -50,9 +50,16 @@ void Enemy::Init()
 	//   ことで「モデルが原因か、敵の経路(スケール)が原因か」を切り分ける。
 	//   ONにしたら敵を出し直すこと(TitleSceneへ戻ってGameSceneに入り直す)。
 	//   原因が分かったら "MATDBG" で grep して丸ごと消すこと。
-	if (DebugFlags::Instance().Get(U8("調査/敵をプレイヤーのモデルにする"), false))
+	const bool usePlayerModel = DebugFlags::Instance().Get(U8("調査/敵をプレイヤーのモデルにする"), false);
+	if (usePlayerModel)
 	{
 		SetAsset("Asset/Models/Character/GogglesChara/GogglesChara.gltf");
+
+		// 【条件を揃える】プレイヤーのモデルは原点が足元なので、これを立てないと
+		//   半身ぶん(約12m)浮いてしまい、屋根より上の日向に出てしまう。
+		//   それでは「明るいのはモデルのおかげか、位置のおかげか」が区別できない。
+		//   最初のA/Bはこれを忘れていて実験として不成立だった(ユーザーが浮きに気付いて発覚)
+		m_modelOriginIsFeet = true;
 	}
 	else
 	{
