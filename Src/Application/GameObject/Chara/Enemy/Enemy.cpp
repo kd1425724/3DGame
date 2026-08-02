@@ -134,6 +134,9 @@ void Enemy::Update()
 		}
 	}
 
+	// [MATDBG] 一時的な調査用。原因が分かったら消す
+	WatchMaterialDebug("Enemy");
+
 	std::shared_ptr<KdGameObject> spTarget = m_wpTarget.lock();
 	if (!spTarget) { return; }
 

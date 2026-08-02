@@ -70,6 +70,9 @@ void Player::Update()
 {
 	const float dt = Application::Instance().GetDeltaTime();
 
+	// [MATDBG] 一時的な調査用。敵と並べて比べるために出す。原因が分かったら消す
+	WatchMaterialDebug("Player");
+
 	// リセット：Rキー、または一定Y以下に落ちたら開始位置へ復帰
 	float fallResetY = DebugParams::Instance().Float(U8("プレイヤー/落下リセットY"), -20.0f, -200.0f, 0.0f);
 	if (KdInputManager::Instance().IsPress("Respawn") || GetPos().y < fallResetY)
