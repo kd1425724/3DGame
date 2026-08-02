@@ -6,6 +6,7 @@ class CameraBase;
 class WireAction;
 class WallAction;
 class Targeting;
+class Enemy;
 
 //====================================================
 //
@@ -92,6 +93,21 @@ private:
 	bool IsAttackInput() const;
 	// 突撃(落下攻撃)を開始する。左クリックを押した瞬間にUpdateWireInputから呼ばれる
 	void StartDive();
+
+	// --- ロックオンと関節の選択 ---
+	// E(Focus)のON/OFFを切り替える。Targetingの更新より【前】に呼ぶ
+	// (このフレームのロック状態で対象を選ばせるため)
+	void UpdateLockOnToggle();
+	// 対象が確定した後の処理：対象が居なければロックを解き、ホイールで関節を切り替える。
+	// Targetingの更新より【後】に呼ぶ(前だと掛けた瞬間に解けてしまう)
+	void UpdateLockOnSelection();
+	// ロック中の対象が敵なら、その敵を返す。ロックしていない/敵でないならnullptr。
+	// ※ 生ポインタで返すのは寿命を持ち出さないため。使うのはそのフレーム内だけ
+	Enemy* GetLockedEnemy() const;
+	// 今狙っている関節の球の中心(ワールド)。関節が取れなければfalse
+	bool GetLockedJointPos(Math::Vector3& _outPos) const;
+	// ホイールの入力ぶん、狙う関節を切り替える。壊れた関節は飛ばす
+	void CycleLockedJoint(int _step);
 
 	// 反撃(ジャスト回避カウンター)：敵の突進を回避の無敵で受けるとスロー猶予窓を開き、
 	// その窓の間に攻撃(左クリック)を押すと今の突撃(ダイブ)へ移行する。回避の早期returnより前で呼ぶ
@@ -214,6 +230,14 @@ private:
 
 	// 落下攻撃で突撃中の対象(Targetingの選択からコピー。ホーミングの狙い先)
 	std::weak_ptr<KdGameObject> m_wpDiveTarget;
+
+	// ロックオン中か。E(Focus)を押すたびに切り替わる(2026/08/02に押しっぱなしから変更)。
+	// 【なぜトグルか】関節を狙い分けるにはロックを保ったままホイールを回す必要があり、
+	//   押しっぱなしだと「Eを押しながらホイールを回しながら移動する」ことになるため
+	bool m_isLockedOn = false;
+
+	// 今狙っている関節の添字(Enemy::kJointDefsの添字)。ロックし直すと0(首)に戻る
+	int m_lockedJointIndex = 0;
 
 	// ワイヤー(物理＋見た目を内包)。立体機動装置に合わせて腰の左右から2本。
 	// ※ 添字0=左 / 1=右。2本同時に撃つ(DebugFlags「ワイヤー/2本掛け」でOFFにすると0番のみ)

@@ -24,8 +24,20 @@ public:
 	Targeting();
 	~Targeting();
 
-	// 画面中心に一番近い敵を選び、マーカーのアニメ時間を進める。Playerのcameraとdtを渡す
-	void Update(const std::shared_ptr<CameraBase>& _spCamera, float _dt);
+	// 画面中心に一番近い敵を選び、マーカーのアニメ時間を進める。Playerのcameraとdtを渡す。
+	// _keepCurrent=true なら、今の対象が生きている限り選び直さない(ロックオン中)。
+	// 【なぜ要るか】毎フレーム選び直すと、関節を狙っている最中に画面中央へ別の敵が
+	//   入っただけで狙いが勝手に移ってしまう
+	void Update(const std::shared_ptr<CameraBase>& _spCamera, float _dt, bool _keepCurrent = false);
+
+	// マーカーを出す位置を明示的に指定する(狙っている関節の位置)。
+	// 指定が無いときは従来どおり対象の少し上に出る
+	void SetMarkerOverridePos(const Math::Vector3& _pos)
+	{
+		m_markerOverridePos = _pos;
+		m_hasMarkerOverride = true;
+	}
+	void ClearMarkerOverridePos() { m_hasMarkerOverride = false; }
 
 	// 選択中の敵にマーカー(カメラを向く板ポリ)を描く。陰影なしパスから呼ぶ
 	void DrawMarker();
@@ -50,4 +62,8 @@ private:
 
 	// マーカーの回転/脈動アニメ用の経過時間
 	float m_time = 0.0f;
+
+	// マーカーの位置を外から指定するとき(狙っている関節の位置)に使う
+	Math::Vector3 m_markerOverridePos = {};
+	bool          m_hasMarkerOverride = false;
 };

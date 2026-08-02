@@ -20,7 +20,7 @@ Targeting::Targeting()
 
 Targeting::~Targeting() = default;
 
-void Targeting::Update(const std::shared_ptr<CameraBase>& _spCamera, float _dt)
+void Targeting::Update(const std::shared_ptr<CameraBase>& _spCamera, float _dt, bool _keepCurrent)
 {
 	// マーカーのアニメ用に時間を進める
 	m_time += _dt;
@@ -29,6 +29,21 @@ void Targeting::Update(const std::shared_ptr<CameraBase>& _spCamera, float _dt)
 	if (!_spCamera)
 	{
 		m_wpTarget.reset();
+		return;
+	}
+
+	// ロックオン中は選び直さない。対象が消えた(倒した)ときは空のまま返し、
+	// 呼び出し側(Player::UpdateLockOnSelection)がそれを見てロックを解く。
+	// ※ ここで次の敵を探しに行くと「倒した瞬間に勝手に隣の敵へ掛かり直す」ことになり、
+	//   ロックを明示的な操作にした意味が無くなる
+	if (_keepCurrent)
+	{
+		std::shared_ptr<KdGameObject> spCurrent = m_wpTarget.lock();
+		if (!spCurrent || spCurrent->IsExpired())
+		{
+			m_wpTarget.reset();
+		}
+
 		return;
 	}
 
@@ -102,9 +117,12 @@ void Targeting::DrawMarker()
 	float rotSpeed = DebugParams::Instance().Float(U8("照準/回転速度"), 60.0f, 0.0f, 360.0f);
 	float rotRad   = DirectX::XMConvertToRadians(m_time * rotSpeed);
 
-	// 面内回転(local Z軸まわり)だけ作って敵の少し上へ配置。カメラへの正対はeScreenビルボードに任せる
+	// 面内回転(local Z軸まわり)だけ作って配置。カメラへの正対はeScreenビルボードに任せる。
+	// 狙う関節が指定されていればそこに、無ければ従来どおり敵の少し上に出す
 	Math::Matrix world = Math::Matrix::CreateRotationZ(rotRad);
-	world.Translation(spTarget->GetPos() + Math::Vector3(0.0f, 0.9f, 0.0f));
+	world.Translation(m_hasMarkerOverride
+		? m_markerOverridePos
+		: spTarget->GetPos() + Math::Vector3(0.0f, 0.9f, 0.0f));
 
 	// 発光色つきで描く(DrawPolygonはCullNoneなので裏表は不問。テクスチャの透過で照準形に抜ける)
 	Math::Color   col(1.0f, 0.5f, 0.25f, 1.0f);
