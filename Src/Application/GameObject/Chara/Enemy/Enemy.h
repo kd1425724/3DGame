@@ -85,9 +85,41 @@ public:
 	// 骨名は推測せずglTFのskins[0].jointsを直接読んで確認した実在の名前(2026/08/02)
 	static const JointDef kJointDefs[kJointCount];
 
+	//----------------------------------------
+	// 関節を外から狙うための口(Playerのロックオン・突撃が使う)
+	//----------------------------------------
+
+	// _index番目の関節の球をワールド座標で返す。
+	// 添字が範囲外・骨が無い・既に壊れている場合はfalse(壊れた関節は狙えない)
+	bool GetJointSphereAt(int _index, Math::Vector3& _outCenter, float& _outRadius) const;
+
+	// _index番目がまだ壊れていないか。ロックオンの切り替えで壊れた関節を飛ばすのに使う
+	bool IsJointAlive(int _index) const;
+
+	// _index番目の関節にダメージを与える。関節HPと本体HPの両方を削り、
+	// 関節HPが0になったらその関節の骨を潰す(＝先の部位が消える)
+	void ApplyJointDamage(int _index, float _damage);
+
+	// 表示用の関節名(「首」「左肘」など)。添字が範囲外なら空文字
+	static const char* GetJointName(int _index);
+
+	// プレイヤーの一撃の威力(DebugParams「プレイヤー/攻撃力」)。
+	// 攻撃側と被弾側で別々に書くと既定値が食い違うので、ここ1箇所に集約する
+	static float GetAttackPower();
+
+	// 部位を指定しないダメージ。本体HPだけを削り、0で消滅する
+	void ApplyBodyDamage(float _damage);
+
 private:
 
 	// ※ 移動速度・旋回速度・攻撃系の数値はDebugParams("敵/…")で調整する
+
+	// 本体HP。0で消滅する。関節を壊しても本体HPは別に残る(モンハン方式)
+	// ※ 初期値はInit()でDebugParamsから入れる。ここは「未初期化で0にならない」ための保険
+	float m_hp = 1.0f;
+
+	// 関節ごとのHP。0になったらその関節の骨を潰す。添字はkJointDefsと同じ
+	float m_jointHp[kJointCount] = {};
 
 	// 体の当たり半径(m)。突進の命中判定とデバッグ表示に使う。
 	// 【2026/07/29】KdColliderへの登録をやめたので、用途はこの2つだけになった。
@@ -115,6 +147,10 @@ private:
 	// 関節の球をデバッグ表示する。
 	// 半径が妥当かは目で見ないと決められないので、命中判定を書く【前】に用意する
 	void DrawJointDebug();
+
+	// 壊れた関節の骨を毎フレーム潰し直す。
+	// アニメが毎フレーム骨を書き戻すので、1回潰すだけでは次のフレームで元に戻る
+	void UpdateBrokenJoints();
 
 	// 突進が命中した瞬間の処理(無敵なら反撃成立で自滅／無防備ならノックバック)
 	void ResolveStrikeHit(const std::shared_ptr<KdGameObject>& _target);

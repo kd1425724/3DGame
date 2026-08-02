@@ -28,6 +28,71 @@ DebugDraw::Category Enemy::GetDebugCategory() const
 	return DebugDraw::Category::Enemy;
 }
 
+const char* Enemy::GetJointName(int _index)
+{
+	if (_index < 0 || _index >= kJointCount) { return ""; }
+
+	return kJointDefs[_index].name;
+}
+
+bool Enemy::IsJointAlive(int _index) const
+{
+	if (_index < 0 || _index >= kJointCount) { return false; }
+
+	return m_jointHp[_index] > 0.0f;
+}
+
+bool Enemy::GetJointSphereAt(int _index, Math::Vector3& _outCenter, float& _outRadius) const
+{
+	// 壊れた関節は骨を潰してあり、球だけ元の位置に残しても狙う先として意味が無い
+	if (!IsJointAlive(_index)) { return false; }
+
+	return GetJointSphere(kJointDefs[_index], _outCenter, _outRadius);
+}
+
+void Enemy::ApplyJointDamage(int _index, float _damage)
+{
+	if (_index < 0 || _index >= kJointCount) { return; }
+
+	const JointDef& joint = kJointDefs[_index];
+
+	// 関節へは倍率を掛けたぶん、本体へは素のダメージが入る。
+	// 弱点(首)を狙うと関節は早く壊れるが、本体HPの減りは他と同じ＝
+	// 「部位を狙う」と「早く倒す」が別の目的になる(モンハン方式の狙い)
+	if (m_jointHp[_index] > 0.0f)
+	{
+		m_jointHp[_index] -= _damage * joint.damageScale;
+
+		if (m_jointHp[_index] <= 0.0f)
+		{
+			m_jointHp[_index] = 0.0f;
+		}
+	}
+
+	ApplyBodyDamage(_damage);
+}
+
+void Enemy::UpdateBrokenJoints()
+{
+	bool collapsedAny = false;
+
+	for (int i = 0; i < kJointCount; ++i)
+	{
+		if (m_jointHp[i] > 0.0f) { continue; }
+
+		// 【なぜ毎フレームか】UpdateAnimationが毎フレーム骨をアニメの姿勢で書き戻すので、
+		//   壊した瞬間に1回潰すだけでは次のフレームで生えて戻る。
+		//   これはボーン潰し方式の性質で、UpdateBoneCollapseTestが後ろに置いてあるのと同じ理由
+		CollapseBone(kJointDefs[i].bone);
+		collapsedAny = true;
+	}
+
+	// 1本も潰していないなら、全ノードの再計算は無駄なので走らせない
+	if (!collapsedAny) { return; }
+
+	m_modelWork.CalcNodeMatrices();
+}
+
 bool Enemy::GetJointSphere(const JointDef& _joint, Math::Vector3& _outCenter, float& _outRadius) const
 {
 	if (!GetBoneWorldPos(_joint.bone, _outCenter)) { return false; }
@@ -48,18 +113,23 @@ void Enemy::DrawJointDebug()
 	// 「5つが互いに離れていて狙い分けられるか」の2点
 	const Math::Color kJointColor = Math::Color(1.0f, 0.85f, 0.2f, 1.0f);
 
-	for (const JointDef& joint : kJointDefs)
+	for (int i = 0; i < kJointCount; ++i)
 	{
 		Math::Vector3 center{};
 		float radius = 0.0f;
-		if (!GetJointSphere(joint, center, radius)) { continue; }
+
+		// 壊れた関節は球を出さない(狙えないものを表示すると狙えるように見える)
+		if (!GetJointSphereAt(i, center, radius)) { continue; }
 
 		m_pDebugWire->AddDebugSphere(center, radius, kJointColor);
 
-		// HPをその関節の位置に出す。どの関節がどの値かは、別ウィンドウに数値が並んでも
+		// 残りHPをその関節の位置に出す。どの関節がどの値かは、別ウィンドウに数値が並んでも
 		// 対応が取れない(5つとも似た名前になる)ので、位置の上に直接重ねる
-		DebugDraw::AddText3D(center, std::to_string(static_cast<int>(joint.maxHp)));
+		DebugDraw::AddText3D(center, std::to_string(static_cast<int>(m_jointHp[i])));
 	}
+
+	// 本体HPは体の中心に出す(関節と見分けが付くよう位置を分ける)
+	DebugDraw::AddText3D(GetPos(), "HP " + std::to_string(static_cast<int>(m_hp)));
 }
 
 void Enemy::DrawDebug()
@@ -125,6 +195,17 @@ void Enemy::Init()
 	// 胴に寄せて身長の1/4程度を初期値にする。実機で見て詰める値
 	m_hitRadius = targetHeight * 0.25f;
 
+	// 本体HP。既定100 ＋ プレイヤーの攻撃力34 ＝ 3発で倒せる設定(2026/08/02にユーザーが選択)
+	m_hp = DebugParams::Instance().Float(U8("敵/本体HP"), 100.0f, 1.0f, 1000.0f);
+
+	// 関節HPは表の値 × 倍率。倍率を1本外に出してあるのは、
+	// 「関節が1発で壊れる/固すぎる」を関節ごとに直さず一括で詰められるようにするため
+	float jointHpScale = DebugParams::Instance().Float(U8("関節/HP倍率"), 1.0f, 0.1f, 5.0f);
+	for (int i = 0; i < kJointCount; ++i)
+	{
+		m_jointHp[i] = kJointDefs[i].maxHp * jointHpScale;
+	}
+
 	// 正面は -Z。プレイヤー(GogglesChara)と同じ。
 	// 骨から測って確定させた: つま先の向きも左肩の向きもプレイヤーと完全に一致していた
 	// (foot→toe が両方とも -Y優勢、右肩→左肩が両方とも +X)。
@@ -175,7 +256,25 @@ void Enemy::Init()
 
 void Enemy::OnHit(KdGameObject* /*_other*/)
 {
-	// 攻撃に当たったら消滅する
+	// 部位を指定しない当たり方(反撃・レーザーなど、命中位置を持たない経路)。
+	// 関節を壊さず本体HPだけを削る。
+	// ※ 以前はここで即 m_isExpired = true にしていた(＝一撃で消滅)。
+	//   本体HPを入れたので、部位を狙った攻撃と同じ土俵で減るようにした
+	ApplyBodyDamage(GetAttackPower());
+}
+
+float Enemy::GetAttackPower()
+{
+	// プレイヤーの一撃の威力。本体HP100に対して34＝3発で倒せる
+	return DebugParams::Instance().Float(U8("プレイヤー/攻撃力"), 34.0f, 1.0f, 200.0f);
+}
+
+void Enemy::ApplyBodyDamage(float _damage)
+{
+	m_hp -= _damage;
+	if (m_hp > 0.0f) { return; }
+
+	m_hp = 0.0f;
 	m_isExpired = true;
 }
 
@@ -435,6 +534,9 @@ void Enemy::PostUpdate()
 	// アニメーションを進める。接地・位置・状態が全て確定したあとで呼ぶ
 	// (Playerと同じくPostUpdateの最後。CLAUDE.mdの「PostUpdate＝world状態の解決」に合わせる)
 	UpdateAnimation();
+
+	// 壊れた関節を潰し直す。UpdateAnimationが毎フレーム骨を書き戻すので、必ずその【後】に呼ぶ
+	UpdateBrokenJoints();
 
 	// 【部位破壊の方式確認】ボーンを潰すと部位が消えるかを実機で確かめる。
 	// UpdateAnimationが毎フレーム骨を書き戻すので、必ずその【後】に呼ぶ(前だと塗り潰される)

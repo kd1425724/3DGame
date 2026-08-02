@@ -10,6 +10,7 @@
 #include "../../Camera/CameraShake.h"
 #include "../../../Effect/EffectManager.h"
 #include "../../Targeting/Targeting.h"
+#include "../Enemy/Enemy.h"   // ロックオン中の関節を狙う(GetJointSphereAt/ApplyJointDamage)
 #include "../../../Collision/CollisionGrid.h"   // IsWallBetween(落下攻撃の突撃先が壁の裏か)
 #include "../../../API/MathAPI/MathAPI.h"
 #include "../../../Debug/DebugDraw/DebugDraw.h"   // デバッグ表示のカテゴリ判定
@@ -556,13 +557,100 @@ Math::Vector3 Player::GetAccelDir() const
 
 bool Player::IsAttackInput() const
 {
-	// E(Focus)を押していて、かつターゲットがいる時だけ「攻撃」として扱う。
-	// ※ 連続攻撃の受付中はEを押していなくても攻撃になるが(ユーザー指定)、
+	// ロックオン中で、かつターゲットがいる時だけ「攻撃」として扱う。
+	// ※ 連続攻撃の受付中はロックしていなくても攻撃になるが(ユーザー指定)、
 	//    その分岐は UpdateWireInput の入口で先に処理している(UpdateDiveへ渡す)
-	if (!KdInputManager::Instance().IsHold("Focus")) { return false; }
+	// ※ 以前は IsHold("Focus")(押しっぱなし)だった。2026/08/02にトグルへ変更
+	if (!m_isLockedOn) { return false; }
 	if (!m_upTargeting) { return false; }
 
 	return m_upTargeting->GetTarget() != nullptr;
+}
+
+void Player::UpdateLockOnToggle()
+{
+	// Eを押すたびにロックのON/OFFを切り替える
+	if (!KdInputManager::Instance().IsPress("Focus")) { return; }
+
+	m_isLockedOn = !m_isLockedOn;
+
+	// 掛け直したら狙いは首(添字0)から。前の対象で選んでいた関節を引きずらない
+	if (m_isLockedOn)
+	{
+		m_lockedJointIndex = 0;
+	}
+}
+
+void Player::UpdateLockOnSelection()
+{
+	if (!m_isLockedOn) { return; }
+
+	// 対象が消えた(倒した/範囲外)ならロックを解く。
+	// ※ ロック中はTargetingが対象を選び直さないので、ここで解かないと掛かったままになる
+	// ※ この判定は【Targetingの更新より後】でなければならない。前に置くと、
+	//   Eを押した最初のフレームはまだ対象が居ないので、その場でロックが解けてしまう
+	if (!m_upTargeting || !m_upTargeting->GetTarget())
+	{
+		m_isLockedOn = false;
+		return;
+	}
+
+	// ホイールで狙う関節を切り替える。
+	// WM_MOUSEWHEELの値は120刻みなので、符号だけ見て1段ずつ送る
+	// (刻み幅に依存させると、高解像度ホイールのマウスで飛び方が変わる)
+	const int wheel = Application::Instance().GetMouseWheelValue();
+	if (wheel > 0)
+	{
+		CycleLockedJoint(1);
+	}
+	else if (wheel < 0)
+	{
+		CycleLockedJoint(-1);
+	}
+
+	// 今狙っている関節が壊れたら、生きている関節へ寄せる
+	Enemy* pEnemy = GetLockedEnemy();
+	if (pEnemy && !pEnemy->IsJointAlive(m_lockedJointIndex))
+	{
+		CycleLockedJoint(1);
+	}
+}
+
+Enemy* Player::GetLockedEnemy() const
+{
+	if (!m_isLockedOn) { return nullptr; }
+	if (!m_upTargeting) { return nullptr; }
+
+	std::shared_ptr<KdGameObject> spTarget = m_upTargeting->GetTarget();
+	if (!spTarget) { return nullptr; }
+
+	// dynamic_castの代わりにタグで判定する(この作品の既定の見分け方)
+	if (spTarget->GetObjectTag() != ObjectTag::Enemy) { return nullptr; }
+
+	return static_cast<Enemy*>(spTarget.get());
+}
+
+void Player::CycleLockedJoint(int _step)
+{
+	Enemy* pEnemy = GetLockedEnemy();
+	if (!pEnemy) { return; }
+
+	// 壊れた関節は飛ばす。全部壊れていたら添字を動かさない(1周して戻る)
+	for (int i = 0; i < Enemy::kJointCount; ++i)
+	{
+		m_lockedJointIndex = (m_lockedJointIndex + _step + Enemy::kJointCount) % Enemy::kJointCount;
+
+		if (pEnemy->IsJointAlive(m_lockedJointIndex)) { return; }
+	}
+}
+
+bool Player::GetLockedJointPos(Math::Vector3& _outPos) const
+{
+	Enemy* pEnemy = GetLockedEnemy();
+	if (!pEnemy) { return false; }
+
+	float radius = 0.0f;
+	return pEnemy->GetJointSphereAt(m_lockedJointIndex, _outPos, radius);
 }
 
 void Player::UpdateMove(float dt)
@@ -871,8 +959,14 @@ void Player::UpdateDive(float dt)
 		float pullAccel = DebugParams::Instance().Float(U8("落下攻撃/引き寄せ加速"),     80.0f, 5.0f, 300.0f);
 		float pullMax   = DebugParams::Instance().Float(U8("落下攻撃/引き寄せ上限速度"), 45.0f, 5.0f, 150.0f);
 
-		// 対象(少し上=胴の高さ)へのベクトル。対象は動くので毎フレーム狙い直す(ホーミング)
-		Math::Vector3 aim = spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f);
+		// 狙い先。ロックオンで関節を選んでいればその関節、そうでなければ従来どおり胴の高さ。
+		// 対象も関節も動くので毎フレーム狙い直す(ホーミング)
+		// ※ 敵の中心へ飛ばすと、身長25mでは体の内側に入ってしまい部位を狙い分けられない
+		Math::Vector3 aim{};
+		if (!GetLockedJointPos(aim))
+		{
+			aim = spTarget->GetPos() + Math::Vector3(0.0f, 0.5f, 0.0f);
+		}
 
 		// 対象が壁(塔)の裏＝遮蔽されていたら突撃を中断(壁に突っ込んで操作不能になるのを防ぐ)
 		if (CollisionGrid::IsWallBetween(GetPos(), aim))
@@ -888,8 +982,16 @@ void Player::UpdateDive(float dt)
 
 		if (dist <= radius)
 		{
-			// 斬る
-			spTarget->OnHit(this);
+			// 斬る。関節を狙っていればその関節へ、そうでなければ本体へダメージが入る。
+			// ※ 以前はOnHitが即 m_isExpired = true で「一撃で消滅」だった
+			if (Enemy* pEnemy = GetLockedEnemy())
+			{
+				pEnemy->ApplyJointDamage(m_lockedJointIndex, Enemy::GetAttackPower());
+			}
+			else
+			{
+				spTarget->OnHit(this);
+			}
 			m_diveChainCount++;
 			CameraShake::Instance().AddTrauma(std::clamp(0.2f + 0.05f * m_diveChainCount, 0.0f, 0.7f));
 			EffectManager::Instance().SpawnSlash(aim);   // 斬った位置に斬撃エフェクト
@@ -1060,13 +1162,36 @@ void Player::PostUpdate()
 		CameraShake::Instance().AddTrauma(std::clamp(wall / 25.0f, 0.0f, 0.7f));
 	}
 
-	// 照準：E(Focus)を押している間だけターゲットを取る(2026/07/19の入力再設計)。
+	// 照準：ロックオン中だけターゲットを取る(2026/07/19の入力再設計、2026/08/02にトグル化)。
 	// 常時ロックだと移動中もマーカーが付きっぱなしになるため、「狙う」を明示的な操作にした。
-	// 連続攻撃の受付中はEを押していなくてもロックを維持する(次の対象へ繋げるため)。
+	// 連続攻撃の受付中はロックしていなくてもターゲットを維持する(次の対象へ繋げるため)。
 	// カメラを渡さずに呼ぶとTargeting側がターゲットを解除する
-	bool wantTarget = KdInputManager::Instance().IsHold("Focus") || m_comboWindowTimer > 0.0f;
+	//
+	// ※ ロックのトグルはTargetingの更新より【前】。そのフレームのロック状態で対象を選ばせる
+	UpdateLockOnToggle();
+
+	bool wantTarget = m_isLockedOn || m_comboWindowTimer > 0.0f;
+
+	// ロック中で【既に対象を掴んでいる】ときだけ選び直しを止める。
+	// 掛けた最初のフレームは対象がまだ居ないので、ここは通常どおり探索させる
+	bool keepCurrent = m_isLockedOn && m_upTargeting->GetTarget() != nullptr;
+
 	m_upTargeting->Update(wantTarget ? m_wpCamera.lock() : nullptr,
-		Application::Instance().GetDeltaTime());
+		Application::Instance().GetDeltaTime(), keepCurrent);
+
+	// 対象が確定した後にロックの後始末と関節の切り替えを行う
+	UpdateLockOnSelection();
+
+	// マーカーは狙っている関節に出す。関節が取れないとき(敵でない等)は敵の中心に出る
+	Math::Vector3 jointPos{};
+	if (GetLockedJointPos(jointPos))
+	{
+		m_upTargeting->SetMarkerOverridePos(jointPos);
+	}
+	else
+	{
+		m_upTargeting->ClearMarkerOverridePos();
+	}
 
 	// 着地した瞬間を捉えて、着地モーションを流す時間を確保する。
 	// 「接地しているか」だけで判定すると、着地の次のフレームには走り/待機へ移ってしまい
