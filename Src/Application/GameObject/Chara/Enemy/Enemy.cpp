@@ -377,4 +377,8 @@ void Enemy::PostUpdate()
 	// アニメーションを進める。接地・位置・状態が全て確定したあとで呼ぶ
 	// (Playerと同じくPostUpdateの最後。CLAUDE.mdの「PostUpdate＝world状態の解決」に合わせる)
 	UpdateAnimation();
+
+	// 【部位破壊の方式確認】ボーンを潰すと部位が消えるかを実機で確かめる。
+	// UpdateAnimationが毎フレーム骨を書き戻すので、必ずその【後】に呼ぶ(前だと塗り潰される)
+	UpdateBoneCollapseTest();
 }
