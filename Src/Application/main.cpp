@@ -11,6 +11,7 @@
 #include "GameObject/Ground/Ground.h"
 #include "GameObject/Chara/Enemy/Enemy.h"
 #include "GameObject/StageProp/StageProp.h"
+#include "Physics/PhysicsWorld.h"
 
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
 // エントリーポイント
@@ -370,6 +371,17 @@ bool Application::Init(int w, int h)
 	//===================================================================
 	DebugParams::Instance().Load();
 
+	//===================================================================
+	// 物理エンジン(Jolt)の初期化
+	// ※ シーン生成より前に済ませておく(破片を出す側が既に使える状態にしておくため)
+	//===================================================================
+	PhysicsWorld::Instance().Init();
+
+	// 【段階0の検証・確認できたら消すこと】
+	// 箱を1個落として高さの推移を JoltSelfTest.log へ書く。
+	// 画面には何も出ないので、実行後にログを読んで成否を判定する
+	PhysicsWorld::Instance().SelfTestFall();
+
 	// デバッグ表示のカテゴリを一覧へ登録する。
 	// DebugFlagsは「Getした時に登録」される遅延登録なので、まだ通っていないカテゴリは
 	// チェックリストに出てこない。起動時にまとめて登録して常に全部並ぶようにする
@@ -513,6 +525,9 @@ void Application::Execute()
 void Application::Release()
 {
 	KdInputManager::Instance().Release();
+
+	// 物理世界はDirect3Dに依存しないが、シーンが消えた後に解放したいのでここで
+	PhysicsWorld::Instance().Release();
 
 	KdShaderManager::Instance().Release();
 

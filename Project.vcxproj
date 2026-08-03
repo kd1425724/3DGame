@@ -257,6 +257,26 @@
       <VariableName>compiledBuffer</VariableName>
     </FxCompile>
   </ItemDefinitionGroup>
+  <!--
+    Jolt Physics (破片の物理シミュレーション用)。x64のみ。
+    ・既存の構成ブロックを書き換えず、後ろから %(...) で足す形にしてある。
+      1箇所にまとまるので消すのも簡単で、構成ごとの重複も無い
+    ・ライブラリは C:/3DGame/Library/JoltPhysics/BuildVS/{Debug,Release}/Jolt.lib
+      CMakeで生成する。作り直す手順は auto-memory の project_jolt_physics_setup を参照
+    ・【罠】下のJPH_*定義はJolt本体のビルド時の定義と【完全に一致】させること。
+      Joltはこれらのマクロで構造体のサイズが変わるため、食い違うとコンパイルもリンクも
+      通るのに実行時に壊れる。値は生成された Jolt.vcxproj から抜いた実物
+    ・Win32構成にはJoltを入れていない(x64版しかビルドしていないため)
+  -->
+  <ItemDefinitionGroup Condition="'$(Platform)'=='x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>..\Library\JoltPhysics;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>JPH_DEBUG_RENDERER;JPH_PROFILE_ENABLED;JPH_OBJECT_STREAM;JPH_USE_SSE4_1;JPH_USE_SSE4_2;JPH_USE_CPU_COMPUTE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>..\Library\JoltPhysics\BuildVS\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\Library\imgui\imconfig.h" />
     <ClInclude Include="..\Library\imgui\imgui.h" />
@@ -308,6 +328,7 @@
     <ClInclude Include="Src\Application\GameObject\Ground\Ground.h" />
     <ClInclude Include="Src\Application\GameObject\Wire\WireAction.h" />
     <ClInclude Include="Src\Application\GameObject\Wall\WallAction.h" />
+    <ClInclude Include="Src\Application\Physics\PhysicsWorld.h" />
     <ClInclude Include="Src\Application\Editor\LevelEditor\LevelEditorManager.h" />
     <ClInclude Include="Src\Application\Editor\LevelEditor\LevelEditorHistory\LevelEditorHistory.h" />
     <ClInclude Include="Src\Application\Editor\LevelEditor\LevelFileIO\LevelFileIO.h" />
@@ -408,6 +429,7 @@
     <ClCompile Include="Src\Application\GameObject\Ground\Ground.cpp" />
     <ClCompile Include="Src\Application\GameObject\Wire\WireAction.cpp" />
     <ClCompile Include="Src\Application\GameObject\Wall\WallAction.cpp" />
+    <ClCompile Include="Src\Application\Physics\PhysicsWorld.cpp" />
     <ClCompile Include="Src\Application\Editor\LevelEditor\LevelEditorManager.cpp" />
     <ClCompile Include="Src\Application\Editor\LevelEditor\LevelEditorHistory\LevelEditorHistory.cpp" />
     <ClCompile Include="Src\Application\Editor\LevelEditor\LevelFileIO\LevelFileIO.cpp" />
