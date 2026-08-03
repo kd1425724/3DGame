@@ -9,10 +9,7 @@
 #include <Jolt/Core/JobSystemThreadPool.h>
 #include <Jolt/Physics/PhysicsSettings.h>
 #include <Jolt/Physics/PhysicsSystem.h>
-#include <Jolt/Physics/Collision/Shape/BoxShape.h>
-#include <Jolt/Physics/Body/BodyCreationSettings.h>
 
-#include <fstream>
 #include <thread>
 
 // 【using namespace JPH を書かない理由】JoltにはColor/Vec3/Mat44など、
@@ -243,95 +240,4 @@ void PhysicsWorld::Release()
 
 	delete JPH::Factory::sInstance;
 	JPH::Factory::sInstance = nullptr;
-}
-
-void PhysicsWorld::SelfTestFall()
-{
-	if (!m_pImpl) { return; }
-
-	JPH::BodyInterface& bodyInterface = m_pImpl->m_physicsSystem.GetBodyInterface();
-
-	// --- 床(静的) ---
-	// 【SetEmbedded】スタックに置いた参照カウント付きオブジェクトは、
-	//   カウントが0になった時に解放されないようこれを呼ぶ決まりになっている
-	JPH::BoxShapeSettings floorShapeSettings(JPH::Vec3(100.0f, 1.0f, 100.0f));
-	floorShapeSettings.SetEmbedded();
-
-	JPH::ShapeSettings::ShapeResult floorShapeResult = floorShapeSettings.Create();
-	JPH::ShapeRefC floorShape = floorShapeResult.Get();
-
-	// 上面がちょうど y=0 になるように、半分の高さぶん沈めて置く
-	JPH::BodyCreationSettings floorSettings(
-		floorShape,
-		JPH::RVec3(0.0f, -1.0f, 0.0f),
-		JPH::Quat::sIdentity(),
-		JPH::EMotionType::Static,
-		Layers::NON_MOVING);
-
-	JPH::Body* pFloor = bodyInterface.CreateBody(floorSettings);
-	if (!pFloor) { return; }
-
-	bodyInterface.AddBody(pFloor->GetID(), JPH::EActivation::DontActivate);
-
-	// --- 箱(動的) ---
-	// BoxShapeは「半分の大きさ」を渡す規約なので、0.5で1m角になる
-	JPH::BoxShapeSettings boxShapeSettings(JPH::Vec3(0.5f, 0.5f, 0.5f));
-	boxShapeSettings.SetEmbedded();
-
-	JPH::ShapeSettings::ShapeResult boxShapeResult = boxShapeSettings.Create();
-	JPH::ShapeRefC boxShape = boxShapeResult.Get();
-
-	JPH::BodyCreationSettings boxSettings(
-		boxShape,
-		JPH::RVec3(0.0f, 10.0f, 0.0f),
-		JPH::Quat::sIdentity(),
-		JPH::EMotionType::Dynamic,
-		Layers::MOVING);
-
-	const JPH::BodyID boxId = bodyInterface.CreateAndAddBody(boxSettings, JPH::EActivation::Activate);
-
-	// 静的なものを入れ終えたらブロードフェーズを最適化する(初期化時に1回だけ行う)
-	m_pImpl->m_physicsSystem.OptimizeBroadPhase();
-
-	// --- 2秒ぶん回して高さの推移を記録する ---
-	constexpr float kStepSeconds	= 1.0f / 60.0f;
-	constexpr int   kStepCount		= 120;
-
-	std::ofstream log("JoltSelfTest.log");
-	if (log)
-	{
-		log << "--- Jolt self test (box falls from y=10 onto floor at y=0) ---\n";
-		log << "workerThreads=" << GetWorkerThreadCount() << "\n";
-	}
-
-	for (int i = 0; i < kStepCount; ++i)
-	{
-		Update(kStepSeconds);
-
-		// 10ステップごとに書く(120行あっても読みづらいだけなので)
-		if (i % 10 != 0) { continue; }
-
-		const JPH::RVec3 pos = bodyInterface.GetCenterOfMassPosition(boxId);
-		if (log)
-		{
-			log << "step " << i
-				<< "  y=" << static_cast<float>(pos.GetY())
-				<< "  active=" << (bodyInterface.IsActive(boxId) ? 1 : 0)
-				<< "\n";
-		}
-	}
-
-	const JPH::RVec3 finalPos = bodyInterface.GetCenterOfMassPosition(boxId);
-	if (log)
-	{
-		log << "final y=" << static_cast<float>(finalPos.GetY())
-			<< "  (期待値: 0.5付近で停止していれば成功)\n";
-	}
-
-	// 検証用のボディは残さない
-	bodyInterface.RemoveBody(boxId);
-	bodyInterface.DestroyBody(boxId);
-
-	bodyInterface.RemoveBody(pFloor->GetID());
-	bodyInterface.DestroyBody(pFloor->GetID());
 }
