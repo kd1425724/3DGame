@@ -101,6 +101,13 @@ void Application::Update()
 void Application::PostUpdate()
 {
 	SceneManager::Instance().PostUpdate();
+
+	// 物理世界を1フレーム進める。
+	// 【なぜPostUpdateか】物理は「world状態に対する解決」なので、各オブジェクトが
+	//   意思決定(Update)を終えた後に回す。オブジェクトリストの並び順にも依存しない
+	// 【なぜGetDeltaTimeか】タイムスケール適用済み＝スロー中は破片も一緒に遅くなる。
+	//   実時間側(GetRealDeltaTime)は1/30秒で頭打ちされているので大ジャンプもしない
+	PhysicsWorld::Instance().Update(GetDeltaTime());
 }
 
 // ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// ///// /////
