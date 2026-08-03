@@ -1,0 +1,136 @@
+{
+    "asset":  {
+                  "version":  "2.0",
+                  "generator":  "GltfPartExtract (from Khronos glTF Blender I/O v5.2.39)"
+              },
+    "scene":  0,
+    "scenes":  [
+                   {
+                       "nodes":  [
+                                     0
+                                 ]
+                   }
+               ],
+    "nodes":  [
+                  {
+                      "name":  "Gib_RightLeg",
+                      "mesh":  0
+                  }
+              ],
+    "meshes":  [
+                   {
+                       "name":  "Gib_RightLeg",
+                       "primitives":  [
+                                          {
+                                              "attributes":  {
+                                                                 "POSITION":  0,
+                                                                 "NORMAL":  1,
+                                                                 "TEXCOORD_0":  2
+                                                             },
+                                              "indices":  3,
+                                              "material":  0
+                                          }
+                                      ]
+                   }
+               ],
+    "materials":  [
+                      {
+                          "doubleSided":  true,
+                          "name":  "StoneGolem",
+                          "pbrMetallicRoughness":  {
+                                                       "baseColorTexture":  {
+                                                                                "index":  0
+                                                                            },
+                                                       "metallicFactor":  0,
+                                                       "roughnessFactor":  0.8899999856948853
+                                                   }
+                      }
+                  ],
+    "textures":  [
+                     {
+                         "sampler":  0,
+                         "source":  0
+                     }
+                 ],
+    "images":  [
+                   {
+                       "mimeType":  "image/png",
+                       "name":  "base_color",
+                       "uri":  "base_color.png"
+                   }
+               ],
+    "samplers":  [
+                     {
+                         "magFilter":  9729,
+                         "minFilter":  9987
+                     }
+                 ],
+    "buffers":  [
+                    {
+                        "uri":  "Gib_RightLeg.bin",
+                        "byteLength":  688184
+                    }
+                ],
+    "bufferViews":  [
+                        {
+                            "buffer":  0,
+                            "byteOffset":  0,
+                            "byteLength":  151320,
+                            "target":  34962
+                        },
+                        {
+                            "buffer":  0,
+                            "byteOffset":  151320,
+                            "byteLength":  151320,
+                            "target":  34962
+                        },
+                        {
+                            "buffer":  0,
+                            "byteOffset":  302640,
+                            "byteLength":  100880,
+                            "target":  34962
+                        },
+                        {
+                            "buffer":  0,
+                            "byteOffset":  403520,
+                            "byteLength":  284664,
+                            "target":  34963
+                        }
+                    ],
+    "accessors":  [
+                      {
+                          "bufferView":  0,
+                          "componentType":  5126,
+                          "count":  12610,
+                          "type":  "VEC3",
+                          "min":  [
+                                      -0.188519,
+                                      0.011467725,
+                                      -0.209386721
+                                  ],
+                          "max":  [
+                                      0.247009769,
+                                      0.701383352,
+                                      0.335682362
+                                  ]
+                      },
+                      {
+                          "bufferView":  1,
+                          "componentType":  5126,
+                          "count":  12610,
+                          "type":  "VEC3"
+                      },
+                      {
+                          "bufferView":  2,
+                          "componentType":  5126,
+                          "count":  12610,
+                          "type":  "VEC2"
+                      },
+                      {
+                          "bufferView":  3,
+                          "componentType":  5125,
+                          "count":  71166,
+                          "type":  "SCALAR"
+                      }
+                  ]
+}

@@ -1,0 +1,136 @@
+{
+    "asset":  {
+                  "version":  "2.0",
+                  "generator":  "GltfPartExtract (from Khronos glTF Blender I/O v5.2.39)"
+              },
+    "scene":  0,
+    "scenes":  [
+                   {
+                       "nodes":  [
+                                     0
+                                 ]
+                   }
+               ],
+    "nodes":  [
+                  {
+                      "name":  "Gib_RightForeArm",
+                      "mesh":  0
+                  }
+              ],
+    "meshes":  [
+                   {
+                       "name":  "Gib_RightForeArm",
+                       "primitives":  [
+                                          {
+                                              "attributes":  {
+                                                                 "POSITION":  0,
+                                                                 "NORMAL":  1,
+                                                                 "TEXCOORD_0":  2
+                                                             },
+                                              "indices":  3,
+                                              "material":  0
+                                          }
+                                      ]
+                   }
+               ],
+    "materials":  [
+                      {
+                          "doubleSided":  true,
+                          "name":  "StoneGolem",
+                          "pbrMetallicRoughness":  {
+                                                       "baseColorTexture":  {
+                                                                                "index":  0
+                                                                            },
+                                                       "metallicFactor":  0,
+                                                       "roughnessFactor":  0.8899999856948853
+                                                   }
+                      }
+                  ],
+    "textures":  [
+                     {
+                         "sampler":  0,
+                         "source":  0
+                     }
+                 ],
+    "images":  [
+                   {
+                       "mimeType":  "image/png",
+                       "name":  "base_color",
+                       "uri":  "base_color.png"
+                   }
+               ],
+    "samplers":  [
+                     {
+                         "magFilter":  9729,
+                         "minFilter":  9987
+                     }
+                 ],
+    "buffers":  [
+                    {
+                        "uri":  "Gib_RightForeArm.bin",
+                        "byteLength":  390192
+                    }
+                ],
+    "bufferViews":  [
+                        {
+                            "buffer":  0,
+                            "byteOffset":  0,
+                            "byteLength":  86148,
+                            "target":  34962
+                        },
+                        {
+                            "buffer":  0,
+                            "byteOffset":  86148,
+                            "byteLength":  86148,
+                            "target":  34962
+                        },
+                        {
+                            "buffer":  0,
+                            "byteOffset":  172296,
+                            "byteLength":  57432,
+                            "target":  34962
+                        },
+                        {
+                            "buffer":  0,
+                            "byteOffset":  229728,
+                            "byteLength":  160464,
+                            "target":  34963
+                        }
+                    ],
+    "accessors":  [
+                      {
+                          "bufferView":  0,
+                          "componentType":  5126,
+                          "count":  7179,
+                          "type":  "VEC3",
+                          "min":  [
+                                      -0.224750027,
+                                      -0.00155135989,
+                                      -0.2137616
+                                  ],
+                          "max":  [
+                                      0.21673888,
+                                      0.8001492,
+                                      0.156135827
+                                  ]
+                      },
+                      {
+                          "bufferView":  1,
+                          "componentType":  5126,
+                          "count":  7179,
+                          "type":  "VEC3"
+                      },
+                      {
+                          "bufferView":  2,
+                          "componentType":  5126,
+                          "count":  7179,
+                          "type":  "VEC2"
+                      },
+                      {
+                          "bufferView":  3,
+                          "componentType":  5125,
+                          "count":  40116,
+                          "type":  "SCALAR"
+                      }
+                  ]
+}
