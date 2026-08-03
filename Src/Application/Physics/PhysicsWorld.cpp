@@ -10,6 +10,7 @@
 #include <Jolt/Physics/PhysicsSettings.h>
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
+#include <Jolt/Physics/Collision/Shape/ScaledShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 
 #include <thread>
@@ -151,6 +152,11 @@ namespace
 		OutputDebugStringA("\n");
 	}
 
+	// モデルの当たり判定メッシュから【モデル座標系のままの】形状を作る。
+	// ワールド変換を含めないので、同じモデルを何棟置いてもこれ1つで足りる。
+	// ※ Jolt型を返すのでヘッダには出せない。ここに置く
+	JPH::RefConst<JPH::Shape> BuildStaticShape(const KdModelWork& _model);
+
 	// 物理に回すワーカースレッドの本数
 	int GetWorkerThreadCount()
 	{
@@ -182,6 +188,14 @@ struct PhysicsWorld::Impl
 	ObjectLayerPairFilterImpl			m_objectLayerPairFilter;
 
 	JPH::PhysicsSystem					m_physicsSystem;
+
+	// 登録済みの静的ボディ(シーンを作り直すとき一括で捨てるために覚えておく)
+	std::vector<JPH::BodyID>			m_staticBodies;
+
+	// モデルごとの形状キャッシュ。同じ家を100軒置いても形状は1つで済む
+	// (InstancedPropRendererが描画でやっているのと同じ考え方)。
+	// KdModelDataはKdAssetsが持ち続けるので、生ポインタをキーにしてよい
+	std::unordered_map<const KdModelData*, JPH::RefConst<JPH::Shape>> m_shapeCache;
 };
 
 // 【なぜここで定義するか】Implが完全型として見えるのはこの.cppだけ。
@@ -251,6 +265,72 @@ bool PhysicsWorld::AddStaticMesh(const KdModelWork& _model, const Math::Matrix& 
 	const std::shared_ptr<KdModelData> spData = _model.GetData();
 	if (!spData) { return false; }
 
+	// --- 形状はモデルごとに1つだけ作って使い回す ---
+	// 【なぜ共有するか】街は738棟だが元のモデルは数十種しかない。1棟ごとに形状を
+	//   作ると同じ木を何百回も建て直すことになる(実測で725ms掛かっていた)
+	JPH::RefConst<JPH::Shape> shape;
+
+	const auto cached = m_pImpl->m_shapeCache.find(spData.get());
+	if (cached != m_pImpl->m_shapeCache.end())
+	{
+		shape = cached->second;
+	}
+	else
+	{
+		shape = BuildStaticShape(_model);
+		if (shape == nullptr) { return false; }
+
+		m_pImpl->m_shapeCache[spData.get()] = shape;
+	}
+
+	// --- 置き方(位置・回転・拡大)はボディ側で持つ ---
+	// 【なぜ焼き込まないか】頂点にワールド行列を焼き込むと形状を共有できなくなる
+	Math::Vector3		scale;
+	Math::Quaternion	rotation;
+	Math::Vector3		translation;
+
+	// 【罠】SimpleMathのDecomposeは非constなので、const参照のままでは呼べない。コピーを取る
+	Math::Matrix world = _world;
+	if (!world.Decompose(scale, rotation, translation)) { return false; }
+
+	// 拡大が1でなければ包んで拡大する(街の建物はスケール2.0で置かれている)
+	constexpr float kScaleEpsilon = 0.0001f;
+	if (std::abs(scale.x - 1.0f) > kScaleEpsilon
+		|| std::abs(scale.y - 1.0f) > kScaleEpsilon
+		|| std::abs(scale.z - 1.0f) > kScaleEpsilon)
+	{
+		JPH::ScaledShapeSettings scaledSettings(shape, JPH::Vec3(scale.x, scale.y, scale.z));
+		scaledSettings.SetEmbedded();
+
+		JPH::ShapeSettings::ShapeResult scaledResult = scaledSettings.Create();
+		if (scaledResult.HasError()) { return false; }
+
+		shape = scaledResult.Get();
+	}
+
+	JPH::BodyCreationSettings bodySettings(
+		shape,
+		JPH::RVec3(translation.x, translation.y, translation.z),
+		JPH::Quat(rotation.x, rotation.y, rotation.z, rotation.w),
+		JPH::EMotionType::Static,
+		Layers::NON_MOVING);
+
+	const JPH::BodyID id = m_pImpl->m_physicsSystem.GetBodyInterface()
+		.CreateAndAddBody(bodySettings, JPH::EActivation::DontActivate);
+
+	m_pImpl->m_staticBodies.push_back(id);
+
+	return true;
+}
+
+namespace
+{
+
+JPH::RefConst<JPH::Shape> BuildStaticShape(const KdModelWork& _model)
+{
+	const std::shared_ptr<KdModelData> spData = _model.GetData();
+	if (!spData) { return nullptr; }
+
 	const std::vector<KdModelData::Node>& dataNodes = _model.GetDataNodes();
 	const std::vector<KdModelWork::Node>& workNodes = _model.GetNodes();
 
@@ -268,15 +348,15 @@ bool PhysicsWorld::AddStaticMesh(const KdModelWork& _model, const Math::Matrix& 
 		const KdMesh* pMesh = dataNodes[index].m_spMesh.get();
 		if (!pMesh) { continue; }
 
-		// ノードのモデル内行列にオブジェクトのワールド行列を掛ける(KdColliderと同じ計算)
-		const Math::Matrix mNode = workNodes[index].m_worldTransform * _world;
+		// ノードのモデル内行列だけを掛ける(オブジェクトのワールド行列はボディ側で持つ)
+		const Math::Matrix& mNode = workNodes[index].m_worldTransform;
 
 		const JPH::uint32 base = static_cast<JPH::uint32>(vertices.size());
 
 		for (const Math::Vector3& local : pMesh->GetVertexPositions())
 		{
-			const Math::Vector3 world = Math::Vector3::Transform(local, mNode);
-			vertices.push_back(JPH::Float3(world.x, world.y, world.z));
+			const Math::Vector3 posInModel = Math::Vector3::Transform(local, mNode);
+			vertices.push_back(JPH::Float3(posInModel.x, posInModel.y, posInModel.z));
 		}
 
 		// 【三角形の向きはそのままでよい】Joltは巻き順で表裏を決めるので逆だとすり抜ける。
@@ -292,27 +372,40 @@ bool PhysicsWorld::AddStaticMesh(const KdModelWork& _model, const Math::Matrix& 
 		}
 	}
 
-	if (triangles.empty()) { return false; }
+	if (triangles.empty()) { return nullptr; }
 
 	JPH::MeshShapeSettings shapeSettings(std::move(vertices), std::move(triangles));
 	shapeSettings.SetEmbedded();
 
 	JPH::ShapeSettings::ShapeResult shapeResult = shapeSettings.Create();
-	if (shapeResult.HasError()) { return false; }
+	if (shapeResult.HasError()) { return nullptr; }
 
-	// 頂点にワールド行列を焼き込んだので、ボディ自体は原点・無回転で置く
-	JPH::BodyCreationSettings bodySettings(
-		shapeResult.Get(),
-		JPH::RVec3::sZero(),
-		JPH::Quat::sIdentity(),
-		JPH::EMotionType::Static,
-		Layers::NON_MOVING);
+	return shapeResult.Get();
+}
 
-	m_pImpl->m_physicsSystem.GetBodyInterface().CreateAndAddBody(bodySettings, JPH::EActivation::DontActivate);
+}	// namespace
 
-	// 【段階2で見直す】静的なものを入れ終えた後に1回で足りる処理。
-	//   街の建物を何百個も入れる段になったら、全部入れてから1回だけ呼ぶ形へ移すこと
+void PhysicsWorld::ClearStaticBodies()
+{
+	if (!m_pImpl) { return; }
+
+	JPH::BodyInterface& bodyInterface = m_pImpl->m_physicsSystem.GetBodyInterface();
+
+	for (const JPH::BodyID& id : m_pImpl->m_staticBodies)
+	{
+		bodyInterface.RemoveBody(id);
+		bodyInterface.DestroyBody(id);
+	}
+
+	m_pImpl->m_staticBodies.clear();
+
+	// 形状キャッシュは残す。モデル自体はKdAssetsが持ち続けるので、
+	// シーンを作り直しても同じ形状をそのまま使い回せる
+}
+
+void PhysicsWorld::FinishStaticSetup()
+{
+	if (!m_pImpl) { return; }
+
 	m_pImpl->m_physicsSystem.OptimizeBroadPhase();
-
-	return true;
 }
