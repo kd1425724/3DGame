@@ -25,14 +25,21 @@ namespace
 	// 物理世界の容量
 	//----------------------------------------
 	// 破片に加えて、街や地面の静的形状も同じ枠を使うので多めに取る。
-	// 足りなくなると「これ以上ボディを追加できない」で静かに失敗するので、
+	// Joltは起動時に全部確保して実行中に増やさないので、上限を先に決める必要がある。
+	// 【足りないと何が起きるかは3種類ある。同じ「足りない」でも症状が違う】
+	//   kMaxBodies             … ボディを追加できなくなる(生成が失敗する)
+	//   kMaxBodyPairs          … Jolt公式いわく "fall through the world"＝物がすり抜けて落ちる
+	//   kMaxContactConstraints … 同上。すり抜けて落ちる
 	// 削るのは実測してからにすること
 	constexpr JPH::uint kMaxBodies				= 65536;
 	constexpr JPH::uint kNumBodyMutexes			= 0;		// 0 = Joltの既定値に任せる
 	constexpr JPH::uint kMaxBodyPairs			= 65536;
 	constexpr JPH::uint kMaxContactConstraints	= 10240;
 
-	// 物理更新の一時確保用。毎フレームのmalloc/freeを避けるために先に確保しておく
+	// 物理更新の一時確保用。毎フレームのmalloc/freeを避けるために先に確保しておく。
+	// 中身はバンプアロケータ(目印を進めるだけ)なので確保が足し算1回で済む。
+	// 🔴【超えると std::abort() でプログラムが即死する】(TempAllocator.h の Allocate)。
+	//   破片を大量に出して突然落ちるようになったら、まずここを疑うこと。10MBはJolt公式の推奨値
 	constexpr JPH::uint kTempAllocatorBytes		= 10 * 1024 * 1024;
 
 	//----------------------------------------
@@ -79,8 +86,13 @@ namespace
 			return m_objectToBroadPhase[_layer];
 		}
 
-		// 【なぜこの#ifが要るか】JPH_PROFILE_ENABLED付きでビルドしたときだけ
-		//   基底クラスにこの純粋仮想関数が生える。定義がずれるとリンクエラーになる
+		// 【なぜこの#ifが要るか】基底クラス(BroadPhaseLayer.h:72)側にも同じ#ifがあり、
+		//   JPH_PROFILE_ENABLED付きのときだけこの純粋仮想関数が生える。だから
+		//     #ifを書かない → プロファイル無効時に「基底に無い関数をoverrideした」でコンパイルエラー
+		//     #ifを外す     → プロファイル有効時に純粋仮想が未実装のまま＝抽象クラスになり、
+		//                     Implのメンバとして実体化できずコンパイルエラー
+		//   ※ さらに、Jolt本体と呼び出し側でこのマクロが食い違うとvtableの形がずれる。
+		//     そちらはコンパイルもリンクも通ってしまい、実行時に壊れる(定義を揃える理由)
 #if defined(JPH_EXTERNAL_PROFILE) || defined(JPH_PROFILE_ENABLED)
 		const char* GetBroadPhaseLayerName(JPH::BroadPhaseLayer _layer) const override
 		{
