@@ -115,12 +115,19 @@ C++/DirectX11製の3Dゲームフレームワーク。TPS視点のアクショ�
 | **DirectXTK**（DirectX Tool Kit） | - | `Math`名前空間（`DirectX::SimpleMath`）、`Audio`、`SpriteBatch`等の基盤。`Inc`/`Lib`/`Bin`をWin32/x64別に格納 |
 | **DirectXTex** | - | テクスチャの読み込み・変換 |
 | **Effekseer** / **Effekseer(Win32)** | - | パーティクル/視覚エフェクト再生エンジン（`KdEffekseerManager`が使用）。`.efk`ファイルを読み込んで再生する。x64用と Win32用でフォルダが分かれている |
+| **Jolt Physics** | master (2026-08-03取得) | 破片の落下・転がり（`PhysicsWorld`が使用）。**用途は破片に限定**し、プレイヤー・敵・ワイヤーの当たり判定は`KdCollider`のまま。x64のみビルド済み（`BuildVS/{Debug,Release}/Jolt.lib`）。**`JPH_*`の定義はJolt本体のビルド時と完全に一致させること**（食い違うと実行時に壊れる） |
 | **imgui**（Dear ImGui） | 1.90.6 WIP | デバッグ用UI（DebugFlags/DebugWatch/DebugParams/DebugEffect、LevelEditor等）。日本語文字列は`U8()`マクロ経由で渡すこと |
 | **nlohmann/json** | 3.12.0 | JSON読み書き（`LevelFileIO`、`DebugParams`の保存/読込で使用）。`#include "nlohmann/json.hpp"`はPch.hで読み込み済み |
 | **tinygltf** | - | glTFモデルの読み込み（`KdGLTFLoader`が使用）。`stb_image.h`/`stb_image_write.h`も同梱 |
 | **strconv.h** | 1.0.0 (2019/02/27) | 文字コード変換（Shift-JIS⇔UTF-8⇔wide文字列）の単一ヘッダー |
 
 ※ バージョン番号は各ライブラリのヘッダー内マクロ等から確認できたもののみ記載。空欄のものはヘッダー内に明確なバージョン表記が見つからなかった。
+
+### 🔴 ライセンス表記は最優先。後回しにしない
+
+**ライブラリ・モデル・テクスチャ・音などサードパーティの成果物を入れたら、その場で `C:/3DGame/THIRD_PARTY_LICENSES.txt` に追記する。**「動いてから書く」は禁止。忘れると配布時に致命的になる（2026-08-03にユーザーが明示）。
+
+記載する内容：名称とバージョン／ライセンス種別／**著作権者（LICENSEファイルから実物を引き写す。記憶で書かない）**／用途／入手元URL／ライセンス原本の場所。**判断に迷ったら書いておく。**
 
 ## 進め方
 

@@ -12,6 +12,7 @@
 #include "../../GameObject/UI/GameHud/GameHud.h"
 #include "../../GameObject/StageProp/InstancedPropRenderer.h"
 #include "../../GameObject/StageProp/StageProp.h"
+#include "../../GameObject/Debris/DebrisSystem.h"
 #include "../../Collision/CollisionGrid.h"
 #include "../../Physics/PhysicsWorld.h"
 
@@ -109,6 +110,12 @@ void GameScene::Init()
 	std::shared_ptr<InstancedPropRenderer> spPropRenderer = std::make_shared<InstancedPropRenderer>();
 	spPropRenderer->Init();
 	AddObject(spPropRenderer);
+
+	// 破片をまとめて持って描くオブジェクト(動きはPhysicsWorldが計算する)。
+	// シーンに1つ常駐させる
+	std::shared_ptr<DebrisSystem> spDebris = std::make_shared<DebrisSystem>();
+	spDebris->Init();
+	AddObject(spDebris);
 
 	// 当たり判定のbroadphaseを、このシーンの静的コリジョン(地面/建物)で作り直させる。
 	// (シーンを切り替えても前シーンの内容が残らないよう、シーン構築のたびにdirtyにする)
