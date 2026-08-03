@@ -56,6 +56,24 @@ public:
 	//   AddStaticMeshのたびに呼ぶと 棟数の2乗 の手間になる(街は738棟ある)
 	void FinishStaticSetup();
 
+	//----------------------------------------
+	// 動く物体(破片)
+	//----------------------------------------
+	// 【IDがuint32な理由】JoltのBodyIDをヘッダへ出さないため。中身は
+	//   JPH::BodyID::GetIndexAndSequenceNumber() と同じ値で、往復して復元できる
+	static constexpr uint32_t kInvalidBodyId = 0xFFFFFFFF;
+
+	// 箱の破片を1つ生む。_halfExtent は「半分の大きさ」(0.5で1m角)。
+	// 戻り値は kInvalidBodyId なら失敗
+	uint32_t SpawnDebrisBox(const Math::Vector3& _pos, const Math::Vector3& _halfExtent,
+		const Math::Vector3& _velocity, const Math::Vector3& _angularVelocity);
+
+	// 物体の今の姿勢を描画用のワールド行列として取り出す
+	bool GetBodyMatrix(uint32_t _id, Math::Matrix& _outWorld) const;
+
+	// 物体を消す
+	void RemoveBody(uint32_t _id);
+
 private:
 
 	// 【罠】コンストラクタもデストラクタも【必ず.cpp側で定義する】。

@@ -11,6 +11,7 @@
 #include <Jolt/Physics/PhysicsSystem.h>
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <Jolt/Physics/Collision/Shape/ScaledShape.h>
+#include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 
 #include <thread>
@@ -408,4 +409,77 @@ void PhysicsWorld::FinishStaticSetup()
 	if (!m_pImpl) { return; }
 
 	m_pImpl->m_physicsSystem.OptimizeBroadPhase();
+}
+
+uint32_t PhysicsWorld::SpawnDebrisBox(const Math::Vector3& _pos, const Math::Vector3& _halfExtent,
+	const Math::Vector3& _velocity, const Math::Vector3& _angularVelocity)
+{
+	if (!m_pImpl) { return kInvalidBodyId; }
+
+	JPH::BoxShapeSettings boxSettings(JPH::Vec3(_halfExtent.x, _halfExtent.y, _halfExtent.z));
+	boxSettings.SetEmbedded();
+
+	JPH::ShapeSettings::ShapeResult boxResult = boxSettings.Create();
+	if (boxResult.HasError()) { return kInvalidBodyId; }
+
+	JPH::BodyCreationSettings bodySettings(
+		boxResult.Get(),
+		JPH::RVec3(_pos.x, _pos.y, _pos.z),
+		JPH::Quat::sIdentity(),
+		JPH::EMotionType::Dynamic,
+		Layers::MOVING);
+
+	bodySettings.mLinearVelocity	= JPH::Vec3(_velocity.x, _velocity.y, _velocity.z);
+	bodySettings.mAngularVelocity	= JPH::Vec3(_angularVelocity.x, _angularVelocity.y, _angularVelocity.z);
+
+	// 【なぜ跳ね返りを抑えるか】石の破片なので、ゴムのように弾むと嘘に見える。
+	//   摩擦は高めにして、転がったあときちんと止まるようにする
+	bodySettings.mRestitution	= 0.1f;
+	bodySettings.mFriction		= 0.8f;
+
+	const JPH::BodyID id = m_pImpl->m_physicsSystem.GetBodyInterface()
+		.CreateAndAddBody(bodySettings, JPH::EActivation::Activate);
+
+	if (id.IsInvalid()) { return kInvalidBodyId; }
+
+	return id.GetIndexAndSequenceNumber();
+}
+
+bool PhysicsWorld::GetBodyMatrix(uint32_t _id, Math::Matrix& _outWorld) const
+{
+	if (!m_pImpl) { return false; }
+	if (_id == kInvalidBodyId) { return false; }
+
+	const JPH::BodyID id(_id);
+	const JPH::BodyInterface& bodyInterface = m_pImpl->m_physicsSystem.GetBodyInterface();
+
+	if (!bodyInterface.IsAdded(id)) { return false; }
+
+	const JPH::RVec3 pos = bodyInterface.GetPosition(id);
+	const JPH::Quat  rot = bodyInterface.GetRotation(id);
+
+	// 【座標系はそのままでよい】ここまで(地面・街)と同じ扱い。
+	//   Joltへ渡した数値がそのまま返ってくるので、両側で同じ規約なら変換は要らない
+	_outWorld = Math::Matrix::CreateFromQuaternion(Math::Quaternion(rot.GetX(), rot.GetY(), rot.GetZ(), rot.GetW()))
+		* Math::Matrix::CreateTranslation(static_cast<float>(pos.GetX()),
+			static_cast<float>(pos.GetY()),
+			static_cast<float>(pos.GetZ()));
+
+	return true;
+}
+
+void PhysicsWorld::RemoveBody(uint32_t _id)
+{
+	if (!m_pImpl) { return; }
+	if (_id == kInvalidBodyId) { return; }
+
+	const JPH::BodyID id(_id);
+	JPH::BodyInterface& bodyInterface = m_pImpl->m_physicsSystem.GetBodyInterface();
+
+	if (bodyInterface.IsAdded(id))
+	{
+		bodyInterface.RemoveBody(id);
+	}
+
+	bodyInterface.DestroyBody(id);
 }

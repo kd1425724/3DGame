@@ -363,6 +363,9 @@ bool Application::Init(int w, int h)
 		// 全デバッグUIの表示/非表示を一括切替
 		pKeyboardMouse->AddButton("ToggleDebugGui", new KdInputButtonForWindows(VK_F3));
 
+		// 破片をカメラの前方にばら撒く(物理の見た目を調整するための確認用)
+		pKeyboardMouse->AddButton("SpawnDebris", new KdInputButtonForWindows(VK_F2));
+
 		// その他
 		pKeyboardMouse->AddButton("Escape", new KdInputButtonForWindows(VK_ESCAPE));
 		pKeyboardMouse->AddButton("SwitchScene", new KdInputButtonForWindows('T'));
