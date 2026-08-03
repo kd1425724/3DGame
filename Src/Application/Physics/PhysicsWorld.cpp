@@ -12,6 +12,7 @@
 #include <Jolt/Physics/Collision/Shape/MeshShape.h>
 #include <Jolt/Physics/Collision/Shape/ScaledShape.h>
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
+#include <Jolt/Physics/Collision/Shape/ConvexHullShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 
 #include <thread>
@@ -448,6 +449,98 @@ uint32_t PhysicsWorld::SpawnDebrisBox(const Math::Vector3& _pos, const Math::Vec
 	//   摩擦は高めにして、転がったあときちんと止まるようにする
 	bodySettings.mRestitution	= 0.1f;
 	bodySettings.mFriction		= 0.8f;
+
+	const JPH::BodyID id = m_pImpl->m_physicsSystem.GetBodyInterface()
+		.CreateAndAddBody(bodySettings, JPH::EActivation::Activate);
+
+	if (id.IsInvalid()) { return kInvalidBodyId; }
+
+	return id.GetIndexAndSequenceNumber();
+}
+
+uint32_t PhysicsWorld::SpawnDebrisConvex(const KdModelWork& _model, const Math::Matrix& _world,
+	const Math::Vector3& _velocity, const Math::Vector3& _angularVelocity)
+{
+	if (!m_pImpl) { return kInvalidBodyId; }
+
+	const std::shared_ptr<KdModelData> spData = _model.GetData();
+	if (!spData) { return kInvalidBodyId; }
+
+	// 姿勢を「拡大」と「位置＋回転」に分ける。
+	// 【なぜ拡大だけ頂点へ焼くか】凸包はScaledShapeでも包めるが、gibはモデルごとに
+	//   1回しか作らないので共有の利点が無い。焼いてしまうほうが単純で速い
+	Math::Vector3		scale;
+	Math::Quaternion	rotation;
+	Math::Vector3		translation;
+
+	Math::Matrix world = _world;
+	if (!world.Decompose(scale, rotation, translation)) { return kInvalidBodyId; }
+
+	// --- 頂点を集める ---
+	// 当たり判定メッシュがあればそれを、無ければ描画メッシュを使う。
+	// gibは当たり専用ノードを持たないので、実際には描画メッシュが使われる
+	const std::vector<KdModelData::Node>& dataNodes = _model.GetDataNodes();
+	const std::vector<KdModelWork::Node>& workNodes = _model.GetNodes();
+
+	const std::vector<int>& colNodes  = spData->GetCollisionMeshNodeIndices();
+	const std::vector<int>& drawNodes = spData->GetDrawMeshNodeIndices();
+	const std::vector<int>& useNodes  = colNodes.empty() ? drawNodes : colNodes;
+
+	JPH::Array<JPH::Vec3> points;
+
+	for (int index : useNodes)
+	{
+		if (index < 0) { continue; }
+		if (index >= static_cast<int>(dataNodes.size())) { continue; }
+		if (index >= static_cast<int>(workNodes.size())) { continue; }
+
+		const KdMesh* pMesh = dataNodes[index].m_spMesh.get();
+		if (!pMesh) { continue; }
+
+		const Math::Matrix& mNode = workNodes[index].m_worldTransform;
+
+		for (const Math::Vector3& local : pMesh->GetVertexPositions())
+		{
+			const Math::Vector3 p = Math::Vector3::Transform(local, mNode) * scale;
+			points.push_back(JPH::Vec3(p.x, p.y, p.z));
+		}
+	}
+
+	if (points.empty()) { return kInvalidBodyId; }
+
+	// 【頂点数を減らす理由】Joltの凸包は既定で256点までしか持てず、それ以上渡すと
+	//   内部で間引かれる。1万点を渡すと構築だけ無駄に重くなるので、こちらで先に間引く。
+	//   凸包は「一番外側の点」しか使わないので、間引いても形はほとんど変わらない
+	constexpr size_t kMaxHullPoints = 256;
+	if (points.size() > kMaxHullPoints)
+	{
+		const size_t step = points.size() / kMaxHullPoints + 1;
+
+		JPH::Array<JPH::Vec3> thinned;
+		for (size_t i = 0; i < points.size(); i += step)
+		{
+			thinned.push_back(points[i]);
+		}
+		points = std::move(thinned);
+	}
+
+	JPH::ConvexHullShapeSettings hullSettings(points);
+	hullSettings.SetEmbedded();
+
+	JPH::ShapeSettings::ShapeResult hullResult = hullSettings.Create();
+	if (hullResult.HasError()) { return kInvalidBodyId; }
+
+	JPH::BodyCreationSettings bodySettings(
+		hullResult.Get(),
+		JPH::RVec3(translation.x, translation.y, translation.z),
+		JPH::Quat(rotation.x, rotation.y, rotation.z, rotation.w),
+		JPH::EMotionType::Dynamic,
+		Layers::MOVING);
+
+	bodySettings.mLinearVelocity	= JPH::Vec3(_velocity.x, _velocity.y, _velocity.z);
+	bodySettings.mAngularVelocity	= JPH::Vec3(_angularVelocity.x, _angularVelocity.y, _angularVelocity.z);
+	bodySettings.mRestitution		= 0.1f;
+	bodySettings.mFriction			= 0.8f;
 
 	const JPH::BodyID id = m_pImpl->m_physicsSystem.GetBodyInterface()
 		.CreateAndAddBody(bodySettings, JPH::EActivation::Activate);

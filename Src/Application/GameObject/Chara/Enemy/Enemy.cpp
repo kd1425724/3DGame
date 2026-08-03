@@ -7,6 +7,7 @@
 #include "../../../Debug/DebugDraw/DebugDraw.h"
 #include "../../../Debug/DebugFlags/DebugFlags.h"
 #include "../Player/Player.h"   // 突進命中時にPlayerの無敵判定/反撃通知/ノックバックを呼ぶため
+#include "../../Debris/DebrisSystem.h"   // 関節が壊れたとき、その部位を落とすため
 
 // 関節表。狙えるのはこの5つだけ。
 // 骨の対応はMixamoリグの作りに沿っている(この経路のモデルなら他でもそのまま使える)：
@@ -16,11 +17,11 @@
 const Enemy::JointDef Enemy::kJointDefs[Enemy::kJointCount] =
 {
 	// 首は弱点。潰すと頭が落ちるので、小さい判定＋大きい倍率という業界標準の作り方にしてある
-	{ U8("首"),   "mixamorig:Neck",         U8("関節/半径_首"), 0.15f, 2.0f, 20.0f },
-	{ U8("左肘"), "mixamorig:LeftForeArm",  U8("関節/半径_肘"), 0.13f, 1.0f, 30.0f },
-	{ U8("右肘"), "mixamorig:RightForeArm", U8("関節/半径_肘"), 0.13f, 1.0f, 30.0f },
-	{ U8("左膝"), "mixamorig:LeftLeg",      U8("関節/半径_膝"), 0.14f, 1.0f, 40.0f },
-	{ U8("右膝"), "mixamorig:RightLeg",     U8("関節/半径_膝"), 0.14f, 1.0f, 40.0f },
+	{ U8("首"),   "mixamorig:Neck",         U8("関節/半径_首"), 0.15f, 2.0f, 20.0f, "Asset/Models/Character/StoneGolem/Gib_Head.gltf"         },
+	{ U8("左肘"), "mixamorig:LeftForeArm",  U8("関節/半径_肘"), 0.13f, 1.0f, 30.0f, "Asset/Models/Character/StoneGolem/Gib_LeftForeArm.gltf"  },
+	{ U8("右肘"), "mixamorig:RightForeArm", U8("関節/半径_肘"), 0.13f, 1.0f, 30.0f, "Asset/Models/Character/StoneGolem/Gib_RightForeArm.gltf" },
+	{ U8("左膝"), "mixamorig:LeftLeg",      U8("関節/半径_膝"), 0.14f, 1.0f, 40.0f, "Asset/Models/Character/StoneGolem/Gib_LeftLeg.gltf"      },
+	{ U8("右膝"), "mixamorig:RightLeg",     U8("関節/半径_膝"), 0.14f, 1.0f, 40.0f, "Asset/Models/Character/StoneGolem/Gib_RightLeg.gltf"     },
 };
 
 DebugDraw::Category Enemy::GetDebugCategory() const
@@ -80,6 +81,14 @@ void Enemy::UpdateBrokenJoints()
 	{
 		if (m_jointHp[i] > 0.0f) { continue; }
 
+		// 【順番が大事】潰す【前】に部位を落とす。潰した後の骨は拡縮がほぼ0なので、
+		//   そこから姿勢を取ると点に潰れた破片が出てくる
+		if (!m_gibSpawned[i])
+		{
+			SpawnGib(i);
+			m_gibSpawned[i] = true;
+		}
+
 		// 【なぜ毎フレームか】UpdateAnimationが毎フレーム骨をアニメの姿勢で書き戻すので、
 		//   壊した瞬間に1回潰すだけでは次のフレームで生えて戻る。
 		//   これはボーン潰し方式の性質で、UpdateBoneCollapseTestが後ろに置いてあるのと同じ理由
@@ -91,6 +100,62 @@ void Enemy::UpdateBrokenJoints()
 	if (!collapsedAny) { return; }
 
 	m_modelWork.CalcNodeMatrices();
+}
+
+void Enemy::SpawnGib(int _index)
+{
+	if (_index < 0 || _index >= kJointCount) { return; }
+
+	// --- 破片を出す先を見つける(初回だけ探してキャッシュ) ---
+	// ※ Init()ではなくここで探すのは、Playerを探すのと同じ理由。
+	//   Init()の時点ではシーンの構築が終わっていない
+	std::shared_ptr<DebrisSystem> spDebris = m_wpDebrisSystem.lock();
+	if (!spDebris)
+	{
+		for (const std::shared_ptr<KdGameObject>& spObj : SceneManager::Instance().GetObjList())
+		{
+			spDebris = std::dynamic_pointer_cast<DebrisSystem>(spObj);
+			if (spDebris) { break; }
+		}
+		if (!spDebris) { return; }
+
+		m_wpDebrisSystem = spDebris;
+	}
+
+	if (m_gibModelIds[_index] < 0)
+	{
+		m_gibModelIds[_index] = spDebris->RegisterModel(kJointDefs[_index].gibModel);
+	}
+
+	// --- 姿勢は「その骨のワールド行列」そのもの ---
+	// gibは Cloude\GltfPartExtract で【骨のローカル空間】に切り出してあるので、
+	// 骨のワールド行列を渡すだけで、消えた部位とぴったり同じ位置・向き・大きさで出る。
+	// (拡大も入っているので、身長25mのゴーレムでもそのまま合う)
+	const KdModelWork::Node* pNode = m_modelWork.FindWorkNode(kJointDefs[_index].bone);
+	if (!pNode) { return; }
+
+	const Math::Matrix boneWorld = GetBoneWorldMatrix(*pNode);
+
+	// --- 落とし方 ---
+	// 体の中心から関節へ向かう水平方向へ、少しだけ押し出す。
+	// 真下に落とすと体に引っかかって不自然に絡むので、外へ逃がす
+	const float pushSpeed = DebugParams::Instance().Float(U8("破片/部位の押し出し"), 4.0f, 0.0f, 30.0f);
+	const float tumble    = DebugParams::Instance().Float(U8("破片/部位の回転"),     1.5f, 0.0f, 20.0f);
+
+	Math::Vector3 outward = MathAPI::FlattenY(boneWorld.Translation() - GetPos());
+	if (!MathAPI::TryNormalize(outward))
+	{
+		// 関節が体の中心の真上/真下にある(首など)。その場合は正面へ逃がす
+		outward = MathAPI::FlattenY(GetDrawMatrix().Backward());
+		if (!MathAPI::TryNormalize(outward)) { outward = Math::Vector3::UnitX; }
+	}
+
+	const Math::Vector3 velocity = outward * pushSpeed;
+
+	// 外向きと上向きの外積＝「外へ倒れ込む」向きの回転になる(乱数を使わずに自然に見せる)
+	const Math::Vector3 angularVelocity = outward.Cross(Math::Vector3::Up) * tumble;
+
+	spDebris->SpawnPiece(m_gibModelIds[_index], boneWorld, velocity, angularVelocity);
 }
 
 bool Enemy::GetJointSphere(const JointDef& _joint, Math::Vector3& _outCenter, float& _outRadius) const
@@ -216,29 +281,10 @@ void Enemy::Init()
 	//   敵が対称な立方体だった頃は向きが見えないので露見していなかった
 	m_modelForwardIsMinusZ = true;
 
-	// --- 戦闘メカ(W9231)を使う場合の設定。戻すときはここを有効にして上を消す ---
-	// 部位破壊の題材として選んだモデル。骨が Arm_L / Minigun_L / Camera / Top_Leg_L … と
-	// 最初から機械の部位で分かれており、部位ごとの当たり判定を骨に追従させやすい。
-	// ライセンスは CC BY 4.0(作者クレジット必須) → THIRD_PARTY_LICENSES.txt
-	// あわせて Enemy.h の m_hitRadius を 0.6 → 1.8 に戻すこと(幅3.77×奥行3.00の実測から)。
-	//SetAsset("Asset/Models/Character/W9231Mech/W9231Mech.gltf");
-	//
-	// 実寸モデルなので等倍。原点は足元にある(実測 足元Z=0.018)
-	//SetScale(Math::Vector3::One);
-	//m_modelOriginIsFeet = true;
-	//
-	// 高さの実測値。スキン変形を計算して求めた値(幅3.764 × 高さ4.368 × 奥行3.000)。
-	// 【罠】このモデルの生の頂点座標は±19000という巨大な値で、スキン変形で初めて
-	//   正しい位置に戻る。頂点座標をそのまま測ると桁が違う値が出るので必ず変形後を見ること。
-	// GetBodyHalfHeight()経由で接地・天井・壁の判定が足元と頭の位置を出すのに使う
-	//m_bodyHeight = 4.37f;
-	//
-	// 正面は +Z。実機で見て確定させた(2026/07/29)。
-	// 【罠】glTFのデータ上ではセンサー(Camera_08)が -Z 側にあるので -Z が正面に見える。
-	//   しかしローダーは頂点の z を反転する(KdGLTFLoader.cpp:501 の `* -1`)ため、
-	//   glTFの -Z はエンジンでは +Z になる。
-	//   データから推論すると必ず逆になるので、この値は実機で見て決めること。
-	//m_modelForwardIsMinusZ = false;
+	// ※ 以前ここに「戦闘メカ(W9231)へ差し替える場合の設定」をコメントで残していたが、
+	//   2026/08/03にユーザーの判断でモデルごと削除したため、設定も消した。
+	//   そのモデルで得た知見(FBX由来はレスト≠バインドで描画されない／生の頂点座標は
+	//   スキン変形後を見ないと分からない)は auto-memory に残してある
 
 	// ※ 当たり判定(KdCollider)は登録しない。立方体へ戻す際も復活させていない。
 	//   理由は下記①のとおり「登録しても誰も問い合わせていなかった」ため、

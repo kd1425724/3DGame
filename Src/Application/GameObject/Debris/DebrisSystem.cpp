@@ -29,6 +29,20 @@ namespace
 		dir.Normalize();
 		return dir;
 	}
+
+	// 3軸それぞれに ±_spin のばらつきを持った回転
+	Math::Vector3 RandomSpin(float _spin)
+	{
+		return Math::Vector3(
+			RandomRange(-_spin, _spin),
+			RandomRange(-_spin, _spin),
+			RandomRange(-_spin, _spin));
+	}
+
+	// 破片の見た目に関する調整値(生成のたびに読むので、実行中に変えるとすぐ効く)
+	float GetDebrisLife()   { return DebugParams::Instance().Float(U8("破片/寿命"),     8.0f, 1.0f, 60.0f); }
+	float GetDebrisSpeed()  { return DebugParams::Instance().Float(U8("破片/飛ぶ速さ"), 12.0f, 0.0f, 60.0f); }
+	float GetDebrisSpin()   { return DebugParams::Instance().Float(U8("破片/回る速さ"),  6.0f, 0.0f, 30.0f); }
 }
 
 DebrisSystem::~DebrisSystem()
@@ -38,31 +52,67 @@ DebrisSystem::~DebrisSystem()
 
 void DebrisSystem::Init()
 {
-	// 【仮のモデル】段階3では挙動を確定させたいだけなので、既存のテスト用立方体を使う。
-	// 本物の破片モデル(ゴーレムを砕いたもの)は段階4以降でBlenderから持ってくる
-	m_spModelWork = std::make_shared<KdModelWork>();
-	m_spModelWork->SetModelData(KdAssets::Instance().m_modeldatas.GetData("Asset/Models/Test/Block/Block.gltf"));
+	// 調整用の立方体。部位のgibはEnemy側が必要になったときに登録する
+	m_testCubeId = RegisterModel("Asset/Models/Test/Block/Block.gltf");
+}
+
+int DebrisSystem::RegisterModel(const std::string& _modelPath)
+{
+	for (size_t i = 0; i < m_groups.size(); ++i)
+	{
+		if (m_groups[i].m_modelPath == _modelPath) { return static_cast<int>(i); }
+	}
+
+	Group group;
+	group.m_modelPath  = _modelPath;
+	group.m_spModelWork = std::make_shared<KdModelWork>();
+	group.m_spModelWork->SetModelData(KdAssets::Instance().m_modeldatas.GetData(_modelPath));
+
+	m_groups.push_back(group);
+	return static_cast<int>(m_groups.size() - 1);
 }
 
 void DebrisSystem::ClearAll()
 {
-	for (const Debris& debris : m_debris)
+	for (Group& group : m_groups)
 	{
-		PhysicsWorld::Instance().RemoveBody(debris.m_bodyId);
+		for (const Debris& debris : group.m_debris)
+		{
+			PhysicsWorld::Instance().RemoveBody(debris.m_bodyId);
+		}
+		group.m_debris.clear();
 	}
+}
 
-	m_debris.clear();
+void DebrisSystem::SpawnPiece(int _modelId, const Math::Matrix& _world,
+	const Math::Vector3& _velocity, const Math::Vector3& _angularVelocity)
+{
+	if (_modelId < 0) { return; }
+	if (_modelId >= static_cast<int>(m_groups.size())) { return; }
+
+	Group& group = m_groups[_modelId];
+	if (!group.m_spModelWork) { return; }
+
+	const uint32_t id = PhysicsWorld::Instance().SpawnDebrisConvex(
+		*group.m_spModelWork, _world, _velocity, _angularVelocity);
+
+	if (id == PhysicsWorld::kInvalidBodyId) { return; }
+
+	Debris debris;
+	debris.m_bodyId	= id;
+	debris.m_life	= GetDebrisLife();
+	debris.m_world	= _world;
+	group.m_debris.push_back(debris);
 }
 
 void DebrisSystem::SpawnBurst(const Math::Vector3& _center, int _count)
 {
-	const float size	= DebugParams::Instance().Float(U8("破片/大きさ"), 1.0f, 0.1f, 5.0f);
-	const float speed	= DebugParams::Instance().Float(U8("破片/飛ぶ速さ"), 12.0f, 0.0f, 60.0f);
-	const float spin	= DebugParams::Instance().Float(U8("破片/回る速さ"), 6.0f, 0.0f, 30.0f);
-	const float life	= DebugParams::Instance().Float(U8("破片/寿命"), 8.0f, 1.0f, 60.0f);
-	const float spread	= DebugParams::Instance().Float(U8("破片/散らばり"), 1.5f, 0.0f, 10.0f);
+	if (m_testCubeId < 0) { return; }
 
-	const Math::Vector3 halfExtent(size * 0.5f, size * 0.5f, size * 0.5f);
+	const float size   = DebugParams::Instance().Float(U8("破片/大きさ"),   1.0f, 0.1f, 5.0f);
+	const float spread = DebugParams::Instance().Float(U8("破片/散らばり"), 1.5f, 0.0f, 10.0f);
+	const float speed  = GetDebrisSpeed();
+	const float spin   = GetDebrisSpin();
 
 	for (int i = 0; i < _count; ++i)
 	{
@@ -72,29 +122,19 @@ void DebrisSystem::SpawnBurst(const Math::Vector3& _center, int _count)
 			RandomRange(-spread, spread),
 			RandomRange(-spread, spread));
 
-		const Math::Vector3 velocity = RandomBurstDirection() * RandomRange(speed * 0.5f, speed);
+		const Math::Matrix world =
+			Math::Matrix::CreateScale(size) *
+			Math::Matrix::CreateTranslation(_center + offset);
 
-		const Math::Vector3 angularVelocity(
-			RandomRange(-spin, spin),
-			RandomRange(-spin, spin),
-			RandomRange(-spin, spin));
-
-		const uint32_t id = PhysicsWorld::Instance().SpawnDebrisBox(
-			_center + offset, halfExtent, velocity, angularVelocity);
-
-		if (id == PhysicsWorld::kInvalidBodyId) { continue; }
-
-		Debris debris;
-		debris.m_bodyId	= id;
-		debris.m_life	= life;
-		m_debris.push_back(debris);
+		SpawnPiece(m_testCubeId, world,
+			RandomBurstDirection() * RandomRange(speed * 0.5f, speed),
+			RandomSpin(spin));
 	}
 }
 
 void DebrisSystem::Update()
 {
-	// 【段階3の確認用】F2でカメラの前方に破片をばら撒く。
-	// 段階4で「敵の関節を壊したとき」に置き換えるが、それまでの調整用として残しておく
+	// 【調整用】F2でカメラの前方に立方体をばら撒く。物理の手触りを詰めるために残してある
 	if (KdInputManager::Instance().IsPress("SpawnDebris"))
 	{
 		const Math::Matrix cameraWorld = KdShaderManager::Instance().GetCameraCB().mView.Invert();
@@ -113,26 +153,29 @@ void DebrisSystem::Update()
 
 	// 【ここは寿命の管理だけ】描画に使う姿勢は PreDraw で取り直す(理由はそちらのコメント)。
 	//   GetBodyMatrix はここでは「物理側にまだ生きているか」の確認として使っている
-	for (size_t i = 0; i < m_debris.size(); )
+	for (Group& group : m_groups)
 	{
-		Debris& debris = m_debris[i];
-
-		debris.m_life -= deltaTime;
-
-		const bool expired = (debris.m_life <= 0.0f);
-		const bool lost    = !PhysicsWorld::Instance().GetBodyMatrix(debris.m_bodyId, debris.m_world);
-
-		if (!expired && !lost)
+		for (size_t i = 0; i < group.m_debris.size(); )
 		{
-			++i;
-			continue;
+			Debris& debris = group.m_debris[i];
+
+			debris.m_life -= deltaTime;
+
+			const bool expired = (debris.m_life <= 0.0f);
+			const bool lost    = !PhysicsWorld::Instance().GetBodyMatrix(debris.m_bodyId, debris.m_world);
+
+			if (!expired && !lost)
+			{
+				++i;
+				continue;
+			}
+
+			PhysicsWorld::Instance().RemoveBody(debris.m_bodyId);
+
+			// 並び順に意味は無いので、最後の要素を持ってきて縮める(消すたびに詰め直さない)
+			group.m_debris[i] = group.m_debris.back();
+			group.m_debris.pop_back();
 		}
-
-		PhysicsWorld::Instance().RemoveBody(debris.m_bodyId);
-
-		// 並び順に意味は無いので、最後の要素を持ってきて縮める(消すたびに詰め直さない)
-		m_debris[i] = m_debris.back();
-		m_debris.pop_back();
 	}
 }
 
@@ -144,30 +187,39 @@ void DebrisSystem::PreDraw()
 	//   Update で作ると:  物理が進む【前】に読むので、描くのは常に1フレーム前の姿になる
 	//   DrawLit で作ると: 影パス(GenerateDepthMapFromLight)が DrawLit より【前】に走るので、
 	//                     影だけ1フレーム古くなるか、最初のフレームは影が出ない
-	m_drawMatrices.clear();
-	m_drawMatrices.reserve(m_debris.size());
-
-	for (Debris& debris : m_debris)
+	for (Group& group : m_groups)
 	{
-		if (!PhysicsWorld::Instance().GetBodyMatrix(debris.m_bodyId, debris.m_world)) { continue; }
+		group.m_drawMatrices.clear();
+		group.m_drawMatrices.reserve(group.m_debris.size());
 
-		m_drawMatrices.push_back(debris.m_world);
+		for (Debris& debris : group.m_debris)
+		{
+			if (!PhysicsWorld::Instance().GetBodyMatrix(debris.m_bodyId, debris.m_world)) { continue; }
+
+			group.m_drawMatrices.push_back(debris.m_world);
+		}
 	}
 }
 
 void DebrisSystem::DrawLit()
 {
-	if (m_drawMatrices.empty()) { return; }
-	if (!m_spModelWork) { return; }
+	for (Group& group : m_groups)
+	{
+		if (group.m_drawMatrices.empty()) { continue; }
+		if (!group.m_spModelWork) { continue; }
 
-	// 同じモデルなので、何個あっても「マテリアル数ぶん」のドローで済む
-	KdShaderManager::Instance().m_StandardShader.DrawModelInstanced(*m_spModelWork, m_drawMatrices);
+		// 同じモデルなので、何個あっても「マテリアル数ぶん」のドローで済む
+		KdShaderManager::Instance().m_StandardShader.DrawModelInstanced(*group.m_spModelWork, group.m_drawMatrices);
+	}
 }
 
 void DebrisSystem::GenerateDepthMapFromLight()
 {
-	if (m_drawMatrices.empty()) { return; }
-	if (!m_spModelWork) { return; }
+	for (Group& group : m_groups)
+	{
+		if (group.m_drawMatrices.empty()) { continue; }
+		if (!group.m_spModelWork) { continue; }
 
-	KdShaderManager::Instance().m_StandardShader.DrawModelInstanced(*m_spModelWork, m_drawMatrices);
+		KdShaderManager::Instance().m_StandardShader.DrawModelInstanced(*group.m_spModelWork, group.m_drawMatrices);
+	}
 }
