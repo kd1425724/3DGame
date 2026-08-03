@@ -8,7 +8,11 @@ C++/DirectX11製の3Dゲームフレームワーク。TPS視点のアクショ�
 ## アーキテクチャ
 
 - `Src/Framework/` — エンジン非依存の汎用機能（Direct3D, Shader, Math, Audio, Input, Font, Effekseer, Window, Utility, `KdGameObject`基底クラスなど）
-  - **Framework配下を変更する場合は必ず先に確認を取ること**
+  - **【2026-08-03に方針を変更】Frameworkは変更してよい。ただし変更は必ず記録する。**
+    - 以前は「変更する場合は必ず先に確認を取る」だったが、ユーザーの指示で撤回した。真意は「触るな」ではなく**「業界でも通用する完璧な設計にしてほしい」**。Frameworkに問題があるなら直すのが正しく、Application側で回避策を積むほうがむしろ悪い設計になる
+    - **記録が要る理由は「Frameworkは他の人（学校）が用意したものだから」。** 自分が書いた部分と、元からあった部分の区別が付かなくなるのを防ぐ
+    - **記録のしかた（3つ全部やる）**：①変更箇所に**なぜ変えたかのコメント**を残す ②**コミットメッセージ**に「Framework の何をなぜ変えたか」を書く ③auto-memoryの`reference_framework_api_map`に追記する
+    - **Application側で回避できる場合は、どちらが良い設計かを比べてから決める。** 「Frameworkを触れるから触る」ではない。特に**ゲーム固有の概念をFrameworkへ持ち込まない**（例：`KdGameObject::ObjectTag`にゲーム固有のタグを足すのは、Frameworkがゲームを知ることになるので避ける）
   - **Framework内の既存コードを消す場合は、削除せずコメントとして残し、「なぜコメントアウトしたか」も必ずコメントで書く**（後で戻せるようにするため）。例：`CameraBase.h`の`RegistHitObject`（`【現在未使用】…登録方式に戻す可能性を考えて元の実装をコメントで残す`）
 - `Src/Application/` — ゲーム固有のコード（Scene, GameObject/Camera派生, LevelEditor, Debugツールなど）
   - 新機能はここに実装する
@@ -36,6 +40,7 @@ C++/DirectX11製の3Dゲームフレームワーク。TPS視点のアクショ�
 
 1. **新規`.h`/`.cpp`ファイルには必ずUTF-8 BOM（`EF BB BF`）を付ける**
    Writeツールで作成したファイルはBOM無しになるため、作成直後に手動で付与すること。無いとMSVCがソースをUTF-8と認識できず、`U8("...")`経由の日本語文字列が文字化けする。
+   - **あわせて`Project.vcxproj`と`Project.vcxproj.filters`の【両方】に登録する。** `.vcxproj`だけだとビルドは通るが、**Visual Studioのソリューションエクスプローラーで本来と違う場所に出る**（2026-08-03に実際に指摘された）。`.filters`には①新しいフォルダなら`<Filter Include="...">`＋GUID、②`<ClInclude>`/`<ClCompile>`に`<Filter>`タグ、の2つが要る
 2. **`.h`ファイルでの`#include`は継承時（基底クラスの完全な定義が必要な場合）のみ許可。** それ以外（ポインタ/参照/`shared_ptr`/`weak_ptr`で使うだけの型）は前方宣言し、実際のincludeは`.cpp`側に書く。
    - `KdGameObject`・`KdCollider`などFramework側の型はPch.hの強制インクルード経由で全ファイルから既に見えているため、明示的なincludeは不要（継承時も含めて不要）。
 3. **シングルトンのコンストラクタから`Init()`を呼ばない。** `Foo() { Init(); }` + `static Foo& Instance()`という形は、`Init()`の中で（間接的にでも）同じ`Instance()`を再度呼ぶと、static変数の初期化中に自己再入してデッドロックする。`Init()`はpublicにして、`Instance()`の外側（`Application::Init()`など）から明示的に1回呼ぶこと。

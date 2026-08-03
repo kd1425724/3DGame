@@ -70,6 +70,16 @@ public:
 	uint32_t SpawnDebrisBox(const Math::Vector3& _pos, const Math::Vector3& _halfExtent,
 		const Math::Vector3& _velocity, const Math::Vector3& _angularVelocity);
 
+	// モデルの形から凸包を作って破片を1つ生む(箱より本物に近い当たりになる)。
+	// 【なぜ凸包か】動く剛体に三角形メッシュは使えない(Joltが許さない/重い)。
+	//   凹んだ形は再現できないが、もげた腕や脚なら見た目との差はほぼ分からない
+	//
+	// _model    … 形の元(gibのモデル)。当たり判定メッシュが無ければ描画メッシュを使う
+	// _world    … 生成時の姿勢。拡大が入っていてよい(頂点側に焼き込む)
+	// 戻り値 … kInvalidBodyId なら失敗
+	uint32_t SpawnDebrisConvex(const KdModelWork& _model, const Math::Matrix& _world,
+		const Math::Vector3& _velocity, const Math::Vector3& _angularVelocity);
+
 	// 物体の今の姿勢を描画用のワールド行列として取り出す
 	bool GetBodyMatrix(uint32_t _id, Math::Matrix& _outWorld) const;
 

@@ -11,6 +11,9 @@
 //  ・プレイヤーの攻撃(OnHit)を受けても消滅する
 //
 //====================================================
+// weak_ptrで持つだけなので前方宣言でよい(実体のincludeは.cpp側)
+class DebrisSystem;
+
 class Enemy : public CharaBase
 {
 public:
@@ -76,6 +79,11 @@ public:
 		float       defaultRadius;  // 半径の既定値【モデル座標系】。ワールドで使う側がスケールを掛ける
 		float       damageScale;    // ダメージ倍率。弱点ほど大きい
 		float       maxHp;          // 関節のHP。本体HPとは別勘定(モンハン方式)
+
+		// 壊れたときに落ちてくる部位のモデル。
+		// 【骨と切り出し範囲を必ず揃えること】gibは Cloude\GltfPartExtract で
+		//   「この骨と配下」の頂点だけを抜いて作ってある。骨を変えるなら作り直しも要る
+		const char* gibModel;
 	};
 
 	// 関節の数。表の実体はEnemy.cppにある
@@ -120,6 +128,20 @@ private:
 
 	// 関節ごとのHP。0になったらその関節の骨を潰す。添字はkJointDefsと同じ
 	float m_jointHp[kJointCount] = {};
+
+	// その関節のgibを既に出したか。
+	// 【なぜ要るか】UpdateBrokenJointsは壊れた関節を毎フレーム潰し直すので、
+	//   ここで区別しないと部位が毎フレーム降ってくる
+	bool m_gibSpawned[kJointCount] = {};
+
+	// gibモデルのDebrisSystem側のID。-1=未登録(初めて壊れたときに登録する)
+	int m_gibModelIds[kJointCount] = { -1, -1, -1, -1, -1 };
+
+	// 破片を出す先。シーンに1つあるので初回に探してキャッシュする
+	std::weak_ptr<DebrisSystem> m_wpDebrisSystem;
+
+	// _index番目の関節の部位を、その関節の姿勢で落とす。壊れた瞬間に1回だけ呼ぶ
+	void SpawnGib(int _index);
 
 	// 体の当たり半径(m)。突進の命中判定とデバッグ表示に使う。
 	// 【2026/07/29】KdColliderへの登録をやめたので、用途はこの2つだけになった。

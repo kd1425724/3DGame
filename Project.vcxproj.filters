@@ -37,6 +37,12 @@
     <Filter Include="Src\Application\API\MathAPI">
       <UniqueIdentifier>{f6dae4b5-a07f-4e62-9d5e-7c0a1f2e3d54}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Src\Application\Physics">
+      <UniqueIdentifier>{a1c7e2d9-3b48-4f65-9e02-7d5a8c1b6e30}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Src\Application\GameObject\Debris">
+      <UniqueIdentifier>{b2d8f3ea-4c59-4076-8f13-8e6b9d2c7f41}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Src\Framework\Math">
       <UniqueIdentifier>{04f33e76-24f0-4a58-9355-5770b3f6f9c6}</UniqueIdentifier>
     </Filter>
@@ -444,6 +450,12 @@
     <ClInclude Include="Src\Application\GameObject\Wall\WallAction.h">
       <Filter>Src\Application\GameObject\Wall</Filter>
     </ClInclude>
+    <ClInclude Include="Src\Application\Physics\PhysicsWorld.h">
+      <Filter>Src\Application\Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\Application\GameObject\Debris\DebrisSystem.h">
+      <Filter>Src\Application\GameObject\Debris</Filter>
+    </ClInclude>
     <ClInclude Include="Src\Application\GameObject\Camera\FPSCamera\FPSCamera.h">
       <Filter>Src\Application\GameObject\Camera\FPSCamera</Filter>
     </ClInclude>
@@ -721,6 +733,12 @@
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Wall\WallAction.cpp">
       <Filter>Src\Application\GameObject\Wall</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\Physics\PhysicsWorld.cpp">
+      <Filter>Src\Application\Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\Application\GameObject\Debris\DebrisSystem.cpp">
+      <Filter>Src\Application\GameObject\Debris</Filter>
     </ClCompile>
     <ClCompile Include="Src\Application\GameObject\Camera\FPSCamera\FPSCamera.cpp">
       <Filter>Src\Application\GameObject\Camera\FPSCamera</Filter>
