@@ -47,6 +47,15 @@ public:
 	// 戻り値 … 登録できたか(当たり判定メッシュが1つも無ければfalse)
 	bool AddStaticMesh(const KdModelWork& _model, const Math::Matrix& _world);
 
+	// 登録済みの静的形状をすべて捨てる。シーンを作り直す前に呼ぶこと。
+	// 【なぜ要るか】呼ばないとシーンを切り替えるたびに街が二重三重に積み上がる
+	void ClearStaticBodies();
+
+	// 静的な地形を入れ終わったら1回だけ呼ぶ。ブロードフェーズを最適化する。
+	// 【なぜ分けてあるか】この処理は登録済みの静的形状ぜんぶを見て木を作り直すので、
+	//   AddStaticMeshのたびに呼ぶと 棟数の2乗 の手間になる(街は738棟ある)
+	void FinishStaticSetup();
+
 private:
 
 	// 【罠】コンストラクタもデストラクタも【必ず.cpp側で定義する】。

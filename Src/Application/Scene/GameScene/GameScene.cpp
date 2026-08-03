@@ -11,7 +11,10 @@
 #include "../../GameObject/Environment/SkySphere.h"
 #include "../../GameObject/UI/GameHud/GameHud.h"
 #include "../../GameObject/StageProp/InstancedPropRenderer.h"
+#include "../../GameObject/StageProp/StageProp.h"
 #include "../../Collision/CollisionGrid.h"
+#include "../../Physics/PhysicsWorld.h"
+
 
 #include "../../Editor/LevelEditor/LevelFileIO/LevelFileIO.h"
 #include "../../Editor/LevelEditor/LevelEditorManager.h"
@@ -29,6 +32,11 @@ void GameScene::Event()
 
 void GameScene::Init()
 {
+	// 物理世界に残っている前シーンの静的形状を捨てる。
+	// 呼ばないとシーンを切り替えるたびに街が二重三重に積み上がる
+	// (地面はこの後のGround::Init、街は末尾のRegisterStagePropsToPhysicsで入れ直す)
+	PhysicsWorld::Instance().ClearStaticBodies();
+
 	// 敵のモデルとテクスチャを先読みしておく。
 	// これが無いと【最初の1体が出現した瞬間に画面がかくつく】(読み込みが走るため)。
 	// メカ(W9231)でも同じ症状が出ていて、実機で「出た瞬間だけ」と確認できたので
@@ -105,4 +113,28 @@ void GameScene::Init()
 	// 当たり判定のbroadphaseを、このシーンの静的コリジョン(地面/建物)で作り直させる。
 	// (シーンを切り替えても前シーンの内容が残らないよう、シーン構築のたびにdirtyにする)
 	CollisionGrid::Instance().MarkDirty();
+
+	// 破片が当たる相手として、街を物理世界にも登録する
+	RegisterStagePropsToPhysics();
+}
+
+void GameScene::RegisterStagePropsToPhysics()
+{
+	// 【なぜInitではなくここでまとめてやるか】
+	//   KdGameObjectFactoryは生成直後にInit()を呼び、SetPos/SetRot/SetScaleは【その後】に来る。
+	//   StageProp::Init()の時点ではワールド行列がまだ単位行列なので、そこで登録すると
+	//   街が丸ごと原点に積み上がる。レベルを読み終えたこの位置なら配置が確定している
+	for (const std::shared_ptr<KdGameObject>& spObj : GetObjList())
+	{
+		const std::shared_ptr<StageProp> spProp = std::dynamic_pointer_cast<StageProp>(spObj);
+		if (!spProp) { continue; }
+
+		const std::shared_ptr<KdModelWork>& spModel = spProp->GetModelWork();
+		if (!spModel) { continue; }
+
+		PhysicsWorld::Instance().AddStaticMesh(*spModel, spProp->GetMatrix());
+	}
+
+	// 静的形状を入れ終えてから1回だけ。AddStaticMeshのたびに呼ぶと棟数の2乗になる
+	PhysicsWorld::Instance().FinishStaticSetup();
 }
