@@ -52,7 +52,13 @@ private:
 	{
 		uint32_t		m_bodyId	= 0;	// PhysicsWorld側のID
 		float			m_life		= 0.0f;	// 残り寿命(秒)
-		Math::Matrix	m_world;			// 物理から受け取った姿勢(描画に使う)
+
+		// 【なぜ拡大を覚えておくか】物理側は拡大を頂点へ焼き込んであるので、
+		//   物理から返ってくるのは「位置と回転」だけ。描画には拡大が要るので
+		//   生成時の値をここに持っておき、描画行列を作るとき掛け直す
+		Math::Vector3	m_scale		= Math::Vector3::One;
+
+		Math::Matrix	m_world;			// 描画に使う姿勢(拡大込み)
 	};
 
 	// 同じモデルの破片をまとめたもの

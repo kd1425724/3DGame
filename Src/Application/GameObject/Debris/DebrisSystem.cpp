@@ -98,9 +98,18 @@ void DebrisSystem::SpawnPiece(int _modelId, const Math::Matrix& _world,
 
 	if (id == PhysicsWorld::kInvalidBodyId) { return; }
 
+	// 生成時の拡大を覚えておく(物理からは位置と回転しか返ってこないため)
+	Math::Vector3		scale = Math::Vector3::One;
+	Math::Quaternion	rotation;
+	Math::Vector3		translation;
+
+	Math::Matrix world = _world;
+	world.Decompose(scale, rotation, translation);
+
 	Debris debris;
 	debris.m_bodyId	= id;
 	debris.m_life	= GetDebrisLife();
+	debris.m_scale	= scale;
 	debris.m_world	= _world;
 	group.m_debris.push_back(debris);
 }
@@ -194,7 +203,12 @@ void DebrisSystem::PreDraw()
 
 		for (Debris& debris : group.m_debris)
 		{
-			if (!PhysicsWorld::Instance().GetBodyMatrix(debris.m_bodyId, debris.m_world)) { continue; }
+			Math::Matrix bodyWorld;
+			if (!PhysicsWorld::Instance().GetBodyMatrix(debris.m_bodyId, bodyWorld)) { continue; }
+
+			// 物理は「位置と回転」しか持っていない(拡大は頂点へ焼き込んである)ので、
+			// 描画用に生成時の拡大を掛け直す。これを忘れるとモデルだけ等倍で描かれる
+			debris.m_world = Math::Matrix::CreateScale(debris.m_scale) * bodyWorld;
 
 			group.m_drawMatrices.push_back(debris.m_world);
 		}
