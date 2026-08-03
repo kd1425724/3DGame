@@ -42,6 +42,7 @@ C++/DirectX11製の3Dゲームフレームワーク。TPS視点のアクショ�
 4. **移動などの「意思決定」は`Update()`、当たり判定・接地判定などの「world状態に対する解決」は`PostUpdate()`で行う。** オブジェクトリストの並び順に依存しない安定した処理にするため。
 5. **命名規則**：メンバ変数には`m_`、引数には`_`を先頭に付ける（例：`m_moveSpeed`、`void SetPos(const Math::Vector3& _pos)`）。この規則は`Src/Application/`配下の新規コードに適用する。
    - **ポインタ種別の接頭辞**：`m_`/`_`の後に、生ポインタは`p`、`weak_ptr`は`wp`、`shared_ptr`は`sp`を付ける（例：`m_pCollider`、`m_wpCamera`、`m_spEditorCamera`、`std::shared_ptr<Enemy>& _spEnemy`）
+   - **定数の接頭辞は`k`**（konstant の頭文字。`c`は`const`/`class`/`char`/`count`と紛らわしいので使わない）。`k`のあとはパスカルケース（例：`kMaxBodies`、`kMaxDeltaTime`、`kInvalidBodyId`）。名前を見ただけで「書き換わらない」と分かるようにするため
    - **複数単語はキャメルケース**：2語目以降の頭を大文字にして単語を見分けられるようにする（例：`m_jumpPower`、`m_moveSpeed`、`m_verticalVelocity`）
    - **例外**：`Src/Framework/`配下は既存コードのままとし、この命名規則を適用しない
    - **例外**：`Src/Application/`内でも`CameraBase`・`TPSCamera`・`FPSCamera`はこの命名規則を適用しない（既存のコードのまま）
