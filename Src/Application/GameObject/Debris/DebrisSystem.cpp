@@ -111,8 +111,8 @@ void DebrisSystem::Update()
 
 	const float deltaTime = Application::Instance().GetDeltaTime();
 
-	// 【なぜここで姿勢を取るか】物理はPostUpdateで進むので、次のフレームのUpdateで
-	//   受け取れば「1フレーム前の姿勢」ではなく最新のものが取れる
+	// 【ここは寿命の管理だけ】描画に使う姿勢は PreDraw で取り直す(理由はそちらのコメント)。
+	//   GetBodyMatrix はここでは「物理側にまだ生きているか」の確認として使っている
 	for (size_t i = 0; i < m_debris.size(); )
 	{
 		Debris& debris = m_debris[i];
@@ -134,14 +134,23 @@ void DebrisSystem::Update()
 		m_debris[i] = m_debris.back();
 		m_debris.pop_back();
 	}
+}
 
-	// 【なぜUpdateで作るか】影パス(GenerateDepthMapFromLight)は通常描画より【前】に走る。
-	//   DrawLitで作ると、影のほうが1フレーム古い姿勢を使うか、初回は空になってしまう
+void DebrisSystem::PreDraw()
+{
+	// 【なぜ描画行列をここで作るか】1フレームのうち PreDraw は
+	//   「PostUpdate(＝物理が進む)の後」かつ「Draw の前」に走る唯一の場所。
+	//
+	//   Update で作ると:  物理が進む【前】に読むので、描くのは常に1フレーム前の姿になる
+	//   DrawLit で作ると: 影パス(GenerateDepthMapFromLight)が DrawLit より【前】に走るので、
+	//                     影だけ1フレーム古くなるか、最初のフレームは影が出ない
 	m_drawMatrices.clear();
 	m_drawMatrices.reserve(m_debris.size());
 
-	for (const Debris& debris : m_debris)
+	for (Debris& debris : m_debris)
 	{
+		if (!PhysicsWorld::Instance().GetBodyMatrix(debris.m_bodyId, debris.m_world)) { continue; }
+
 		m_drawMatrices.push_back(debris.m_world);
 	}
 }

@@ -23,6 +23,7 @@ public:
 
 	void Init()						override;
 	void Update()					override;
+	void PreDraw()					override;
 	void DrawLit()					override;
 	void GenerateDepthMapFromLight() override;
 
