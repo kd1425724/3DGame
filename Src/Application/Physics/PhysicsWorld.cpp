@@ -9,6 +9,8 @@
 #include <Jolt/Core/JobSystemThreadPool.h>
 #include <Jolt/Physics/PhysicsSettings.h>
 #include <Jolt/Physics/PhysicsSystem.h>
+#include <Jolt/Physics/Collision/Shape/MeshShape.h>
+#include <Jolt/Physics/Body/BodyCreationSettings.h>
 
 #include <thread>
 
@@ -240,4 +242,77 @@ void PhysicsWorld::Release()
 
 	delete JPH::Factory::sInstance;
 	JPH::Factory::sInstance = nullptr;
+}
+
+bool PhysicsWorld::AddStaticMesh(const KdModelWork& _model, const Math::Matrix& _world)
+{
+	if (!m_pImpl) { return false; }
+
+	const std::shared_ptr<KdModelData> spData = _model.GetData();
+	if (!spData) { return false; }
+
+	const std::vector<KdModelData::Node>& dataNodes = _model.GetDataNodes();
+	const std::vector<KdModelWork::Node>& workNodes = _model.GetNodes();
+
+	JPH::VertexList			vertices;
+	JPH::IndexedTriangleList	triangles;
+
+	// 【KdColliderと同じ選び方にする】当たり判定用メッシュノードだけを使う。
+	//   ここを変えると「ゲームが当たると思っている地面」と「物理の地面」がずれる
+	for (int index : spData->GetCollisionMeshNodeIndices())
+	{
+		if (index < 0) { continue; }
+		if (index >= static_cast<int>(dataNodes.size())) { continue; }
+		if (index >= static_cast<int>(workNodes.size())) { continue; }
+
+		const KdMesh* pMesh = dataNodes[index].m_spMesh.get();
+		if (!pMesh) { continue; }
+
+		// ノードのモデル内行列にオブジェクトのワールド行列を掛ける(KdColliderと同じ計算)
+		const Math::Matrix mNode = workNodes[index].m_worldTransform * _world;
+
+		const JPH::uint32 base = static_cast<JPH::uint32>(vertices.size());
+
+		for (const Math::Vector3& local : pMesh->GetVertexPositions())
+		{
+			const Math::Vector3 world = Math::Vector3::Transform(local, mNode);
+			vertices.push_back(JPH::Float3(world.x, world.y, world.z));
+		}
+
+		// 【三角形の向きはそのままでよい】Joltは巻き順で表裏を決めるので逆だとすり抜ける。
+		//   KdGLTFLoaderはZを反転すると同時にインデックスの1と2を入れ替えている
+		//   (KdGLTFLoader.cpp:655「Z軸ミラーのため、1と2を入れ替えています」)ので、
+		//   エンジン側のデータは cross(v1-v0, v2-v0) が外向き＝Joltの期待と一致する
+		for (const KdMeshFace& face : pMesh->GetFaces())
+		{
+			triangles.push_back(JPH::IndexedTriangle(
+				base + face.Idx[0],
+				base + face.Idx[1],
+				base + face.Idx[2]));
+		}
+	}
+
+	if (triangles.empty()) { return false; }
+
+	JPH::MeshShapeSettings shapeSettings(std::move(vertices), std::move(triangles));
+	shapeSettings.SetEmbedded();
+
+	JPH::ShapeSettings::ShapeResult shapeResult = shapeSettings.Create();
+	if (shapeResult.HasError()) { return false; }
+
+	// 頂点にワールド行列を焼き込んだので、ボディ自体は原点・無回転で置く
+	JPH::BodyCreationSettings bodySettings(
+		shapeResult.Get(),
+		JPH::RVec3::sZero(),
+		JPH::Quat::sIdentity(),
+		JPH::EMotionType::Static,
+		Layers::NON_MOVING);
+
+	m_pImpl->m_physicsSystem.GetBodyInterface().CreateAndAddBody(bodySettings, JPH::EActivation::DontActivate);
+
+	// 【段階2で見直す】静的なものを入れ終えた後に1回で足りる処理。
+	//   街の建物を何百個も入れる段になったら、全部入れてから1回だけ呼ぶ形へ移すこと
+	m_pImpl->m_physicsSystem.OptimizeBroadPhase();
+
+	return true;
 }

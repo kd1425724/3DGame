@@ -38,6 +38,15 @@ public:
 	// Init()が済んでいるか
 	bool IsReady() const { return m_pImpl != nullptr; }
 
+	// 静的な地形(地面・建物)を物理世界へ登録する。【動かないものだけ】を入れること。
+	//
+	// KdColliderと同じ「当たり判定用メッシュノード」を使うので、ゲーム側の当たり判定と
+	// 物理側の形がずれない。頂点にはワールド行列を焼き込むので、登録後に動かせない
+	//
+	// _model … 形の元になるモデル / _world … そのオブジェクトのワールド行列
+	// 戻り値 … 登録できたか(当たり判定メッシュが1つも無ければfalse)
+	bool AddStaticMesh(const KdModelWork& _model, const Math::Matrix& _world);
+
 private:
 
 	// 【罠】コンストラクタもデストラクタも【必ず.cpp側で定義する】。

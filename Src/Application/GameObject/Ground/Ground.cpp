@@ -2,6 +2,7 @@
 
 #include "../../Debug/DebugDraw/DebugDraw.h"
 #include "../../Culling/CullingManager.h"   // CalcLocalBoundingSphere(モデル全体の境界球)
+#include "../../Physics/PhysicsWorld.h"
 
 void Ground::Init()
 {
@@ -34,6 +35,11 @@ void Ground::Init()
 		m_spModelWork,				//登録したいモデルの形状
 		KdCollider::TypeGround		//当たり判定の種類
 	);
+
+	// 破片が落ちて転がる床として、物理世界にも同じ形を登録する(静的＝以後動かさない)。
+	// 上のKdColliderとは別系統だが、AddStaticMeshは同じ「当たり判定用メッシュノード」を
+	// 使うので、ゲームが当たると思っている地面と物理の地面はずれない
+	PhysicsWorld::Instance().AddStaticMesh(*m_spModelWork, m_mWorld);
 }
 
 void Ground::SetAsset(const std::string& assetName)
