@@ -25,8 +25,18 @@ public:
 	static constexpr const char* kAssetPath = "Asset/Models/Character/StoneGolem/StoneGolem.gltf";
 
 	// このモデルが持つアニメの名前。glTFのanimationsは【この1本だけ】(2026/08/02にファイルを直接読んで確認)。
-	// 攻撃・被弾・死亡はまだMixamoから取っていない
+	// 攻撃・被弾はまだMixamoから取っていない
 	static constexpr const char* kWalkAnimName = "walk";
+
+	// 倒れるモーションの名前。
+	// 【まだモデルに入っていない】(2026-08-04時点)。Mixamoの Sword And Shield Death を
+	//   序盤カット＋ルートモーション除去して取り込む予定。
+	//   見つからない間、CharaBase::UpdateAnimation は切り替えず前のアニメを流し続けるので、
+	//   取り込むまでは倒れても歩行のままになる(止まりはしない)。
+	// 【死亡モーションを別に用意しない理由】倒れた先が終端(起き上がらない)なので、
+	//   膝を壊されたダウンも死亡もこれ1本で足りる。
+	//   ループOFFで流すと最終フレームで止まるため、ダウン中の待機アニメも兼ねる
+	static constexpr const char* kFallAnimName = "fall";
 
 	// モデルとテクスチャを先読みしてキャッシュへ載せる。シーンのInitから1回呼ぶ。
 	// 【なぜ要るか】最初の1体が出現した瞬間に読み込みが走って画面がかくつくため。
@@ -42,6 +52,12 @@ public:
 
 	// 再生速度の倍率。足が地面を滑らないよう、実際の移動速度から計算する
 	float SelectAnimationSpeed() const override;
+
+	// 「倒れる」だけはループさせない(最終フレームのポーズで留めてダウン中の待機に使う)
+	bool SelectAnimationLoop() const override;
+
+	// 切り替えを混ぜる秒数。歩き→倒れるが1フレームで飛ぶのを防ぐ
+	float SelectAnimationBlendTime() const override;
 
 	// 当たり判定デバッグ表示は「敵」カテゴリに出す(接地/壁判定はCharaBaseが描くので、
 	// ここで種類を教えないとプレイヤーと一緒くたに出てしまう)
@@ -101,6 +117,11 @@ public:
 		// 🔴 gibとノードの切り分けは必ず同じ平面で作ること。ずれると
 		//   「落ちた部位」と「体の切り口」が食い違う
 		const char* partNode;
+
+		// この関節を壊されたら倒れるか(＝膝)。
+		// 【なぜ表に持たせるか】添字を直接見て「3と4は膝」と書くと、表を並べ替えたときに
+		//   黙って別の関節が対象になる。どの関節が何を引き起こすかは表側の情報にしておく
+		bool causesDown;
 	};
 
 	// 関節の数。表の実体はEnemy.cppにある
@@ -175,10 +196,30 @@ private:
 	std::weak_ptr<KdGameObject> m_wpTarget;
 
 	// --- 攻撃の状態機械：追従 → 予備動作(予告) → 突進 → 硬直 → 追従 ---
-	enum class State { Chase, Windup, Strike, Recover };
+	// Down は片道。膝を壊されるか本体HPが尽きると入り、二度と出てこない
+	// (「片膝を斬られた時点で立ち上がれない」という仕様)
+	enum class State { Chase, Windup, Strike, Recover, Down };
 	State m_state = State::Chase;
 	float m_stateTimer = 0.0f;          // 現在状態の残り時間(Windup/Strike/Recoverで使用)
 	Math::Vector3 m_lungeDir = {};      // 突進方向。Windup終了時に固定する(以後は追尾しない=回避で避けられる)
+
+	// 倒れた状態へ入る。_isDead=trueなら「死んで倒れた」＝そのまま消える(将来は全身破砕へ繋ぐ)、
+	// falseなら「膝を壊されて倒れた」＝生きていて、ダウンのまま戦い続ける
+	void EnterDown(bool _isDead);
+
+	// 倒れている間の処理(向き直りと、死亡時の消滅までの管理)
+	void UpdateDown(float _dt);
+
+	// 死んで倒れてから消えるまでの秒数。
+	// 【仮】全身破砕を入れたら「倒れ切った瞬間に砕く」へ差し替わる。
+	//   それまで死体が残り続けないようにするためのつなぎ
+	float GetDownDisappearTime() const;
+
+	// 死んで倒れたのか(falseなら膝を壊されただけで、まだ生きている)
+	bool m_isDead = false;
+
+	// 死んで倒れてから消えるまでの残り秒数
+	float m_downTimer = 0.0f;
 
 	// 【確認用】DebugFlags「敵/動きを止める」。AIと移動を止め、アニメも姿勢を凍らせる。
 	// 関節の球や部位破壊を見比べるとき、敵が歩き回っていると確認しづらいため
