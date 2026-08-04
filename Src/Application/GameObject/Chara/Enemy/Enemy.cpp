@@ -528,7 +528,7 @@ std::string Enemy::SelectAnimation() const
 
 bool Enemy::IsFrozenForDebug() const
 {
-	return DebugFlags::Instance().Get(U8("敵/動きを止める"), false);
+	return DebugFlags::Instance().Get(U8("敵/動きを止める"), true);
 }
 
 float Enemy::SelectAnimationSpeed() const
