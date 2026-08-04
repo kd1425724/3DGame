@@ -582,14 +582,22 @@ float Enemy::SelectAnimationSpeed() const
 	// 大きくすると同じ移動速度でも足の回転が速くなり、軽い生き物に見える
 	float weight = DebugParams::Instance().Float(U8("敵/歩行アニメ倍率"), 1.0f, 0.1f, 5.0f);
 
-	// 止まっている間に完全な0にすると歩幅の途中で固まり「バグで止まった」ように見える。
-	// ごく遅く動かし続けて、重心を移し替えているように見せる
-	constexpr float kMinAnimSpeed = 0.05f;
+	// 止まっている間の再生速度。
+	//
+	// 【2026-08-04】突進を撤去して「間合いで止まったまま」の時間ができたことで、
+	//   ここが実際に見えるようになった。既定の0.05だと歩行1周に約57秒かかり、
+	//   スローモーションで足踏みしているように見える(実機で指摘された)。
+	//   0にすると歩幅の途中で完全に固まり「バグで止まった」ように見えるので、
+	//   どこが自然かは目で見て決めるしかない → DebugParamsへ出した。
+	//
+	// 🔴 本来の解は【待機モーションを持たせること】。この値は待機アニメが無い間のつなぎで、
+	//   歩行クリップを遅回しして「止まっている」を表現しているに過ぎない
+	float minSpeed = DebugParams::Instance().Float(U8("敵/停止時のアニメ倍率"), 0.25f, 0.0f, 1.0f);
 
 	float speed = currentSpeed / noSlideSpeed * weight;
-	if (speed < kMinAnimSpeed)
+	if (speed < minSpeed)
 	{
-		speed = kMinAnimSpeed;
+		speed = minSpeed;
 	}
 	return speed;
 }
