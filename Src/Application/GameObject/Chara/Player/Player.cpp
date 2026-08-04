@@ -1523,6 +1523,13 @@ float Player::GetAnimSpeedScale(const char* _key) const
 	return DebugParams::Instance().Float(_key, 1.0f, 0.1f, 4.0f);
 }
 
+float Player::SelectAnimationBlendTime() const
+{
+	// 0にすると従来どおりの即差し替えに戻るので、効果の有無をその場で見比べられる。
+	// 長くすると入力に対して反応が鈍く見えるため、既定は短め
+	return DebugParams::Instance().Float(U8("アニメ/切り替えを混ぜる秒数"), 0.15f, 0.0f, 0.5f);
+}
+
 float Player::SelectTurnSpeed() const
 {
 	return DebugParams::Instance().Float(U8("プレイヤー/向き直る速さ"), 720.0f, 90.0f, 2880.0f);

@@ -155,22 +155,90 @@ void KdAnimationData::Node::Interpolate(Math::Matrix& rDst, float time)
 	}
 }
 
+// 【2026-08-04 追加：クロスフェード】切り替え直前のポーズを控える。
+// 新しいアニメが触るノードだけでよい(触らないノードは値が変わらない＝そもそも飛びようがない)
+void KdAnimator::TakeBlendSnapshot(const std::vector<KdModelWork::Node>& rNodes)
+{
+	m_blendPoses.clear();
+
+	if (!m_spAnimation) { return; }
+
+	m_blendPoses.resize(m_spAnimation->m_nodes.size());
+
+	for (size_t i = 0; i < m_spAnimation->m_nodes.size(); ++i)
+	{
+		UINT idx = m_spAnimation->m_nodes[i].m_nodeOffset;
+
+		// Decomposeは非constなので、ノードの行列をコピーしてから分解する
+		Math::Matrix local = rNodes[idx].m_localTransform;
+
+		BlendPose& rPose = m_blendPoses[i];
+		rPose.m_valid = local.Decompose(rPose.m_scale, rPose.m_rotate, rPose.m_translate);
+	}
+}
+
+// 【2026-08-04 追加：クロスフェード】rate=0で混ぜ元、1で新しいポーズになるよう rDst を書き換える
+void KdAnimator::BlendPoseInto(Math::Matrix& rDst, const BlendPose& prev, float rate)
+{
+	if (!prev.m_valid) { return; }
+
+	Math::Vector3		scale;
+	Math::Quaternion	rotate;
+	Math::Vector3		translate;
+
+	// Decomposeは非constなのでコピーを取ってから分解する
+	Math::Matrix now = rDst;
+	if (!now.Decompose(scale, rotate, translate)) { return; }
+
+	// 拡縮と位置は線形、回転はslerpで混ぜる。
+	// 行列の成分をそのまま線形に混ぜると、回転の途中で軸の長さが縮んで形が潰れる
+	scale     = Math::Vector3::Lerp(prev.m_scale, scale, rate);
+	rotate    = Math::Quaternion::Slerp(prev.m_rotate, rotate, rate);
+	translate = Math::Vector3::Lerp(prev.m_translate, translate, rate);
+
+	rDst = Math::Matrix::CreateScale(scale)
+		* Math::Matrix::CreateFromQuaternion(rotate)
+		* Math::Matrix::CreateTranslation(translate);
+}
+
 void KdAnimator::AdvanceTime(std::vector<KdModelWork::Node>& rNodes, float speed)
 {
 	if (!m_spAnimation) { return; }
 
-	// 全てのアニメーションノード（モデルの行列を補間する情報）の行列補間を実行する
-	for (auto& rAnimNode : m_spAnimation->m_nodes)
+	// 【2026-08-04 追加】混ぜ元の採取。
+	// この時点のノードには、まだ切り替え前のアニメの結果が残っている
+	if (m_needsBlendSnapshot)
 	{
+		TakeBlendSnapshot(rNodes);
+		m_needsBlendSnapshot = false;
+	}
+
+	const bool isBlending = IsBlending();
+
+	// m_blendTimeが0のときは isBlending が false になるので、ここで0除算は起きない
+	const float blendRate = isBlending ? (m_blendElapsed / m_blendTime) : 1.0f;
+
+	// 全てのアニメーションノード（モデルの行列を補間する情報）の行列補間を実行する
+	for (size_t i = 0; i < m_spAnimation->m_nodes.size(); ++i)
+	{
+		auto& rAnimNode = m_spAnimation->m_nodes[i];
+
 		// 対応するモデルノードのインデックス
 		UINT idx = rAnimNode.m_nodeOffset;
 
-		auto prev = rNodes[idx].m_localTransform;
+		// ※ ここにあった prev(m_localTransformの控え)は、代入するだけで一度も読んでいない
+		//   変数だったため、クロスフェードを足すときにコメント化した。
+		//   「前のポーズ」が必要なのは混ぜる処理のほうで、それは m_blendPoses が持っている
+		// auto prev = rNodes[idx].m_localTransform;
 
 		// アニメーションデータによる行列補間
 		rAnimNode.Interpolate(rNodes[idx].m_localTransform, m_time);
 
-		prev = rNodes[idx].m_localTransform;
+		// 切り替えた直後は、前のポーズから徐々に移す
+		if (isBlending && i < m_blendPoses.size())
+		{
+			BlendPoseInto(rNodes[idx].m_localTransform, m_blendPoses[i], blendRate);
+		}
 	}
 
 	// アニメーションのフレームを進める
@@ -187,6 +255,24 @@ void KdAnimator::AdvanceTime(std::vector<KdModelWork::Node>& rNodes, float speed
 		else
 		{
 			m_time = m_spAnimation->m_maxLength;
+		}
+	}
+
+	// 【2026-08-04 追加】クロスフェードを進める。
+	// speedと同じ歩幅で進めるので、再生を遅くすると混ぜる時間も一緒に伸びる
+	// (集中スロー中に切り替えだけ一瞬で終わると浮くため、そろえてある)。
+	// 逆再生(speedが負)でも混ぜ終わるよう、絶対値で足す
+	if (isBlending)
+	{
+		m_blendElapsed += (speed < 0.0f) ? -speed : speed;
+
+		if (m_blendElapsed >= m_blendTime)
+		{
+			m_blendElapsed = m_blendTime;
+
+			// 混ぜ終わったら控えは不要
+			m_blendPoses.clear();
+			m_blendPoses.shrink_to_fit();
 		}
 	}
 }

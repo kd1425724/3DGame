@@ -38,6 +38,11 @@ public:
 	// 走りだけ、実際の速さに合わせて再生速度を変える
 	float SelectAnimationSpeed() const override;
 
+	// アニメを切り替えるときに前のポーズから混ぜる秒数。
+	// プレイヤーは状態が多く(待機/走り/ジャンプ/落下/着地/回避…)、切り替えのたびに
+	// ポーズが飛んでいた。実機で詰めたいのでDebugParamsから読む
+	float SelectAnimationBlendTime() const override;
+
 	// 向き直る速さ(度/秒)。実機で詰めたいのでDebugParamsから読む
 	float SelectTurnSpeed() const override;
 

@@ -371,8 +371,15 @@ void CharaBase::UpdateAnimation()
 		// m_currentAnimNameも更新しないので、名前が直れば次のフレームで復帰できる
 		if (spAnim)
 		{
-			m_animator.SetAnimation(spAnim, true);
+			// 【順番】名前を先に更新する。SelectAnimationLoop/SelectAnimationBlendTimeは
+			// 「これから流すアニメ」について答える必要があり、派生クラスは現在のアニメ名を
+			// 見て判断するため(SelectAnimationSpeedを切り替えの【後】で呼ぶのと同じ理由)
 			m_currentAnimName = next;
+
+			// 秒 → 60fps基準のフレーム数。AdvanceTimeへ渡す値と単位をそろえる
+			const float blendFrames = SelectAnimationBlendTime() * 60.0f;
+
+			m_animator.SetAnimation(spAnim, SelectAnimationLoop(), blendFrames);
 		}
 	}
 
