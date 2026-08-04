@@ -382,6 +382,13 @@ void Enemy::EnterDown(bool _isDead)
 
 void Enemy::UpdateDown(float _dt)
 {
+	// 倒れ切るまでは何もしない。
+	// 【2026-08-04に実機で出た不具合2つを、ここ1箇所で塞いでいる】
+	//   ・倒れている最中に向き直りが始まり、体が滑るように回っていた
+	//   ・消滅までの時間が倒れ始めから数えられ、モーションの途中で消えていた
+	//     (倒れるモーションは3.92秒あるのに、消えるまでが3.0秒だった)
+	if (!IsFallFinished()) { return; }
+
 	// --- 死んで倒れた場合 ---
 	// 【仮の実装】本来はここで全身破砕へ移す。破砕が未実装なので、死体が残り続けないよう
 	//   時間で消しておく。破砕を入れるときにこの分岐を差し替える
@@ -417,8 +424,24 @@ void Enemy::UpdateDown(float _dt)
 	SetRot(rot);
 }
 
+bool Enemy::IsFallFinished() const
+{
+	// 倒れるモーションを持たないモデルでは、待っても終わらない。
+	// 「終わった」扱いにしないと死体が永久に消えなくなるので、無い場合は即trueを返す
+	if (!m_modelWork.GetAnimation(kFallAnimName)) { return true; }
+
+	// アニメの切り替えはPostUpdate(UpdateAnimation)で起きるので、倒れた直後の数フレームは
+	// まだ歩行が流れている。名前で確かめてからでないと、ループしている歩行が末尾に来た
+	// 瞬間を「倒れ終わった」と誤認する
+	if (m_currentAnimName != kFallAnimName) { return false; }
+
+	return m_animator.IsAnimationEnd();
+}
+
 float Enemy::GetDownDisappearTime() const
 {
+	// 倒れ切ってから数え始める(倒れ始めからではない)。
+	// 【仮】全身破砕を入れたら「倒れ切った瞬間に砕く」へ差し替わる
 	return DebugParams::Instance().Float(U8("敵/死亡から消えるまでの秒数"), 3.0f, 0.5f, 10.0f);
 }
 
