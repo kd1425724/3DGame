@@ -14,14 +14,29 @@
 //   肘 = ForeArm の根元／膝 = Leg の根元／首 = Neck。いずれも「その関節から先」を配下に持つ
 // 半径はglTFの骨座標の実測から決めた初期値【モデル座標系】(身長1.899m)。
 // 実機で見て詰められるよう、半径だけDebugParamsに出してある(左右は同じキーを共有)
+// 蓋の骨が「壊す骨の親」になっているのは意図的。理由はJointDef::stumpBoneのコメント参照
 const Enemy::JointDef Enemy::kJointDefs[Enemy::kJointCount] =
 {
 	// 首は弱点。潰すと頭が落ちるので、小さい判定＋大きい倍率という業界標準の作り方にしてある
-	{ U8("首"),   "mixamorig:Neck",         U8("関節/半径_首"), 0.15f, 2.0f, 20.0f, "Asset/Models/Character/StoneGolem/Gib_Head.gltf"         },
-	{ U8("左肘"), "mixamorig:LeftForeArm",  U8("関節/半径_肘"), 0.13f, 1.0f, 30.0f, "Asset/Models/Character/StoneGolem/Gib_LeftForeArm.gltf"  },
-	{ U8("右肘"), "mixamorig:RightForeArm", U8("関節/半径_肘"), 0.13f, 1.0f, 30.0f, "Asset/Models/Character/StoneGolem/Gib_RightForeArm.gltf" },
-	{ U8("左膝"), "mixamorig:LeftLeg",      U8("関節/半径_膝"), 0.14f, 1.0f, 40.0f, "Asset/Models/Character/StoneGolem/Gib_LeftLeg.gltf"      },
-	{ U8("右膝"), "mixamorig:RightLeg",     U8("関節/半径_膝"), 0.14f, 1.0f, 40.0f, "Asset/Models/Character/StoneGolem/Gib_RightLeg.gltf"     },
+	{ U8("首"),   "mixamorig:Neck",         U8("関節/半径_首"), 0.15f, 2.0f, 20.0f,
+	  "Asset/Models/Character/StoneGolem/Gib_Head.gltf",
+	  "Asset/Models/Character/StoneGolem/Stump_Head.gltf",         "mixamorig:Spine2"     },
+
+	{ U8("左肘"), "mixamorig:LeftForeArm",  U8("関節/半径_肘"), 0.13f, 1.0f, 30.0f,
+	  "Asset/Models/Character/StoneGolem/Gib_LeftForeArm.gltf",
+	  "Asset/Models/Character/StoneGolem/Stump_LeftForeArm.gltf",  "mixamorig:LeftArm"    },
+
+	{ U8("右肘"), "mixamorig:RightForeArm", U8("関節/半径_肘"), 0.13f, 1.0f, 30.0f,
+	  "Asset/Models/Character/StoneGolem/Gib_RightForeArm.gltf",
+	  "Asset/Models/Character/StoneGolem/Stump_RightForeArm.gltf", "mixamorig:RightArm"   },
+
+	{ U8("左膝"), "mixamorig:LeftLeg",      U8("関節/半径_膝"), 0.14f, 1.0f, 40.0f,
+	  "Asset/Models/Character/StoneGolem/Gib_LeftLeg.gltf",
+	  "Asset/Models/Character/StoneGolem/Stump_LeftLeg.gltf",      "mixamorig:LeftUpLeg"  },
+
+	{ U8("右膝"), "mixamorig:RightLeg",     U8("関節/半径_膝"), 0.14f, 1.0f, 40.0f,
+	  "Asset/Models/Character/StoneGolem/Gib_RightLeg.gltf",
+	  "Asset/Models/Character/StoneGolem/Stump_RightLeg.gltf",     "mixamorig:RightUpLeg" },
 };
 
 DebugDraw::Category Enemy::GetDebugCategory() const
@@ -156,6 +171,42 @@ void Enemy::SpawnGib(int _index)
 	const Math::Vector3 angularVelocity = outward.Cross(Math::Vector3::Up) * tumble;
 
 	spDebris->SpawnPiece(m_gibModelIds[_index], boneWorld, velocity, angularVelocity);
+}
+
+void Enemy::DrawLit()
+{
+	CharaBase::DrawLit();
+
+	DrawStumps();
+}
+
+void Enemy::DrawStumps()
+{
+	for (int i = 0; i < kJointCount; ++i)
+	{
+		// 壊れていない関節には切り口が無い
+		if (m_jointHp[i] > 0.0f) { continue; }
+
+		// 初めて壊れたときに読む。壊れない関節のぶんは読み込みもしない
+		if (!m_spStumpWorks[i])
+		{
+			m_spStumpWorks[i] = std::make_shared<KdModelWork>();
+			m_spStumpWorks[i]->SetModelData(
+				KdAssets::Instance().m_modeldatas.GetData(kJointDefs[i].stumpModel));
+		}
+
+		if (!m_spStumpWorks[i]->IsEnable()) { continue; }
+
+		// 【壊した骨ではなく親を引く】UpdateBrokenJointsが毎フレームCollapseBoneするので、
+		//   壊した骨の行列は点に潰れている。そこから姿勢を取ると蓋も点に潰れて消える
+		const KdModelWork::Node* pNode = m_modelWork.FindWorkNode(kJointDefs[i].stumpBone);
+		if (!pNode) { continue; }
+
+		// 蓋は親の骨のローカル空間に焼き込んであるので、その骨のワールド行列を渡すだけで
+		// 切断面にぴったり重なる(gibと同じ規約)
+		KdShaderManager::Instance().m_StandardShader.DrawModel(
+			*m_spStumpWorks[i], GetBoneWorldMatrix(*pNode));
+	}
 }
 
 bool Enemy::GetJointSphere(const JointDef& _joint, Math::Vector3& _outCenter, float& _outRadius) const

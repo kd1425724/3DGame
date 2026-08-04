@@ -43,6 +43,10 @@ public:
 	// 再生速度の倍率。足が地面を滑らないよう、実際の移動速度から計算する
 	float SelectAnimationSpeed() const override;
 
+	// 本体のモデルに加えて、壊れた関節の「断端の蓋」を描く。
+	// 蓋が無いと、部位が落ちたあとの切り口が開きっぱなしで体の中が見える
+	void DrawLit() override;
+
 	// 当たり判定デバッグ表示は「敵」カテゴリに出す(接地/壁判定はCharaBaseが描くので、
 	// ここで種類を教えないとプレイヤーと一緒くたに出てしまう)
 	DebugDraw::Category GetDebugCategory() const override;
@@ -81,9 +85,22 @@ public:
 		float       maxHp;          // 関節のHP。本体HPとは別勘定(モンハン方式)
 
 		// 壊れたときに落ちてくる部位のモデル。
-		// 【骨と切り出し範囲を必ず揃えること】gibは Cloude\GltfPartExtract で
-		//   「この骨と配下」の頂点だけを抜いて作ってある。骨を変えるなら作り直しも要る
+		// 【骨と切り出し範囲を必ず揃えること】gibは「この骨と配下」を関節の平面で
+		//   切って作ってある。骨を変えるなら作り直しも要る
+		// 【必ず骨のローカル空間に焼き込むこと】頂点は inverse(骨の静止ワールド行列) を
+		//   掛けた状態で保存する。平行移動だけだと、骨の静止姿勢に回転がある関節
+		//   (肘・膝は約175度)で部位が裏返って出る
 		const char* gibModel;
+
+		// 部位が落ちたあと、本体側に残る切り口を塞ぐ蓋。
+		// gibと同じ平面・同じ輪郭の断面を、向きだけ反転して作ってある
+		const char* stumpModel;
+
+		// 蓋を付ける骨。【壊す骨ではなく、その親】であることに注意。
+		// UpdateBrokenJointsが毎フレームCollapseBoneするので、壊した骨のワールド行列は
+		// 点に潰れていて使えない。切断面は親の骨の先端にあるので、親に付ければ
+		// アニメにも正しく追従する
+		const char* stumpBone;
 	};
 
 	// 関節の数。表の実体はEnemy.cppにある
@@ -140,8 +157,17 @@ private:
 	// 破片を出す先。シーンに1つあるので初回に探してキャッシュする
 	std::weak_ptr<DebrisSystem> m_wpDebrisSystem;
 
+	// 断端の蓋。壊れた関節ぶんだけ描く。添字はkJointDefsと同じ。
+	// 空=未読み込み(その関節が初めて壊れたときに読む。壊れなければ読み込みもしない)
+	std::shared_ptr<KdModelWork> m_spStumpWorks[kJointCount];
+
 	// _index番目の関節の部位を、その関節の姿勢で落とす。壊れた瞬間に1回だけ呼ぶ
 	void SpawnGib(int _index);
+
+	// 壊れた関節の断端の蓋を描く。DrawLitから呼ぶ。
+	// 【影パスに出していない理由】蓋は関節の断面で小さく、影に出なくても分からない。
+	//   必要になったらGenerateDepthMapFromLightからも同じものを呼べばよい
+	void DrawStumps();
 
 	// 体の当たり半径(m)。突進の命中判定とデバッグ表示に使う。
 	// 【2026/07/29】KdColliderへの登録をやめたので、用途はこの2つだけになった。
