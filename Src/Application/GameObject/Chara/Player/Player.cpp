@@ -1972,8 +1972,12 @@ bool Player::SelectArmAimTarget(Math::Vector3& _outTarget) const
 
 void Player::NotifyCounter()
 {
-	// 敵(Enemy::ResolveStrikeHit)がジャスト回避を受けた時に呼ぶ。実際の窓開けは次のUpdateCounterで行う
+	// 敵の攻撃をジャスト回避で受けた時に敵側から呼ぶ。実際の窓開けは次のUpdateCounterで行う
 	// (発動側をPlayerに集約して、スロー窓や突撃移行の管理を1箇所にまとめるため)
+	//
+	// 🔴 2026-08-04時点で【呼び出し元が無い】。敵の突進(Enemy::ResolveStrikeHit)を撤去したため、
+	//   反撃システムに入る手段が消えている。敵に新しい攻撃を入れるとき、必ずここを呼び直すこと
+	//   (回避の無敵は反撃の唯一の入口なので、受け側であるこの関数は残してある)
 	m_counterPending = true;
 }
 
