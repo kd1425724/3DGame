@@ -126,6 +126,18 @@ protected:
 	// 同じ走りモーションを歩きでもダッシュでも等速で流すと、足が地面を滑って見える
 	virtual float SelectAnimationSpeed() const { return 1.0f; }
 
+	// ループ再生するか。falseにすると最後のフレームで止まり、そのポーズのまま留まる
+	// (KdAnimatorが再生位置を頭打ちにし、補間側が最後のキーを返すため)。
+	// 「倒れる」のように1回で終わって、その姿勢が次の待機ポーズになる動きに使う
+	// ＝倒れた状態の待機アニメを別に用意しなくて済む
+	virtual bool SelectAnimationLoop() const { return true; }
+
+	// アニメを切り替えるときに、前のポーズから混ぜる秒数(0=即差し替え)。
+	// 【なぜ要るか】KdAnimatorは切り替えの瞬間にポーズが1フレームで飛ぶ。
+	//   状態が増えるほど目立つので、切り替わりを短時間ならして繋ぐ。
+	// 既定0なので、上書きしない派生クラスの見た目は変わらない
+	virtual float SelectAnimationBlendTime() const { return 0.0f; }
+
 	// 再生中のアニメ名(デバッグ表示から読む)
 	const std::string& GetCurrentAnimName() const { return m_currentAnimName; }
 

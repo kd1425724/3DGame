@@ -19,19 +19,20 @@ const Enemy::JointDef Enemy::kJointDefs[Enemy::kJointCount] =
 {
 	// 首は弱点。壊すと頭が落ちるので、小さい判定＋大きい倍率という業界標準の作り方にしてある
 	{ U8("首"),   "mixamorig:Neck",         U8("関節/半径_首"), 0.15f, 2.0f, 20.0f,
-	  "Asset/Models/Character/StoneGolem/Gib_Head.gltf",         "Part_Head"         },
+	  "Asset/Models/Character/StoneGolem/Gib_Head.gltf",         "Part_Head",         false },
 
 	{ U8("左肘"), "mixamorig:LeftForeArm",  U8("関節/半径_肘"), 0.13f, 1.0f, 30.0f,
-	  "Asset/Models/Character/StoneGolem/Gib_LeftForeArm.gltf",  "Part_LeftForeArm"  },
+	  "Asset/Models/Character/StoneGolem/Gib_LeftForeArm.gltf",  "Part_LeftForeArm",  false },
 
 	{ U8("右肘"), "mixamorig:RightForeArm", U8("関節/半径_肘"), 0.13f, 1.0f, 30.0f,
-	  "Asset/Models/Character/StoneGolem/Gib_RightForeArm.gltf", "Part_RightForeArm" },
+	  "Asset/Models/Character/StoneGolem/Gib_RightForeArm.gltf", "Part_RightForeArm", false },
 
+	// 膝を壊されたら倒れる。片方でも壊れれば立ち上がれない
 	{ U8("左膝"), "mixamorig:LeftLeg",      U8("関節/半径_膝"), 0.14f, 1.0f, 40.0f,
-	  "Asset/Models/Character/StoneGolem/Gib_LeftLeg.gltf",      "Part_LeftLeg"      },
+	  "Asset/Models/Character/StoneGolem/Gib_LeftLeg.gltf",      "Part_LeftLeg",      true  },
 
 	{ U8("右膝"), "mixamorig:RightLeg",     U8("関節/半径_膝"), 0.14f, 1.0f, 40.0f,
-	  "Asset/Models/Character/StoneGolem/Gib_RightLeg.gltf",     "Part_RightLeg"     },
+	  "Asset/Models/Character/StoneGolem/Gib_RightLeg.gltf",     "Part_RightLeg",     true  },
 };
 
 DebugDraw::Category Enemy::GetDebugCategory() const
@@ -77,6 +78,12 @@ void Enemy::ApplyJointDamage(int _index, float _damage)
 		if (m_jointHp[_index] <= 0.0f)
 		{
 			m_jointHp[_index] = 0.0f;
+
+			// 膝を壊されたら倒れる。以後は立ち上がれない
+			if (joint.causesDown)
+			{
+				EnterDown(false);
+			}
 		}
 	}
 
@@ -341,7 +348,78 @@ void Enemy::ApplyBodyDamage(float _damage)
 	if (m_hp > 0.0f) { return; }
 
 	m_hp = 0.0f;
-	m_isExpired = true;
+
+	// 【2026-08-04】その場で消えるのをやめ、まず倒れるようにした。
+	// 最終形は「倒れ切った瞬間に全身破砕へ移す」で、消滅はそのあとになる
+	EnterDown(true);
+}
+
+void Enemy::EnterDown(bool _isDead)
+{
+	// 既に倒れている場合は倒れ直さない。
+	// 膝を壊されて倒れたあとに本体HPが尽きる順序があるので、そのときは
+	// 「生きたダウン → 死んだダウン」へ変わるだけでよい
+	if (m_state == State::Down)
+	{
+		if (_isDead && !m_isDead)
+		{
+			m_isDead = true;
+			m_downTimer = GetDownDisappearTime();
+		}
+		return;
+	}
+
+	m_state = State::Down;
+	m_stateTimer = 0.0f;
+
+	m_isDead = _isDead;
+	m_downTimer = GetDownDisappearTime();
+
+	// 倒れた体が水平の勢いを持ったまま滑っていかないように消す
+	m_velocity.x = 0.0f;
+	m_velocity.z = 0.0f;
+}
+
+void Enemy::UpdateDown(float _dt)
+{
+	// --- 死んで倒れた場合 ---
+	// 【仮の実装】本来はここで全身破砕へ移す。破砕が未実装なので、死体が残り続けないよう
+	//   時間で消しておく。破砕を入れるときにこの分岐を差し替える
+	if (m_isDead)
+	{
+		m_downTimer -= _dt;
+
+		if (m_downTimer <= 0.0f)
+		{
+			m_isExpired = true;
+		}
+		return;
+	}
+
+	// --- 膝を壊されて倒れた(まだ生きている)場合 ---
+	// 【案1：その場でゆっくり向き直る】(2026-08-04にユーザーが選択)
+	//   倒れたまま向きを変えられないと、プレイヤーが背後へ回るだけで完全な安全地帯になり、
+	//   ダウンが「危険な状態」でなく「ただの休憩」になってしまう。
+	//   這って向き直るモーション(Low Crawl)を使う案もあるが、まずは回転だけで様子を見て、
+	//   見た目が足りなければそちらへ差し替える
+	std::shared_ptr<KdGameObject> spTarget = m_wpTarget.lock();
+	if (!spTarget) { return; }
+
+	Math::Vector3 toTarget    = MathAPI::FlattenY(spTarget->GetPos() - GetPos());
+	Math::Vector3 dirToTarget = MathAPI::GetSafeNormal(toTarget, Math::Vector3::Backward);
+
+	// 立っているときより明確に遅くする(這って向きを変えている重さを出すため)
+	float turnSpeedDeg = DebugParams::Instance().Float(U8("敵/ダウン中の旋回速度"), 30.0f, 0.0f, 180.0f);
+
+	Math::Vector3 rot = GetRot();
+	// 🔴 m_modelForwardIsMinusZ を必ず渡すこと(渡さないとモデルがずっと逆を向く)
+	rot.y = MathAPI::RotateToDirection(rot.y, dirToTarget, turnSpeedDeg * _dt, m_modelForwardIsMinusZ);
+	SetRot(rot);
+}
+
+float Enemy::GetDownDisappearTime() const
+{
+	return DebugParams::Instance().Float(U8("敵/死亡から消えるまでの秒数"), 3.0f, 0.5f, 10.0f);
 }
 
 void Enemy::Update()
@@ -364,10 +442,18 @@ void Enemy::Update()
 	// ※ アニメはSelectAnimationSpeedが0を返して凍る。呼ぶのをやめてはいけない → そちらのコメント
 	if (IsFrozenForDebug()) { return; }
 
+	const float dt = Application::Instance().GetDeltaTime();
+
+	// 倒れている間は追従も攻撃もしない。向き直りと消滅の管理だけ行う。
+	// ※ 対象を見失っていても消滅までは進めたいので、targetの取得より【前】に置く
+	if (m_state == State::Down)
+	{
+		UpdateDown(dt);
+		return;
+	}
+
 	std::shared_ptr<KdGameObject> spTarget = m_wpTarget.lock();
 	if (!spTarget) { return; }
-
-	const float dt = Application::Instance().GetDeltaTime();
 
 	Math::Vector3 pos       = GetPos();
 	Math::Vector3 targetPos = spTarget->GetPos();
@@ -521,9 +607,28 @@ float Enemy::GetLungeSpeed() const
 
 std::string Enemy::SelectAnimation() const
 {
+	// 倒れている間は「倒れる」を1回だけ流し、最終フレームのポーズで留まる
+	// (SelectAnimationLoopがfalseを返すため)。これがそのままダウン中の待機になる。
+	// ※ kFallAnimNameはまだモデルに入っていないので、今は見つからず歩行のまま流れ続ける
+	if (m_state == State::Down) { return kFallAnimName; }
+
 	// 持っているアニメが歩行1本だけなので、どの状態でもこれを流し、違いは再生速度で付ける。
-	// 攻撃・被弾・死亡が揃ったら、ここを状態で分岐させる(Player::SelectAnimationと同じ形)
+	// 攻撃・被弾が揃ったら、ここを状態で分岐させる(Player::SelectAnimationと同じ形)
 	return kWalkAnimName;
+}
+
+bool Enemy::SelectAnimationLoop() const
+{
+	// 「倒れる」だけはループさせない。最後のフレームで止まり、その姿勢のまま留まる
+	return m_currentAnimName != kFallAnimName;
+}
+
+float Enemy::SelectAnimationBlendTime() const
+{
+	// 歩き→倒れるの切り替わりが1フレームで飛ぶのを防ぐ。
+	// 倒れるモーションの序盤を切るほど、切り替え前後のポーズ差が大きくなって目立つ。
+	// 0にすれば従来どおりの即差し替えに戻せる
+	return DebugParams::Instance().Float(U8("敵/アニメ切り替えを混ぜる秒数"), 0.15f, 0.0f, 0.5f);
 }
 
 bool Enemy::IsFrozenForDebug() const
@@ -540,6 +645,10 @@ float Enemy::SelectAnimationSpeed() const
 	//   KdAnimator::AdvanceTime は【先に姿勢を当ててから時間を進める】(KdAnimation.cpp:171→177)
 	//   ので、速度0で呼び続ければ姿勢はそのまま保たれる
 	if (IsFrozenForDebug()) { return 0.0f; }
+
+	// 倒れるモーションは等速で流す。
+	// 以下の「足を滑らせない倍率」は歩行クリップ前提の計算なので、倒れる動きには意味が無い
+	if (m_state == State::Down) { return 1.0f; }
 
 	// 【足を滑らせないための計算】
 	// この歩行はその場歩き(腰の水平移動が±0.14mしかない=ルートモーション無し)なので、
