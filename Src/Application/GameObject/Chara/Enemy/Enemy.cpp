@@ -14,29 +14,24 @@
 //   肘 = ForeArm の根元／膝 = Leg の根元／首 = Neck。いずれも「その関節から先」を配下に持つ
 // 半径はglTFの骨座標の実測から決めた初期値【モデル座標系】(身長1.899m)。
 // 実機で見て詰められるよう、半径だけDebugParamsに出してある(左右は同じキーを共有)
-// 蓋の骨が「壊す骨の親」になっているのは意図的。理由はJointDef::stumpBoneのコメント参照
+// partNode は StoneGolem.gltf の【メッシュノード名】。骨名ではないことに注意
 const Enemy::JointDef Enemy::kJointDefs[Enemy::kJointCount] =
 {
-	// 首は弱点。潰すと頭が落ちるので、小さい判定＋大きい倍率という業界標準の作り方にしてある
+	// 首は弱点。壊すと頭が落ちるので、小さい判定＋大きい倍率という業界標準の作り方にしてある
 	{ U8("首"),   "mixamorig:Neck",         U8("関節/半径_首"), 0.15f, 2.0f, 20.0f,
-	  "Asset/Models/Character/StoneGolem/Gib_Head.gltf",
-	  "Asset/Models/Character/StoneGolem/Stump_Head.gltf",         "mixamorig:Spine2"     },
+	  "Asset/Models/Character/StoneGolem/Gib_Head.gltf",         "Part_Head"         },
 
 	{ U8("左肘"), "mixamorig:LeftForeArm",  U8("関節/半径_肘"), 0.13f, 1.0f, 30.0f,
-	  "Asset/Models/Character/StoneGolem/Gib_LeftForeArm.gltf",
-	  "Asset/Models/Character/StoneGolem/Stump_LeftForeArm.gltf",  "mixamorig:LeftArm"    },
+	  "Asset/Models/Character/StoneGolem/Gib_LeftForeArm.gltf",  "Part_LeftForeArm"  },
 
 	{ U8("右肘"), "mixamorig:RightForeArm", U8("関節/半径_肘"), 0.13f, 1.0f, 30.0f,
-	  "Asset/Models/Character/StoneGolem/Gib_RightForeArm.gltf",
-	  "Asset/Models/Character/StoneGolem/Stump_RightForeArm.gltf", "mixamorig:RightArm"   },
+	  "Asset/Models/Character/StoneGolem/Gib_RightForeArm.gltf", "Part_RightForeArm" },
 
 	{ U8("左膝"), "mixamorig:LeftLeg",      U8("関節/半径_膝"), 0.14f, 1.0f, 40.0f,
-	  "Asset/Models/Character/StoneGolem/Gib_LeftLeg.gltf",
-	  "Asset/Models/Character/StoneGolem/Stump_LeftLeg.gltf",      "mixamorig:LeftUpLeg"  },
+	  "Asset/Models/Character/StoneGolem/Gib_LeftLeg.gltf",      "Part_LeftLeg"      },
 
 	{ U8("右膝"), "mixamorig:RightLeg",     U8("関節/半径_膝"), 0.14f, 1.0f, 40.0f,
-	  "Asset/Models/Character/StoneGolem/Gib_RightLeg.gltf",
-	  "Asset/Models/Character/StoneGolem/Stump_RightLeg.gltf",     "mixamorig:RightUpLeg" },
+	  "Asset/Models/Character/StoneGolem/Gib_RightLeg.gltf",     "Part_RightLeg"     },
 };
 
 DebugDraw::Category Enemy::GetDebugCategory() const
@@ -90,31 +85,41 @@ void Enemy::ApplyJointDamage(int _index, float _damage)
 
 void Enemy::UpdateBrokenJoints()
 {
-	bool collapsedAny = false;
-
 	for (int i = 0; i < kJointCount; ++i)
 	{
 		if (m_jointHp[i] > 0.0f) { continue; }
 
-		// 【順番が大事】潰す【前】に部位を落とす。潰した後の骨は拡縮がほぼ0なので、
-		//   そこから姿勢を取ると点に潰れた破片が出てくる
-		if (!m_gibSpawned[i])
-		{
-			SpawnGib(i);
-			m_gibSpawned[i] = true;
-		}
+		// 壊れた瞬間の1回だけでよい。ノードの可視はアニメで書き戻されないため、
+		// ボーン潰し方式のように毎フレームやり直す必要が無い
+		if (m_gibSpawned[i]) { continue; }
 
-		// 【なぜ毎フレームか】UpdateAnimationが毎フレーム骨をアニメの姿勢で書き戻すので、
-		//   壊した瞬間に1回潰すだけでは次のフレームで生えて戻る。
-		//   これはボーン潰し方式の性質で、UpdateBoneCollapseTestが後ろに置いてあるのと同じ理由
-		CollapseBone(kJointDefs[i].bone);
-		collapsedAny = true;
+		// 【順番が大事】消す【前】に部位を落とす。骨の姿勢から破片の初期姿勢を取るので、
+		//   先に消しても問題は無いが、gibとの見た目の連続性のためこの順にしてある
+		SpawnGib(i);
+		m_gibSpawned[i] = true;
+
+		HidePartNode(kJointDefs[i].partNode);
 	}
+}
 
-	// 1本も潰していないなら、全ノードの再計算は無駄なので走らせない
-	if (!collapsedAny) { return; }
+void Enemy::HidePartNode(const char* _nodeName)
+{
+	if (!_nodeName) { return; }
 
-	m_modelWork.CalcNodeMatrices();
+	// 【ボーン潰しをやめた理由】以前は CollapseBone でその骨の拡縮を潰して部位を消していたが、
+	//   あれは「その骨にウェイトを持つ頂点を1点へ集める」操作なので、体に残る切り口が
+	//   ウェイト境界のギザギザな穴（複数の岩の殻にまたがった開いた弧）になり、
+	//   断面を塞ぐ手立てが無かった。
+	//   StoneGolem.gltf を本体＋部位5つの6メッシュノードに分け、ノードごと描かない形にすると、
+	//   切り口は切断平面＝閉じた輪になり、蓋をモデル側に作り込める（業界標準のやり方）。
+	for (KdModelWork::Node& node : m_modelWork.WorkNodes())
+	{
+		if (node.m_name == _nodeName)
+		{
+			node.m_visible = false;
+			return;
+		}
+	}
 }
 
 void Enemy::SpawnGib(int _index)
@@ -171,61 +176,6 @@ void Enemy::SpawnGib(int _index)
 	const Math::Vector3 angularVelocity = outward.Cross(Math::Vector3::Up) * tumble;
 
 	spDebris->SpawnPiece(m_gibModelIds[_index], boneWorld, velocity, angularVelocity);
-}
-
-void Enemy::DrawLit()
-{
-	CharaBase::DrawLit();
-
-	// 【2026/08/04 いったん止めている】DrawStumps();
-	//
-	// 蓋が実機で明らかにずれる・大きすぎるため、呼び出しだけ外した。
-	// コードと Stump_*.gltf は作り直しの土台として残してある。
-	//
-	// 【なぜ今の方式では直らないか】
-	//   蓋は「関節の平面で切った断面」だが、ゲームは平面で切っておらず
-	//   CollapseBone で【その骨のウェイトを持つ頂点】を潰している。この2つは
-	//   一致しない(首の実測：平面より上に1,066頂点が残り、平面より下の424頂点が消える)。
-	//   さらに穴のフチは複数の岩の殻にまたがった【開いた弧】になるので、
-	//   閉じた輪を前提にした塞ぎ方(fill/凸包/耳刈り)がどれも成立しない。
-	//   加えて蓋は親の骨に固定した硬い板なので、姿勢が静止姿勢から離れるほど
-	//   本体の表面(2つの骨のウェイトが混ざって変形する)からずれてめり込む。
-	//
-	// 【直す方向】業界標準は「部位ごとに閉じたメッシュへ分け、部位のメッシュを
-	//   非表示にする」。そうすれば断面は平面＝閉じた輪になり、蓋が確実に作れる。
-	//   必要な作業は3つ：
-	//     ① StoneGolem.gltf を本体＋5部位の6メッシュノードに分割し、本体側に平面の蓋を付ける
-	//     ② KdModelWork::Node にノード単位の表示フラグを足す(KdStandardShader::DrawModelで飛ばす)
-	//     ③ ここを CollapseBone からノード非表示へ変える
-}
-
-void Enemy::DrawStumps()
-{
-	for (int i = 0; i < kJointCount; ++i)
-	{
-		// 壊れていない関節には切り口が無い
-		if (m_jointHp[i] > 0.0f) { continue; }
-
-		// 初めて壊れたときに読む。壊れない関節のぶんは読み込みもしない
-		if (!m_spStumpWorks[i])
-		{
-			m_spStumpWorks[i] = std::make_shared<KdModelWork>();
-			m_spStumpWorks[i]->SetModelData(
-				KdAssets::Instance().m_modeldatas.GetData(kJointDefs[i].stumpModel));
-		}
-
-		if (!m_spStumpWorks[i]->IsEnable()) { continue; }
-
-		// 【壊した骨ではなく親を引く】UpdateBrokenJointsが毎フレームCollapseBoneするので、
-		//   壊した骨の行列は点に潰れている。そこから姿勢を取ると蓋も点に潰れて消える
-		const KdModelWork::Node* pNode = m_modelWork.FindWorkNode(kJointDefs[i].stumpBone);
-		if (!pNode) { continue; }
-
-		// 蓋は親の骨のローカル空間に焼き込んであるので、その骨のワールド行列を渡すだけで
-		// 切断面にぴったり重なる(gibと同じ規約)
-		KdShaderManager::Instance().m_StandardShader.DrawModel(
-			*m_spStumpWorks[i], GetBoneWorldMatrix(*pNode));
-	}
 }
 
 bool Enemy::GetJointSphere(const JointDef& _joint, Math::Vector3& _outCenter, float& _outRadius) const
