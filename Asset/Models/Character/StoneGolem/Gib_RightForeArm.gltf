@@ -51,29 +51,29 @@
   {
    "bufferView": 0,
    "componentType": 5126,
-   "count": 8339,
+   "count": 8337,
    "max": [
-    0.2167389839887619,
-    0.8001495003700256,
-    0.15613584220409393
+    0.21673889458179474,
+    0.8001499772071838,
+    0.15613588690757751
    ],
    "min": [
-    -0.22475002706050873,
-    -1.1082738637924194e-07,
-    -0.21376162767410278
+    -0.22475013136863708,
+    -7.425842341035604e-08,
+    -0.21376165747642517
    ],
    "type": "VEC3"
   },
   {
    "bufferView": 1,
    "componentType": 5126,
-   "count": 8339,
+   "count": 8337,
    "type": "VEC3"
   },
   {
    "bufferView": 2,
    "componentType": 5126,
-   "count": 8339,
+   "count": 8337,
    "type": "VEC2"
   },
   {
@@ -86,32 +86,32 @@
  "bufferViews": [
   {
    "buffer": 0,
-   "byteLength": 100068,
+   "byteLength": 100044,
    "byteOffset": 0,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 100068,
-   "byteOffset": 100068,
+   "byteLength": 100044,
+   "byteOffset": 100044,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 66712,
-   "byteOffset": 200136,
+   "byteLength": 66696,
+   "byteOffset": 200088,
    "target": 34962
   },
   {
    "buffer": 0,
    "byteLength": 89496,
-   "byteOffset": 266848,
+   "byteOffset": 266784,
    "target": 34963
   }
  ],
  "buffers": [
   {
-   "byteLength": 356344,
+   "byteLength": 356280,
    "uri": "Gib_RightForeArm.bin"
   }
  ],
