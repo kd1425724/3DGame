@@ -109,12 +109,27 @@ public:
 		Math::Matrix	m_localTransform;	// 直属の親ボーンからの行列
 		Math::Matrix	m_worldTransform;	// 原点からの行列
 
+		// 【2026/08/04 追加】このノードのメッシュを描くかどうか。
+		// KdStandardShader::DrawModel が false のノードを飛ばす。
+		//
+		// 【なぜ足したか】部位破壊で「腕だけ消す」ができなかったため。
+		//   従来はボーンを極小に潰して消していたが、それは頂点をウェイト基準で
+		//   1点へ集める操作なので、体に残る切り口がウェイト境界のギザギザな穴になり、
+		//   断面を塞ぐ手立てが無かった。モデルを部位ごとのメッシュノードに分け、
+		//   ノード単位で非表示にできれば、切り口は「平面」＝閉じた輪になり、
+		//   モデル側にあらかじめ蓋を作り込める(業界標準のやり方)。
+		//
+		// SetEnable はモデル【全体】の可視で、ノード単位の制御が無かった
+		bool			m_visible = true;
+
 		void copy(const KdModelData::Node& rNode)
 		{
 			m_name = rNode.m_name;
 
 			m_localTransform = rNode.m_localTransform;
 			m_worldTransform = rNode.m_worldTransform;
+
+			// 可視状態はゲーム側が制御するものなので、データからコピーせず既定(true)のまま
 		}
 	};
 

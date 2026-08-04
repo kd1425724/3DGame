@@ -317,6 +317,10 @@ void KdStandardShader::DrawModel(KdModelWork& rModel, const Math::Matrix& mWorld
 	// 全描画用メッシュノードを描画
 	for (auto& nodeIdx : data->GetDrawMeshNodeIndices())
 	{
+		// 【2026/08/04 追加】ノード単位の非表示。部位破壊で「腕のノードだけ描かない」を
+		// 実現するために足した(理由の詳細は KdModelWork::Node::m_visible のコメント)
+		if (!workNodes[nodeIdx].m_visible) { continue; }
+
 		// 描画
 		DrawMesh(dataNodes[nodeIdx].m_spMesh.get(), workNodes[nodeIdx].m_worldTransform * mWorld,
 			data->GetMaterials(), colRate, emissive);
