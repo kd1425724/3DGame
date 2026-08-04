@@ -1,136 +1,137 @@
 {
-    "asset":  {
-                  "version":  "2.0",
-                  "generator":  "GltfPartExtract (from Khronos glTF Blender I/O v5.2.39)"
-              },
-    "scene":  0,
-    "scenes":  [
-                   {
-                       "nodes":  [
-                                     0
-                                 ]
-                   }
-               ],
-    "nodes":  [
-                  {
-                      "name":  "Gib_Head",
-                      "mesh":  0
-                  }
-              ],
-    "meshes":  [
-                   {
-                       "name":  "Gib_Head",
-                       "primitives":  [
-                                          {
-                                              "attributes":  {
-                                                                 "POSITION":  0,
-                                                                 "NORMAL":  1,
-                                                                 "TEXCOORD_0":  2
-                                                             },
-                                              "indices":  3,
-                                              "material":  0
-                                          }
-                                      ]
-                   }
-               ],
-    "materials":  [
-                      {
-                          "doubleSided":  true,
-                          "name":  "StoneGolem",
-                          "pbrMetallicRoughness":  {
-                                                       "baseColorTexture":  {
-                                                                                "index":  0
-                                                                            },
-                                                       "metallicFactor":  0,
-                                                       "roughnessFactor":  0.8899999856948853
-                                                   }
-                      }
-                  ],
-    "textures":  [
-                     {
-                         "sampler":  0,
-                         "source":  0
-                     }
-                 ],
-    "images":  [
-                   {
-                       "mimeType":  "image/png",
-                       "name":  "base_color",
-                       "uri":  "base_color.png"
-                   }
-               ],
-    "samplers":  [
-                     {
-                         "magFilter":  9729,
-                         "minFilter":  9987
-                     }
-                 ],
-    "buffers":  [
-                    {
-                        "uri":  "Gib_Head.bin",
-                        "byteLength":  159716
-                    }
-                ],
-    "bufferViews":  [
-                        {
-                            "buffer":  0,
-                            "byteOffset":  0,
-                            "byteLength":  35544,
-                            "target":  34962
-                        },
-                        {
-                            "buffer":  0,
-                            "byteOffset":  35544,
-                            "byteLength":  35544,
-                            "target":  34962
-                        },
-                        {
-                            "buffer":  0,
-                            "byteOffset":  71088,
-                            "byteLength":  23696,
-                            "target":  34962
-                        },
-                        {
-                            "buffer":  0,
-                            "byteOffset":  94784,
-                            "byteLength":  64932,
-                            "target":  34963
-                        }
-                    ],
-    "accessors":  [
-                      {
-                          "bufferView":  0,
-                          "componentType":  5126,
-                          "count":  2962,
-                          "type":  "VEC3",
-                          "min":  [
-                                      -0.154484808,
-                                      0.0391505361,
-                                      -0.171114475
-                                  ],
-                          "max":  [
-                                      0.131783217,
-                                      0.218937576,
-                                      0.158760533
-                                  ]
-                      },
-                      {
-                          "bufferView":  1,
-                          "componentType":  5126,
-                          "count":  2962,
-                          "type":  "VEC3"
-                      },
-                      {
-                          "bufferView":  2,
-                          "componentType":  5126,
-                          "count":  2962,
-                          "type":  "VEC2"
-                      },
-                      {
-                          "bufferView":  3,
-                          "componentType":  5125,
-                          "count":  16233,
-                          "type":  "SCALAR"
-                      }
-                  ]
+ "asset": {
+  "generator": "Khronos glTF Blender I/O v5.2.39",
+  "version": "2.0"
+ },
+ "scene": 0,
+ "scenes": [
+  {
+   "name": "Scene",
+   "nodes": [
+    0
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "mesh": 0,
+   "name": "Gib_Head"
+  }
+ ],
+ "materials": [
+  {
+   "doubleSided": true,
+   "name": "StoneGolem",
+   "pbrMetallicRoughness": {
+    "metallicFactor": 0,
+    "roughnessFactor": 0.8899999856948853,
+    "baseColorTexture": {
+     "index": 0
+    }
+   }
+  }
+ ],
+ "meshes": [
+  {
+   "name": "Gib_Head",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1,
+      "TEXCOORD_0": 2
+     },
+     "indices": 3,
+     "material": 0
+    }
+   ]
+  }
+ ],
+ "accessors": [
+  {
+   "bufferView": 0,
+   "componentType": 5126,
+   "count": 3911,
+   "max": [
+    0.1658450961112976,
+    0.21893757581710815,
+    0.15876053273677826
+   ],
+   "min": [
+    -0.1544848084449768,
+    -0.01857919618487358,
+    -0.18178564310073853
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 1,
+   "componentType": 5126,
+   "count": 3911,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 2,
+   "componentType": 5126,
+   "count": 3911,
+   "type": "VEC2"
+  },
+  {
+   "bufferView": 3,
+   "componentType": 5123,
+   "count": 21114,
+   "type": "SCALAR"
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteLength": 46932,
+   "byteOffset": 0,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 46932,
+   "byteOffset": 46932,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 31288,
+   "byteOffset": 93864,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 42228,
+   "byteOffset": 125152,
+   "target": 34963
+  }
+ ],
+ "buffers": [
+  {
+   "byteLength": 167380,
+   "uri": "Gib_Head.bin"
+  }
+ ],
+ "images": [
+  {
+   "mimeType": "image/png",
+   "name": "base_color",
+   "uri": "base_color.png"
+  }
+ ],
+ "samplers": [
+  {
+   "magFilter": 9729,
+   "minFilter": 9987
+  }
+ ],
+ "textures": [
+  {
+   "sampler": 0,
+   "source": 0
+  }
+ ]
 }
