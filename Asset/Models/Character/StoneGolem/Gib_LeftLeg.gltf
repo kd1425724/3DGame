@@ -1,136 +1,137 @@
 {
-    "asset":  {
-                  "version":  "2.0",
-                  "generator":  "GltfPartExtract (from Khronos glTF Blender I/O v5.2.39)"
-              },
-    "scene":  0,
-    "scenes":  [
-                   {
-                       "nodes":  [
-                                     0
-                                 ]
-                   }
-               ],
-    "nodes":  [
-                  {
-                      "name":  "Gib_LeftLeg",
-                      "mesh":  0
-                  }
-              ],
-    "meshes":  [
-                   {
-                       "name":  "Gib_LeftLeg",
-                       "primitives":  [
-                                          {
-                                              "attributes":  {
-                                                                 "POSITION":  0,
-                                                                 "NORMAL":  1,
-                                                                 "TEXCOORD_0":  2
-                                                             },
-                                              "indices":  3,
-                                              "material":  0
-                                          }
-                                      ]
-                   }
-               ],
-    "materials":  [
-                      {
-                          "doubleSided":  true,
-                          "name":  "StoneGolem",
-                          "pbrMetallicRoughness":  {
-                                                       "baseColorTexture":  {
-                                                                                "index":  0
-                                                                            },
-                                                       "metallicFactor":  0,
-                                                       "roughnessFactor":  0.8899999856948853
-                                                   }
-                      }
-                  ],
-    "textures":  [
-                     {
-                         "sampler":  0,
-                         "source":  0
-                     }
-                 ],
-    "images":  [
-                   {
-                       "mimeType":  "image/png",
-                       "name":  "base_color",
-                       "uri":  "base_color.png"
-                   }
-               ],
-    "samplers":  [
-                     {
-                         "magFilter":  9729,
-                         "minFilter":  9987
-                     }
-                 ],
-    "buffers":  [
-                    {
-                        "uri":  "Gib_LeftLeg.bin",
-                        "byteLength":  731592
-                    }
-                ],
-    "bufferViews":  [
-                        {
-                            "buffer":  0,
-                            "byteOffset":  0,
-                            "byteLength":  160848,
-                            "target":  34962
-                        },
-                        {
-                            "buffer":  0,
-                            "byteOffset":  160848,
-                            "byteLength":  160848,
-                            "target":  34962
-                        },
-                        {
-                            "buffer":  0,
-                            "byteOffset":  321696,
-                            "byteLength":  107232,
-                            "target":  34962
-                        },
-                        {
-                            "buffer":  0,
-                            "byteOffset":  428928,
-                            "byteLength":  302664,
-                            "target":  34963
-                        }
-                    ],
-    "accessors":  [
-                      {
-                          "bufferView":  0,
-                          "componentType":  5126,
-                          "count":  13404,
-                          "type":  "VEC3",
-                          "min":  [
-                                      -0.2183454,
-                                      0.00403374434,
-                                      -0.22287555
-                                  ],
-                          "max":  [
-                                      0.189735323,
-                                      0.688908458,
-                                      0.2955386
-                                  ]
-                      },
-                      {
-                          "bufferView":  1,
-                          "componentType":  5126,
-                          "count":  13404,
-                          "type":  "VEC3"
-                      },
-                      {
-                          "bufferView":  2,
-                          "componentType":  5126,
-                          "count":  13404,
-                          "type":  "VEC2"
-                      },
-                      {
-                          "bufferView":  3,
-                          "componentType":  5125,
-                          "count":  75666,
-                          "type":  "SCALAR"
-                      }
-                  ]
+ "asset": {
+  "generator": "Khronos glTF Blender I/O v5.2.39",
+  "version": "2.0"
+ },
+ "scene": 0,
+ "scenes": [
+  {
+   "name": "Scene",
+   "nodes": [
+    0
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "mesh": 0,
+   "name": "Gib_LeftLeg"
+  }
+ ],
+ "materials": [
+  {
+   "doubleSided": true,
+   "name": "StoneGolem",
+   "pbrMetallicRoughness": {
+    "metallicFactor": 0,
+    "roughnessFactor": 0.8899999856948853,
+    "baseColorTexture": {
+     "index": 0
+    }
+   }
+  }
+ ],
+ "meshes": [
+  {
+   "name": "Gib_LeftLeg",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1,
+      "TEXCOORD_0": 2
+     },
+     "indices": 3,
+     "material": 0
+    }
+   ]
+  }
+ ],
+ "accessors": [
+  {
+   "bufferView": 0,
+   "componentType": 5126,
+   "count": 13981,
+   "max": [
+    0.1897353231906891,
+    0.6889084577560425,
+    0.29553860425949097
+   ],
+   "min": [
+    -0.21834540367126465,
+    -3.725290298461914e-09,
+    -0.22287555038928986
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 1,
+   "componentType": 5126,
+   "count": 13981,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 2,
+   "componentType": 5126,
+   "count": 13981,
+   "type": "VEC2"
+  },
+  {
+   "bufferView": 3,
+   "componentType": 5123,
+   "count": 78729,
+   "type": "SCALAR"
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteLength": 167772,
+   "byteOffset": 0,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 167772,
+   "byteOffset": 167772,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 111848,
+   "byteOffset": 335544,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 157458,
+   "byteOffset": 447392,
+   "target": 34963
+  }
+ ],
+ "buffers": [
+  {
+   "byteLength": 604852,
+   "uri": "Gib_LeftLeg.bin"
+  }
+ ],
+ "images": [
+  {
+   "mimeType": "image/png",
+   "name": "base_color",
+   "uri": "base_color.png"
+  }
+ ],
+ "samplers": [
+  {
+   "magFilter": 9729,
+   "minFilter": 9987
+  }
+ ],
+ "textures": [
+  {
+   "sampler": 0,
+   "source": 0
+  }
+ ]
 }
