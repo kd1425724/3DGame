@@ -33,7 +33,7 @@
  ],
  "meshes": [
   {
-   "name": "Gib_LeftForeArm",
+   "name": "mesh.008",
    "primitives": [
     {
      "attributes": {
@@ -51,7 +51,7 @@
   {
    "bufferView": 0,
    "componentType": 5126,
-   "count": 9594,
+   "count": 10530,
    "max": [
     0.20770518481731415,
     0.8186204433441162,
@@ -59,7 +59,7 @@
    ],
    "min": [
     -0.21221694350242615,
-    -7.41519033908844e-05,
+    -4.6566128730773926e-08,
     -0.15049996972084045
    ],
    "type": "VEC3"
@@ -67,51 +67,51 @@
   {
    "bufferView": 1,
    "componentType": 5126,
-   "count": 9594,
+   "count": 10530,
    "type": "VEC3"
   },
   {
    "bufferView": 2,
    "componentType": 5126,
-   "count": 9594,
+   "count": 10530,
    "type": "VEC2"
   },
   {
    "bufferView": 3,
    "componentType": 5123,
-   "count": 54114,
+   "count": 57444,
    "type": "SCALAR"
   }
  ],
  "bufferViews": [
   {
    "buffer": 0,
-   "byteLength": 115128,
+   "byteLength": 126360,
    "byteOffset": 0,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 115128,
-   "byteOffset": 115128,
+   "byteLength": 126360,
+   "byteOffset": 126360,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 76752,
-   "byteOffset": 230256,
+   "byteLength": 84240,
+   "byteOffset": 252720,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 108228,
-   "byteOffset": 307008,
+   "byteLength": 114888,
+   "byteOffset": 336960,
    "target": 34963
   }
  ],
  "buffers": [
   {
-   "byteLength": 415236,
+   "byteLength": 451848,
    "uri": "Gib_LeftForeArm.bin"
   }
  ],
