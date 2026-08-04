@@ -15,7 +15,7 @@
  "nodes": [
   {
    "mesh": 0,
-   "name": "Gib_RightLeg"
+   "name": "Stump_RightLeg"
   }
  ],
  "materials": [
@@ -33,7 +33,7 @@
  ],
  "meshes": [
   {
-   "name": "Gib_RightLeg",
+   "name": "Stump_RightLeg",
    "primitives": [
     {
      "attributes": {
@@ -51,68 +51,68 @@
   {
    "bufferView": 0,
    "componentType": 5126,
-   "count": 12971,
+   "count": 132,
    "max": [
-    0.24700477719306946,
-    0.7013813853263855,
-    0.3356812000274658
+    0.049861304461956024,
+    0.4694920778274536,
+    0.04423093423247337
    ],
    "min": [
-    -0.18851985037326813,
-    -3.918021684512496e-05,
-    -0.2093825340270996
+    -0.04275420308113098,
+    0.4491429030895233,
+    -0.05382479354739189
    ],
    "type": "VEC3"
   },
   {
    "bufferView": 1,
    "componentType": 5126,
-   "count": 12971,
+   "count": 132,
    "type": "VEC3"
   },
   {
    "bufferView": 2,
    "componentType": 5126,
-   "count": 12971,
+   "count": 132,
    "type": "VEC2"
   },
   {
    "bufferView": 3,
    "componentType": 5123,
-   "count": 72570,
+   "count": 390,
    "type": "SCALAR"
   }
  ],
  "bufferViews": [
   {
    "buffer": 0,
-   "byteLength": 155652,
+   "byteLength": 1584,
    "byteOffset": 0,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 155652,
-   "byteOffset": 155652,
+   "byteLength": 1584,
+   "byteOffset": 1584,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 103768,
-   "byteOffset": 311304,
+   "byteLength": 1056,
+   "byteOffset": 3168,
    "target": 34962
   },
   {
    "buffer": 0,
-   "byteLength": 145140,
-   "byteOffset": 415072,
+   "byteLength": 780,
+   "byteOffset": 4224,
    "target": 34963
   }
  ],
  "buffers": [
   {
-   "byteLength": 560212,
-   "uri": "Gib_RightLeg.bin"
+   "byteLength": 5004,
+   "uri": "Stump_RightLeg.bin"
   }
  ],
  "images": [
