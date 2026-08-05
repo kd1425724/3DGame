@@ -602,7 +602,11 @@ float Enemy::SelectAnimationBlendTime() const
 
 bool Enemy::IsFrozenForDebug() const
 {
-	return DebugFlags::Instance().Get(U8("敵/動きを止める"), true);
+	// 【既定はfalseに戻すこと】DebugFlagsには保存/読込が無いので、ここの既定値が
+	// そのまま毎回の値になる。trueのままだと敵が起動のたびに止まった状態で始まり、
+	// 倒れる→砕けるまで進まない(Update側でこの判定より後ろにあるため)。
+	// 部位破壊の見比べで一時的にtrueにしていたぶんを戻した(2026-08-05)
+	return DebugFlags::Instance().Get(U8("敵/動きを止める"), false);
 }
 
 float Enemy::SelectAnimationSpeed() const
