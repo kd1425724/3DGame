@@ -717,7 +717,24 @@ void Enemy::Update()
 	//   敵が向き直って必ず当たる＝回避が成立しない。回避のiフレームは反撃の唯一の
 	//   入口なので、避けられない攻撃を作ると反撃システムごと死ぬ。
 	//   振りかぶり(Windup)の間だけは遅く向き直れる＝「狙いを付けている」ように見せる
-	float turnSpeedDeg = DebugParams::Instance().Float(U8("敵/旋回速度"), 180.0f, 0.0f, 720.0f);
+	// 🔴【旋回速度は歩く速さから決める】独立した値にすると必ず足が滑る。
+	//   歩きながら向きを変えるとき、体は半径 r = 速さ ÷ 角速度 の弧を描く。
+	//   この r が体の幅より小さいと「その場で回っている」ことになり、
+	//   前へ歩かせても足が追いつかない。
+	//
+	//   実測でそうなっていた：歩く5.5m/s ÷ 180度/秒 = 半径【1.75m】。
+	//   身長25m・足幅10m近いゴーレムには小さすぎた（2026-08-05に実機で「滑る」と指摘）。
+	//
+	//   なので角速度のほうを 速さ÷半径 で求める。大きい敵ほど自然に鈍くなり、
+	//   「ワイヤーで背後を取る」ことに意味が出る
+	const float turnRadius =
+		DebugParams::Instance().Float(U8("敵/旋回半径"), 15.0f, 1.0f, 60.0f);
+
+	const float turnCapDeg =
+		DebugParams::Instance().Float(U8("敵/旋回速度の上限"), 60.0f, 0.0f, 720.0f);
+
+	float turnSpeedDeg = DirectX::XMConvertToDegrees(GetMoveSpeed() / std::max(turnRadius, 0.01f));
+	turnSpeedDeg = std::min(turnSpeedDeg, turnCapDeg);
 
 	if (m_state == State::Windup)
 	{
@@ -727,6 +744,8 @@ void Enemy::Update()
 	{
 		turnSpeedDeg = 0.0f;
 	}
+
+	DebugWatch::Instance().Watch(U8("敵/旋回_実効(度毎秒)"), turnSpeedDeg);
 
 	if (turnSpeedDeg > 0.0f)
 	{
@@ -801,11 +820,16 @@ void Enemy::Update()
 	const float facingDeg =
 		DebugParams::Instance().Float(U8("敵/正面とみなす角度"), 25.0f, 5.0f, 90.0f);
 
+	// 自分がいま向いている方向。
+	// 🔴 進む向きは【必ずこれ】。対象の方向へ直接進めると、横を向いたまま真横へ動く
+	//   ＝カニ歩きになり、足が思い切り滑る(2026-08-05に実機で指摘された滑りの半分はこれ)
+	const Math::Vector3 forward = MathAPI::YawDegToDir(GetRot().y, m_modelForwardIsMinusZ);
+
 	// --- 追う ---
 	if (distXZ > stopDist)
 	{
 		m_currentMoveSpeed = GetMoveSpeed();
-		pos += dirToTarget * m_currentMoveSpeed * dt;
+		pos += forward * m_currentMoveSpeed * dt;
 		SetPos(pos);
 		return;
 	}
@@ -820,10 +844,6 @@ void Enemy::Update()
 	//   ワイヤーで回り込む機動力に意味が出る。ここを速くすると立体機動の価値が薄れる
 	if (offAngle > facingDeg)
 	{
-		// 自分の正面へ進む(対象の方向ではない)。だから弧を描く。
-		// 行列から取らずYawから作るのは、Forward()/Backward()の符号で迷わないため
-		const Math::Vector3 forward = MathAPI::YawDegToDir(GetRot().y, m_modelForwardIsMinusZ);
-
 		const float arcRate =
 			DebugParams::Instance().Float(U8("敵/回り込みの歩く速さの割合"), 0.55f, 0.0f, 1.0f);
 
