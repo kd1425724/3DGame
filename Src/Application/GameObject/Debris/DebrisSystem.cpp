@@ -78,8 +78,53 @@ int DebrisSystem::RegisterModel(const std::string& _modelPath)
 	//   時点で払っておき、出す瞬間はボディを作るだけにする
 	PhysicsWorld::Instance().PrepareDebrisConvex(*group.m_spModelWork);
 
+	// 頂点の中心も同じタイミングで求めておく(散らす向きの計算に使う)
+	group.m_center = CalcModelCenter(*group.m_spModelWork);
+
 	m_groups.push_back(group);
 	return static_cast<int>(m_groups.size() - 1);
+}
+
+Math::Vector3 DebrisSystem::CalcModelCenter(const KdModelWork& _model)
+{
+	const std::shared_ptr<KdModelData> spData = _model.GetData();
+	if (!spData) { return Math::Vector3::Zero; }
+
+	const std::vector<KdModelData::Node>& dataNodes = _model.GetDataNodes();
+	const std::vector<KdModelWork::Node>& workNodes = _model.GetNodes();
+
+	Math::Vector3 sum   = Math::Vector3::Zero;
+	int           count = 0;
+
+	for (int index : spData->GetDrawMeshNodeIndices())
+	{
+		if (index < 0) { continue; }
+		if (index >= static_cast<int>(dataNodes.size())) { continue; }
+		if (index >= static_cast<int>(workNodes.size())) { continue; }
+
+		const KdMesh* pMesh = dataNodes[index].m_spMesh.get();
+		if (!pMesh) { continue; }
+
+		const Math::Matrix& mNode = workNodes[index].m_worldTransform;
+
+		for (const Math::Vector3& local : pMesh->GetVertexPositions())
+		{
+			sum += Math::Vector3::Transform(local, mNode);
+			++count;
+		}
+	}
+
+	if (count == 0) { return Math::Vector3::Zero; }
+
+	return sum / static_cast<float>(count);
+}
+
+Math::Vector3 DebrisSystem::GetModelCenter(int _modelId) const
+{
+	if (_modelId < 0) { return Math::Vector3::Zero; }
+	if (_modelId >= static_cast<int>(m_groups.size())) { return Math::Vector3::Zero; }
+
+	return m_groups[_modelId].m_center;
 }
 
 void DebrisSystem::ClearAll()

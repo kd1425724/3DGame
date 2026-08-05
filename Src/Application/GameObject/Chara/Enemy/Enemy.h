@@ -194,11 +194,26 @@ private:
 	//   一度見つけたら m_wpDebrisSystem にキャッシュする
 	std::shared_ptr<DebrisSystem> FindDebrisSystem();
 
-	// gibのモデルと凸包を先に読み込んでおく。Updateから毎フレーム呼んでよい(1回で済む)
+	// gibと全身破砕の破片を先に読み込んでおく。Updateから毎フレーム呼んでよい(1回で済む)
 	void PreloadDebrisModels();
 
 	// 上を済ませたか
 	bool m_debrisPreloaded = false;
+
+	// 全身破砕の破片1つぶん。fragments.json(破砕ツールの出力)から読む
+	struct FragmentDef
+	{
+		std::string	modelPath;			// Frag_XX.gltf
+		std::string	bone;				// 支配ボーン。この骨の姿勢で破片を置く
+		int			modelId = -1;		// DebrisSystem側のID
+	};
+
+	// 【なぜコードに表を持たないか】破片の数や骨の割り当ては破砕ツールの出力で決まる。
+	//   コードに焼くと、ツールを流し直すたびに手で書き換えることになり、必ず食い違う
+	std::vector<FragmentDef> m_fragments;
+
+	// 破片の表を読む。読めなければfalse(その場合は破砕せず、従来どおり消えるだけ)
+	bool LoadFragmentTable();
 
 	// 体の当たり半径(m)。追従を止める間合いの基準とデバッグ表示に使う。
 	// 【2026/07/29】KdColliderへの登録をやめたので、用途はこの2つだけになった。
