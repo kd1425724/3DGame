@@ -22,16 +22,32 @@ static constexpr const char* kHipsBoneName = "mixamorig:Hips";
 // 攻撃に使う腕の骨。肩から手へ向かって並べる。
 // 【なぜ複数か】手だけに判定を付けると、腕の中ほどに当たっても素通りする。
 //   骨と骨の間も補間して球を置くので、腕全体が一本の当たり判定になる
-static constexpr const char* kAttackArmBones[] =
+static constexpr const char* kAttackArmBonesRight[] =
 {
 	"mixamorig:RightArm",       // 上腕
 	"mixamorig:RightForeArm",   // 前腕
 	"mixamorig:RightHand",      // 手
 };
-static constexpr int kAttackArmBoneCount = _countof(kAttackArmBones);
+static constexpr const char* kAttackArmBonesLeft[] =
+{
+	"mixamorig:LeftArm",
+	"mixamorig:LeftForeArm",
+	"mixamorig:LeftHand",
+};
+static constexpr int kAttackArmBoneCount = _countof(kAttackArmBonesRight);
 
 // 骨と骨の間に追加で置く球の数。0なら骨の位置だけ
 static constexpr int kAttackSphereBetween = 2;
+
+// 攻撃アニメの名前。左右で素材が分かれている(Mixamoで両方落としてある)
+static constexpr const char* kSlamRightAnimName = "slamR";
+static constexpr const char* kSlamLeftAnimName  = "slamL";
+
+// 待機アニメ。無いと止まったとき歩行を遅回しすることになり「歩いて見える」
+static constexpr const char* kIdleAnimName = "idle";
+
+// 掃引で刻む球の上限。増やすほど確実だが重くなる
+static constexpr int kMaxSweepSteps = 16;
 
 // 全身破砕の破片の表と置き場所。破砕ツール(Cloude\GltfFracture)の出力。
 // 【コードに焼かない理由】破片の数も骨の割り当てもツールの出力で決まるので、
@@ -787,23 +803,29 @@ float Enemy::GetMoveSpeed() const
 void Enemy::EnterWindup()
 {
 	m_state      = State::Windup;
-	m_stateTimer = DebugParams::Instance().Float(U8("敵/攻撃_予備動作の秒数"), 0.9f, 0.1f, 3.0f);
+
+	// 【既定値はアニメの実測から決めた】slamR/slamL(1.25秒)の内訳：
+	//   0.00〜0.67 振りかぶり / 0.71〜0.96 振り下ろし(0.83で最速) / 0.96〜1.25 戻り
+	m_stateTimer = DebugParams::Instance().Float(U8("敵/攻撃_予備動作の秒数"), 0.70f, 0.1f, 3.0f);
+
+	// 左右を交互に振る(素材が両方あるので、同じ動きの繰り返しに見えにくい)
+	m_swingRight = !m_swingRight;
 
 	// この振りぶんの当たりを解禁する
 	m_hitDoneThisSwing = false;
-	m_hasPrevHandPos   = false;
+	m_hasPrevSpheres   = false;
 }
 
 void Enemy::EnterStrike()
 {
 	m_state      = State::Strike;
-	m_stateTimer = DebugParams::Instance().Float(U8("敵/攻撃_当たる秒数"), 0.25f, 0.05f, 2.0f);
+	m_stateTimer = DebugParams::Instance().Float(U8("敵/攻撃_当たる秒数"), 0.30f, 0.05f, 2.0f);
 }
 
 void Enemy::EnterRecover()
 {
 	m_state      = State::Recover;
-	m_stateTimer = DebugParams::Instance().Float(U8("敵/攻撃_硬直の秒数"), 0.7f, 0.0f, 3.0f);
+	m_stateTimer = DebugParams::Instance().Float(U8("敵/攻撃_硬直の秒数"), 0.55f, 0.0f, 3.0f);
 
 	// 次に殴れるまでの間。硬直とは別に持つ(硬直＝隙、クールダウン＝攻撃の頻度)
 	m_attackCooldown = DebugParams::Instance().Float(U8("敵/攻撃_間隔の秒数"), 1.5f, 0.0f, 10.0f);
@@ -818,13 +840,17 @@ void Enemy::BuildAttackSpheres(std::vector<std::pair<Math::Vector3, float>>& _ou
 	const float radius =
 		DebugParams::Instance().Float(U8("敵/攻撃_判定の半径"), 0.12f, 0.01f, 1.0f) * GetScale().y;
 
+	// 振っている側の腕に付ける。アニメと判定が左右で食い違うと、
+	// 「当たっていないのに食らう」という一番たちの悪い状態になる
+	const char* const* bones = m_swingRight ? kAttackArmBonesRight : kAttackArmBonesLeft;
+
 	Math::Vector3 prev{};
 	bool hasPrev = false;
 
 	for (int i = 0; i < kAttackArmBoneCount; ++i)
 	{
 		Math::Vector3 p{};
-		if (!GetBoneWorldPos(kAttackArmBones[i], p)) { continue; }
+		if (!GetBoneWorldPos(bones[i], p)) { continue; }
 
 		// 骨と骨の間を埋める(隙間があると腕の途中が素通りする)
 		if (hasPrev)
@@ -851,32 +877,54 @@ bool Enemy::ResolveAttackHit(const std::shared_ptr<KdGameObject>& _target)
 	BuildAttackSpheres(spheres);
 	if (spheres.empty()) { return false; }
 
-	// --- すり抜けの検知 ---
-	// 【なぜ測るか】1フレームの手の移動量が球の半径を超えると、間にいたプレイヤーを
-	//   飛び越す。超えているなら経路に球を刻む必要がある(CharaBase::ResolveBumpSweepと同じ手)。
-	//   推測せず数字で判断できるよう、毎フレーム出しておく
-	const Math::Vector3& handPos = spheres.back().first;
-	if (m_hasPrevHandPos)
-	{
-		const float travel = (handPos - m_prevHandPos).Length();
-		DebugWatch::Instance().Watch(U8("敵/攻撃_手の1フレーム移動量"), travel);
-		DebugWatch::Instance().Watch(U8("敵/攻撃_判定球の半径"),       spheres.back().second);
-	}
-	m_prevHandPos    = handPos;
-	m_hasPrevHandPos = true;
-
 	// --- プレイヤーを包む球 ---
 	// 足元が原点なので、胴のあたりへ持ち上げてから当てる
 	const float bodyHeight = DebugParams::Instance().Float(U8("敵/攻撃_プレイヤーの高さ"), 1.0f, 0.0f, 3.0f);
 	const float bodyRadius = DebugParams::Instance().Float(U8("敵/攻撃_プレイヤーの半径"), 0.6f, 0.1f, 3.0f);
 	const Math::Vector3 targetCenter = _target->GetPos() + Math::Vector3::Up * bodyHeight;
 
-	for (const std::pair<Math::Vector3, float>& sphere : spheres)
+	// --- 前フレームからの掃引 ---
+	// 🔴【実測で必要と確定した】振り下ろしの最速時、手は1フレームで【9.48m】動く。
+	//   判定球(1.58m)＋プレイヤー(0.6m)＝2.18m しか無いので、その場の位置だけを見ると
+	//   間にいたプレイヤーを飛び越す。前フレームとの間に球を刻んで埋める
+	//   (CharaBase::ResolveBumpSweep が壁のすり抜けで使っているのと同じ手)。
+	//   刻む数は移動量÷半径で決める＝速いときだけ細かくなり、遅いときは1回で済む
+	int steps = 1;
+	if (m_hasPrevSpheres && m_prevSpheres.size() == spheres.size())
 	{
-		const float reach = sphere.second + bodyRadius;
-		if ((sphere.first - targetCenter).LengthSquared() > reach * reach) { continue; }
+		float maxTravel = 0.0f;
+		for (size_t i = 0; i < spheres.size(); ++i)
+		{
+			maxTravel = std::max(maxTravel, (spheres[i].first - m_prevSpheres[i].first).Length());
+		}
 
-		// --- 命中 ---
+		const float radius = spheres.front().second;
+		if (radius > 1e-4f)
+		{
+			steps = std::clamp(static_cast<int>(std::ceil(maxTravel / radius)), 1, kMaxSweepSteps);
+		}
+
+		DebugWatch::Instance().Watch(U8("敵/攻撃_手の1フレーム移動量"), maxTravel);
+		DebugWatch::Instance().Watch(U8("敵/攻撃_判定球の半径"),       radius);
+		DebugWatch::Instance().Watch(U8("敵/攻撃_掃引の刻み数"),       steps);
+	}
+
+	for (int s = 0; s < steps; ++s)
+	{
+		// s=0 が前フレーム寄り、s=steps-1 が今フレーム。1回だけなら今の位置になる
+		const float t = (steps <= 1) ? 1.0f
+			: static_cast<float>(s + 1) / static_cast<float>(steps);
+
+		for (size_t i = 0; i < spheres.size(); ++i)
+		{
+			const Math::Vector3 center = (steps <= 1 || !m_hasPrevSpheres)
+				? spheres[i].first
+				: Math::Vector3::Lerp(m_prevSpheres[i].first, spheres[i].first, t);
+
+			const float reach = spheres[i].second + bodyRadius;
+			if ((center - targetCenter).LengthSquared() > reach * reach) { continue; }
+
+			// --- 命中 ---
 		// この振りではもう当てない(球は数フレーム重なり続けるので、
 		// これが無いと1回の振りで何度もノックバックする)
 		m_hitDoneThisSwing = true;
@@ -892,14 +940,18 @@ bool Enemy::ResolveAttackHit(const std::shared_ptr<KdGameObject>& _target)
 		}
 		else
 		{
-			// 無防備で被弾 → 外向きにノックバック(HPは無い＝勢いを崩すだけ)
-			const Math::Vector3 knockDir = _target->GetPos() - GetPos();
-			const float power = DebugParams::Instance().Float(U8("敵/ノックバック力"), 8.0f, 0.0f, 40.0f);
-			pPlayer->ApplyKnockback(knockDir, power);
+				// 無防備で被弾 → 外向きにノックバック(HPは無い＝勢いを崩すだけ)
+				const Math::Vector3 knockDir = _target->GetPos() - GetPos();
+				const float power = DebugParams::Instance().Float(U8("敵/ノックバック力"), 8.0f, 0.0f, 40.0f);
+				pPlayer->ApplyKnockback(knockDir, power);
+			}
+			return true;
 		}
-		return true;
 	}
 
+	// 次のフレームの掃引に使うので、今の位置を覚えておく
+	m_prevSpheres    = spheres;
+	m_hasPrevSpheres = true;
 	return false;
 }
 
@@ -926,19 +978,34 @@ void Enemy::DrawAttackDebug()
 std::string Enemy::SelectAnimation() const
 {
 	// 倒れている間は「倒れる」を1回だけ流し、最終フレームのポーズで留まる
-	// (SelectAnimationLoopがfalseを返すため)。これがそのままダウン中の待機になる。
-	// ※ kFallAnimNameはまだモデルに入っていないので、今は見つからず歩行のまま流れ続ける
+	// (SelectAnimationLoopがfalseを返すため)。これがそのままダウン中の待機になる
 	if (m_state == State::Down) { return kFallAnimName; }
 
-	// 持っているアニメが歩行1本だけなので、どの状態でもこれを流し、違いは再生速度で付ける。
-	// 攻撃・被弾が揃ったら、ここを状態で分岐させる(Player::SelectAnimationと同じ形)
+	// 攻撃の3状態はまとめて振り下ろし1本で流す。
+	// 【なぜ状態ごとに分けないか】素材が「振りかぶり→振り下ろし→戻り」で1本に
+	//   繋がっているため。状態ごとに切ると、切り替わりのたびに先頭へ巻き戻る
+	if (m_state == State::Windup || m_state == State::Strike || m_state == State::Recover)
+	{
+		return m_swingRight ? kSlamRightAnimName : kSlamLeftAnimName;
+	}
+
+	// 止まっているときは待機。
+	// 【なぜ要るか】待機が無かった頃は歩行を遅回ししていたので、間合いで止まっても
+	//   「その場で歩いている」ように見えていた(再生倍率をどう詰めても直らない)
+	if (m_currentMoveSpeed <= 0.0f) { return kIdleAnimName; }
+
 	return kWalkAnimName;
 }
 
 bool Enemy::SelectAnimationLoop() const
 {
-	// 「倒れる」だけはループさせない。最後のフレームで止まり、その姿勢のまま留まる
-	return m_currentAnimName != kFallAnimName;
+	// 1回きりで最後のポーズに留まるもの：倒れる／振り下ろし
+	// (振り下ろしはループさせると、硬直中に2回目の振りが始まってしまう)
+	if (m_currentAnimName == kFallAnimName)      { return false; }
+	if (m_currentAnimName == kSlamRightAnimName) { return false; }
+	if (m_currentAnimName == kSlamLeftAnimName)  { return false; }
+
+	return true;
 }
 
 float Enemy::SelectAnimationBlendTime() const
@@ -968,9 +1035,9 @@ float Enemy::SelectAnimationSpeed() const
 	//   ので、速度0で呼び続ければ姿勢はそのまま保たれる
 	if (IsFrozenForDebug()) { return 0.0f; }
 
-	// 倒れるモーションは等速で流す。
-	// 以下の「足を滑らせない倍率」は歩行クリップ前提の計算なので、倒れる動きには意味が無い
-	if (m_state == State::Down) { return 1.0f; }
+	// 以下の「足を滑らせない倍率」は歩行クリップ前提の計算なので、
+	// 歩行以外(倒れる／振り下ろす／待機)には意味が無い。等速で流す
+	if (m_currentAnimName != kWalkAnimName) { return 1.0f; }
 
 	// 【足を滑らせないための計算】
 	// この歩行はその場歩き(腰の水平移動が±0.14mしかない=ルートモーション無し)なので、
