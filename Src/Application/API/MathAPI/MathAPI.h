@@ -165,6 +165,20 @@ namespace MathAPI
 		return DirectX::XMConvertToDegrees(std::atan2(s * _dir.x, s * _dir.z));
 	}
 
+	// 上の逆。Y軸回転の角度(度)から、そのオブジェクトが向いている水平方向を求める
+	//
+	// 【なぜ用意するか】行列から向きを取ろうとすると Forward()/Backward() の符号で必ず迷う
+	//   (SimpleMathのForward()は右手系前提で -Z を返すが、このエンジンは左手系)。
+	//   DirToYawDeg と対で持っておけば、往復しても必ず一致する
+	//   ＝ DirToYawDeg(YawDegToDir(y, f), f) == y
+	inline Math::Vector3 YawDegToDir(float _yawDeg, bool _forwardIsMinusZ = false)
+	{
+		const float s   = _forwardIsMinusZ ? -1.0f : 1.0f;
+		const float rad = DirectX::XMConvertToRadians(_yawDeg);
+
+		return Math::Vector3(s * std::sin(rad), 0.0f, s * std::cos(rad));
+	}
+
 	//------------------------------------------------
 	// 面に対する分解
 	//------------------------------------------------
