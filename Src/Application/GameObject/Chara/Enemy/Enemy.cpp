@@ -8,6 +8,11 @@
 #include "../../../Debug/DebugFlags/DebugFlags.h"
 #include "../../Debris/DebrisSystem.h"   // 関節が壊れたとき、その部位を落とすため
 
+// 本体(部位を切り出した残り)のメッシュノード名。全身破砕でここを消す。
+// 分割ツールの設定(Cloude\Project\3DGame\GltfPartExtract\StoneGolem.parts.json の
+// bodyNodeName)と揃えること
+static constexpr const char* kBodyNodeName = "Body";
+
 // 関節表。狙えるのはこの5つだけ。
 // 骨の対応はMixamoリグの作りに沿っている(この経路のモデルなら他でもそのまま使える)：
 //   肘 = ForeArm の根元／膝 = Leg の根元／首 = Neck。いずれも「その関節から先」を配下に持つ
@@ -104,11 +109,11 @@ void Enemy::UpdateBrokenJoints()
 		SpawnGib(i);
 		m_gibSpawned[i] = true;
 
-		HidePartNode(kJointDefs[i].partNode);
+		HideMeshNode(kJointDefs[i].partNode);
 	}
 }
 
-void Enemy::HidePartNode(const char* _nodeName)
+void Enemy::HideMeshNode(const char* _nodeName)
 {
 	if (!_nodeName) { return; }
 
@@ -128,25 +133,27 @@ void Enemy::HidePartNode(const char* _nodeName)
 	}
 }
 
+std::shared_ptr<DebrisSystem> Enemy::FindDebrisSystem()
+{
+	std::shared_ptr<DebrisSystem> spDebris = m_wpDebrisSystem.lock();
+	if (spDebris) { return spDebris; }
+
+	for (const std::shared_ptr<KdGameObject>& spObj : SceneManager::Instance().GetObjList())
+	{
+		spDebris = std::dynamic_pointer_cast<DebrisSystem>(spObj);
+		if (spDebris) { break; }
+	}
+
+	m_wpDebrisSystem = spDebris;
+	return spDebris;
+}
+
 void Enemy::SpawnGib(int _index)
 {
 	if (_index < 0 || _index >= kJointCount) { return; }
 
-	// --- 破片を出す先を見つける(初回だけ探してキャッシュ) ---
-	// ※ Init()ではなくここで探すのは、Playerを探すのと同じ理由。
-	//   Init()の時点ではシーンの構築が終わっていない
-	std::shared_ptr<DebrisSystem> spDebris = m_wpDebrisSystem.lock();
-	if (!spDebris)
-	{
-		for (const std::shared_ptr<KdGameObject>& spObj : SceneManager::Instance().GetObjList())
-		{
-			spDebris = std::dynamic_pointer_cast<DebrisSystem>(spObj);
-			if (spDebris) { break; }
-		}
-		if (!spDebris) { return; }
-
-		m_wpDebrisSystem = spDebris;
-	}
+	std::shared_ptr<DebrisSystem> spDebris = FindDebrisSystem();
+	if (!spDebris) { return; }
 
 	if (m_gibModelIds[_index] < 0)
 	{
@@ -349,7 +356,7 @@ void Enemy::ApplyBodyDamage(float _damage)
 	m_hp = 0.0f;
 
 	// 【2026-08-04】その場で消えるのをやめ、まず倒れるようにした。
-	// 最終形は「倒れ切った瞬間に全身破砕へ移す」で、消滅はそのあとになる
+	// 【2026-08-05】倒れ切ったあと Shatter() で砕け、そこで初めて消える
 	EnterDown(true);
 }
 
@@ -363,7 +370,7 @@ void Enemy::EnterDown(bool _isDead)
 		if (_isDead && !m_isDead)
 		{
 			m_isDead = true;
-			m_downTimer = GetDownDisappearTime();
+			m_downTimer = GetShatterDelayTime();
 		}
 		return;
 	}
@@ -371,7 +378,7 @@ void Enemy::EnterDown(bool _isDead)
 	m_state = State::Down;
 
 	m_isDead = _isDead;
-	m_downTimer = GetDownDisappearTime();
+	m_downTimer = GetShatterDelayTime();
 
 	// 倒れた体が水平の勢いを持ったまま滑っていかないように消す
 	m_velocity.x = 0.0f;
@@ -388,15 +395,14 @@ void Enemy::UpdateDown(float _dt)
 	if (!IsFallFinished()) { return; }
 
 	// --- 死んで倒れた場合 ---
-	// 【仮の実装】本来はここで全身破砕へ移す。破砕が未実装なので、死体が残り続けないよう
-	//   時間で消しておく。破砕を入れるときにこの分岐を差し替える
+	// 倒れ伏した姿を少しだけ見せてから砕く(0にすれば倒れ終わった瞬間に砕ける)
 	if (m_isDead)
 	{
 		m_downTimer -= _dt;
 
 		if (m_downTimer <= 0.0f)
 		{
-			m_isExpired = true;
+			Shatter();
 		}
 		return;
 	}
@@ -436,11 +442,60 @@ bool Enemy::IsFallFinished() const
 	return m_animator.IsAnimationEnd();
 }
 
-float Enemy::GetDownDisappearTime() const
+float Enemy::GetShatterDelayTime() const
 {
-	// 倒れ切ってから数え始める(倒れ始めからではない)。
-	// 【仮】全身破砕を入れたら「倒れ切った瞬間に砕く」へ差し替わる
-	return DebugParams::Instance().Float(U8("敵/死亡から消えるまでの秒数"), 3.0f, 0.5f, 10.0f);
+	// 倒れ切ってから数え始める(倒れ始めからではない)
+	return DebugParams::Instance().Float(U8("敵/倒れてから砕けるまでの秒数"), 1.0f, 0.0f, 10.0f);
+}
+
+void Enemy::Shatter()
+{
+	if (m_shattered) { return; }
+	m_shattered = true;
+
+	// --- ① まだ体に付いている部位を、部位破壊とまったく同じやり方で落とす ---
+	// 既に壊れている部位は m_gibSpawned が立っているので二重には落ちない。
+	// 【なぜ本体と分けるか】部位はモデルが既に「閉じたメッシュ」に分かれていて、
+	//   落とす仕組みも実機で動いている。砕く対象を本体だけに絞れるので、
+	//   壊した脚が破片として復活する心配も原理的に無くなる
+	for (int i = 0; i < kJointCount; ++i)
+	{
+		if (m_gibSpawned[i]) { continue; }
+
+		SpawnGib(i);
+		m_gibSpawned[i] = true;
+
+		HideMeshNode(kJointDefs[i].partNode);
+	}
+
+	// --- ② 本体を消す ---
+	HideMeshNode(kBodyNodeName);
+
+	// --- ③ 本体の破片を出す ---
+	std::shared_ptr<DebrisSystem> spDebris = FindDebrisSystem();
+	if (spDebris)
+	{
+		// 【5-Aの仮実装】本物の破片モデルがまだ無いので、既存のgibを数だけ揃えて撒く。
+		//   狙いは見た目ではなく【生成コストの実測】。本番と同じ SpawnDebrisConvex を
+		//   同じ個数だけ通るので、ここが詰まるかどうかをアセットを作る前に判定できる。
+		//   破片モデルができたら、この1呼び出しが Frag_00〜29 の生成に置き換わる
+		const int count = DebugParams::Instance().Int(U8("破片/全身破砕の数"), 30, 1, 120);
+
+		const int modelId = spDebris->RegisterModel(kJointDefs[0].gibModel);
+
+		// 撒く中心は腰の骨。倒れた姿勢では原点(足元)から体が離れているので、
+		// GetPos()を使うと足元にだけ湧いて不自然になる
+		Math::Vector3 center;
+		if (!GetBoneWorldPos("mixamorig:Hips", center)) { center = GetPos(); }
+
+		// 身長25mに対して既定の散らばり(1.5m)では1点に固まって押し合うので、別のキーにする
+		const float spread = DebugParams::Instance().Float(U8("破片/全身破砕の散らばり"), 6.0f, 0.0f, 30.0f);
+
+		spDebris->SpawnBurstOfModel(modelId, center, GetScale(), spread, count);
+	}
+
+	// 破片へ引き継いだので本体は退場する
+	m_isExpired = true;
 }
 
 void Enemy::Update()
@@ -458,20 +513,29 @@ void Enemy::Update()
 		}
 	}
 
-	// 【確認用】動いていると関節の球を見比べられないので、その場に固定できるようにする。
-	// AIと移動だけを止め、接地(PostUpdateのGroundCheck)は生かして立たせたままにする。
-	// ※ アニメはSelectAnimationSpeedが0を返して凍る。呼ぶのをやめてはいけない → そちらのコメント
-	if (IsFrozenForDebug()) { return; }
+	// 【確認用】F4で即死させる。倒れ方と全身破砕を何度も見比べるための入口。
+	// 通常の経路(ロックオン→突撃→命中)は手順が長く、見た目の詰めに向かないため
+	if (KdInputManager::Instance().IsPress("KillEnemy"))
+	{
+		ApplyBodyDamage(m_hp);
+	}
 
 	const float dt = Application::Instance().GetDeltaTime();
 
-	// 倒れている間は追従も攻撃もしない。向き直りと消滅の管理だけ行う。
-	// ※ 対象を見失っていても消滅までは進めたいので、targetの取得より【前】に置く
+	// 倒れている間は追従も攻撃もしない。向き直りと破砕の管理だけ行う。
+	// ※ 対象を見失っていても破砕までは進めたいので、targetの取得より【前】に置く
+	// ※ 凍結(下)より【前】に置く。「動きを止める」はAIと移動を止めるための旗であって、
+	//   倒れ切る・砕けるまで進まなくなるのは意図ではない(F4で確認するときに詰まる)
 	if (m_state == State::Down)
 	{
 		UpdateDown(dt);
 		return;
 	}
+
+	// 【確認用】動いていると関節の球を見比べられないので、その場に固定できるようにする。
+	// AIと移動だけを止め、接地(PostUpdateのGroundCheck)は生かして立たせたままにする。
+	// ※ アニメはSelectAnimationSpeedが0を返して凍る。呼ぶのをやめてはいけない → そちらのコメント
+	if (IsFrozenForDebug()) { return; }
 
 	std::shared_ptr<KdGameObject> spTarget = m_wpTarget.lock();
 	if (!spTarget) { return; }
@@ -547,7 +611,11 @@ float Enemy::SelectAnimationBlendTime() const
 
 bool Enemy::IsFrozenForDebug() const
 {
-	return DebugFlags::Instance().Get(U8("敵/動きを止める"), true);
+	// 【既定はfalseに戻すこと】DebugFlagsには保存/読込が無いので、ここの既定値が
+	// そのまま毎回の値になる。trueのままだと敵が起動のたびに止まった状態で始まり、
+	// 倒れる→砕けるまで進まない(Update側でこの判定より後ろにあるため)。
+	// 部位破壊の見比べで一時的にtrueにしていたぶんを戻した(2026-08-05)
+	return DebugFlags::Instance().Get(U8("敵/動きを止める"), false);
 }
 
 float Enemy::SelectAnimationSpeed() const

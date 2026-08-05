@@ -42,10 +42,20 @@ public:
 	// 立方体の破片を _center のまわりに _count 個ばら撒く(見た目の調整用)
 	void SpawnBurst(const Math::Vector3& _center, int _count);
 
+	// 登録済みモデルの破片を _center のまわりに _count 個ばら撒く。
+	// _scale … モデルに掛ける拡大(gibは骨ローカル＝モデル座標で作ってあるので、
+	//           身長25mのゴーレムに合わせるならキャラの拡大を渡す)
+	// _spread … ばら撒く範囲(m)。キャラが大きいほど広げないと1点に固まって弾け飛ぶ
+	void SpawnBurstOfModel(int _modelId, const Math::Vector3& _center,
+		const Math::Vector3& _scale, float _spread, int _count);
+
 private:
 
 	// 生きている破片を消す(シーン終了時など)
 	void ClearAll();
+
+	// 生成コストと破片の数をDebugWatchへ出す(Updateの末尾で毎フレーム呼ぶ)
+	void UpdateSpawnCostWatch();
 
 	// 破片1つぶん
 	struct Debris
@@ -76,4 +86,15 @@ private:
 
 	// 立方体(調整用)のモデルID。Init()で登録する
 	int m_testCubeId = -1;
+
+	//----------------------------------------
+	// 生成コストの計測(全身破砕で30個を1フレームに出すため)
+	//----------------------------------------
+	// 【なぜ測るか】PhysicsWorld::SpawnDebrisConvex は破片1個ごとに
+	//   全頂点の走査→間引き→凸包の構築をやり直している。部位gibの5個なら問題にならないが、
+	//   全身破砕で数十個を同じフレームに出すと引っかかる可能性がある。
+	//   アセットを作る前に実測しておき、要るならモデル登録時のキャッシュへ変える
+	float m_spawnCostThisFrame = 0.0f;	// このフレームで生成に使った合計(ミリ秒)
+	float m_lastBurstCost      = 0.0f;	// 直近「生成があったフレーム」の合計(ミリ秒)
+	int   m_lastBurstCount     = 0;		// そのフレームで出した個数
 };

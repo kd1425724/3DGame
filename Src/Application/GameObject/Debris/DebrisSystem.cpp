@@ -2,7 +2,11 @@
 
 #include "../../Physics/PhysicsWorld.h"
 #include "../../Debug/DebugParams/DebugParams.h"
+#include "../../Debug/DebugWatch/DebugWatch.h"
 #include "../../main.h"
+
+// 生成コストの計測用。Pch.hには入っていないのでここで読む
+#include <chrono>
 
 namespace
 {
@@ -93,8 +97,15 @@ void DebrisSystem::SpawnPiece(int _modelId, const Math::Matrix& _world,
 	Group& group = m_groups[_modelId];
 	if (!group.m_spModelWork) { return; }
 
+	// 【計測】凸包の構築は破片1個ごとに走るので、ここが全身破砕の負荷そのものになる
+	const std::chrono::steady_clock::time_point spawnBegin = std::chrono::steady_clock::now();
+
 	const uint32_t id = PhysicsWorld::Instance().SpawnDebrisConvex(
 		*group.m_spModelWork, _world, _velocity, _angularVelocity);
+
+	const std::chrono::duration<float, std::milli> spawnElapsed =
+		std::chrono::steady_clock::now() - spawnBegin;
+	m_spawnCostThisFrame += spawnElapsed.count();
 
 	if (id == PhysicsWorld::kInvalidBodyId) { return; }
 
@@ -116,26 +127,33 @@ void DebrisSystem::SpawnPiece(int _modelId, const Math::Matrix& _world,
 
 void DebrisSystem::SpawnBurst(const Math::Vector3& _center, int _count)
 {
-	if (m_testCubeId < 0) { return; }
-
 	const float size   = DebugParams::Instance().Float(U8("破片/大きさ"),   1.0f, 0.1f, 5.0f);
 	const float spread = DebugParams::Instance().Float(U8("破片/散らばり"), 1.5f, 0.0f, 10.0f);
-	const float speed  = GetDebrisSpeed();
-	const float spin   = GetDebrisSpin();
+
+	SpawnBurstOfModel(m_testCubeId, _center, Math::Vector3(size), spread, _count);
+}
+
+void DebrisSystem::SpawnBurstOfModel(int _modelId, const Math::Vector3& _center,
+	const Math::Vector3& _scale, float _spread, int _count)
+{
+	if (_modelId < 0) { return; }
+
+	const float speed = GetDebrisSpeed();
+	const float spin  = GetDebrisSpin();
 
 	for (int i = 0; i < _count; ++i)
 	{
 		// 同じ場所に重ねて生むと押し合って弾け飛ぶので、少しずらして置く
 		const Math::Vector3 offset(
-			RandomRange(-spread, spread),
-			RandomRange(-spread, spread),
-			RandomRange(-spread, spread));
+			RandomRange(-_spread, _spread),
+			RandomRange(-_spread, _spread),
+			RandomRange(-_spread, _spread));
 
 		const Math::Matrix world =
-			Math::Matrix::CreateScale(size) *
+			Math::Matrix::CreateScale(_scale) *
 			Math::Matrix::CreateTranslation(_center + offset);
 
-		SpawnPiece(m_testCubeId, world,
+		SpawnPiece(_modelId, world,
 			RandomBurstDirection() * RandomRange(speed * 0.5f, speed),
 			RandomSpin(spin));
 	}
@@ -186,6 +204,31 @@ void DebrisSystem::Update()
 			group.m_debris.pop_back();
 		}
 	}
+
+	UpdateSpawnCostWatch();
+}
+
+void DebrisSystem::UpdateSpawnCostWatch()
+{
+	int aliveCount = 0;
+	for (const Group& group : m_groups)
+	{
+		aliveCount += static_cast<int>(group.m_debris.size());
+	}
+
+	// 【なぜ持ち越すか】DebugWatchは毎フレーム書かれなかった項目を消すので、
+	//   一瞬で終わる破砕の値をその場で出しても次のフレームには消えて読めない。
+	//   「生成があったフレーム」の値を覚えておき、毎フレーム出し直す
+	if (m_spawnCostThisFrame > 0.0f)
+	{
+		m_lastBurstCost      = m_spawnCostThisFrame;
+		m_lastBurstCount     = aliveCount;
+		m_spawnCostThisFrame = 0.0f;
+	}
+
+	DebugWatch::Instance().Watch(U8("破片/生きている数"),           aliveCount);
+	DebugWatch::Instance().Watch(U8("破片/直近の生成コスト(ms)"),   m_lastBurstCost);
+	DebugWatch::Instance().Watch(U8("破片/その時に出ていた数"),     m_lastBurstCount);
 }
 
 void DebrisSystem::PreDraw()
