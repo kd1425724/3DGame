@@ -7,11 +7,21 @@
 #include "../../../Debug/DebugDraw/DebugDraw.h"
 #include "../../../Debug/DebugFlags/DebugFlags.h"
 #include "../../Debris/DebrisSystem.h"   // 関節が壊れたとき、その部位を落とすため
+#include "../../../Utility/JsonManager.h"   // 全身破砕の破片の表(fragments.json)を読むため
 
 // 本体(部位を切り出した残り)のメッシュノード名。全身破砕でここを消す。
 // 分割ツールの設定(Cloude\Project\3DGame\GltfPartExtract\StoneGolem.parts.json の
 // bodyNodeName)と揃えること
 static constexpr const char* kBodyNodeName = "Body";
+
+// 腰の骨。破片を外向きに散らすときの「体の中心」に使う
+static constexpr const char* kHipsBoneName = "mixamorig:Hips";
+
+// 全身破砕の破片の表と置き場所。破砕ツール(Cloude\GltfFracture)の出力。
+// 【コードに焼かない理由】破片の数も骨の割り当てもツールの出力で決まるので、
+// 表を読む形にしておかないと、流し直すたびに手で書き換えることになる
+static constexpr const char* kFragmentDir       = "Asset/Models/Character/StoneGolem/";
+static constexpr const char* kFragmentTablePath = "Asset/Models/Character/StoneGolem/fragments.json";
 
 // 関節表。狙えるのはこの5つだけ。
 // 骨の対応はMixamoリグの作りに沿っている(この経路のモデルなら他でもそのまま使える)：
@@ -148,6 +158,36 @@ std::shared_ptr<DebrisSystem> Enemy::FindDebrisSystem()
 	return spDebris;
 }
 
+bool Enemy::LoadFragmentTable()
+{
+	nlohmann::json json;
+	if (!JsonManager::Instance().Read(kFragmentTablePath, json)) { return false; }
+
+	m_fragments.clear();
+
+	try
+	{
+		for (const nlohmann::json& item : json)
+		{
+			if (!item.contains("name")) { continue; }
+			if (!item.contains("bone")) { continue; }
+
+			FragmentDef def;
+			def.modelPath = std::string(kFragmentDir) + item["name"].get<std::string>() + ".gltf";
+			def.bone      = item["bone"].get<std::string>();
+			m_fragments.push_back(def);
+		}
+	}
+	catch (const nlohmann::json::exception&)
+	{
+		// 壊れていたら破砕なしで通す。ここで落とすとゲームが起動しなくなる
+		m_fragments.clear();
+		return false;
+	}
+
+	return !m_fragments.empty();
+}
+
 void Enemy::PreloadDebrisModels()
 {
 	if (m_debrisPreloaded) { return; }
@@ -159,11 +199,22 @@ void Enemy::PreloadDebrisModels()
 
 	// 【なぜ先に登録するか】RegisterModelはモデルの読み込みと凸包の構築を伴う。
 	//   壊れた瞬間に初めて登録すると、その1フレームに全部の costが乗る。
-	//   全身破砕では30個ぶんが同時に来るので、実測でDebug 140msかかった。
+	//   実測でDebug 140msかかった(1フレーム16.6msの約8.4倍)。
 	//   ここで払っておけば、出す瞬間はボディを作るだけになる
 	for (int i = 0; i < kJointCount; ++i)
 	{
 		m_gibModelIds[i] = spDebris->RegisterModel(kJointDefs[i].gibModel);
+	}
+
+	// 全身破砕の破片も同じ理由で先に登録する。
+	// 🔴 こちらは30種類が【全部違うモデル】なので、キャッシュでは初回に間に合わない。
+	//   ここで払うことに意味がある(gibは5種類なので影響が小さかった)
+	if (LoadFragmentTable())
+	{
+		for (FragmentDef& frag : m_fragments)
+		{
+			frag.modelId = spDebris->RegisterModel(frag.modelPath);
+		}
 	}
 }
 
@@ -494,23 +545,41 @@ void Enemy::Shatter()
 	std::shared_ptr<DebrisSystem> spDebris = FindDebrisSystem();
 	if (spDebris)
 	{
-		// 【5-Aの仮実装】本物の破片モデルがまだ無いので、既存のgibを数だけ揃えて撒く。
-		//   狙いは見た目ではなく【生成コストの実測】。本番と同じ SpawnDebrisConvex を
-		//   同じ個数だけ通るので、ここが詰まるかどうかをアセットを作る前に判定できる。
-		//   破片モデルができたら、この1呼び出しが Frag_00〜29 の生成に置き換わる
-		const int count = DebugParams::Instance().Int(U8("破片/全身破砕の数"), 30, 1, 120);
+		// 破片は「支配ボーンのローカル空間」へ焼き込んであるので、その骨の姿勢を
+		// 渡すだけで、砕ける直前とまったく同じ位置・向き・大きさで出る。
+		// gibと同じ仕組みで、粒度が5個から30個に上がっただけ
+		const float burst = DebugParams::Instance().Float(U8("破片/破砕の勢い"), 6.0f,  0.0f, 40.0f);
+		const float lift  = DebugParams::Instance().Float(U8("破片/破砕の浮き"), 2.0f,  0.0f, 20.0f);
+		const float spin  = DebugParams::Instance().Float(U8("破片/破砕の回転"), 3.0f,  0.0f, 20.0f);
 
-		const int modelId = spDebris->RegisterModel(kJointDefs[0].gibModel);
+		// 体の中心。ここから見て外向きに散らす
+		Math::Vector3 bodyCenter;
+		if (!GetBoneWorldPos(kHipsBoneName, bodyCenter)) { bodyCenter = GetPos(); }
 
-		// 撒く中心は腰の骨。倒れた姿勢では原点(足元)から体が離れているので、
-		// GetPos()を使うと足元にだけ湧いて不自然になる
-		Math::Vector3 center;
-		if (!GetBoneWorldPos("mixamorig:Hips", center)) { center = GetPos(); }
+		for (const FragmentDef& frag : m_fragments)
+		{
+			if (frag.modelId < 0) { continue; }
 
-		// 身長25mに対して既定の散らばり(1.5m)では1点に固まって押し合うので、別のキーにする
-		const float spread = DebugParams::Instance().Float(U8("破片/全身破砕の散らばり"), 6.0f, 0.0f, 30.0f);
+			const KdModelWork::Node* pNode = m_modelWork.FindWorkNode(frag.bone);
+			if (!pNode) { continue; }
 
-		spDebris->SpawnBurstOfModel(modelId, center, GetScale(), spread, count);
+			const Math::Matrix boneWorld = GetBoneWorldMatrix(*pNode);
+
+			// 【骨の位置で代用しない】同じ骨の破片が全部同じ向きへ飛んで束になる。
+			//   破片ごとの中心をワールドへ持っていって、そこから外向きを決める
+			const Math::Vector3 fragWorld =
+				Math::Vector3::Transform(spDebris->GetModelCenter(frag.modelId), boneWorld);
+
+			Math::Vector3 outward = fragWorld - bodyCenter;
+			if (!MathAPI::TryNormalize(outward)) { outward = Math::Vector3::Up; }
+
+			const Math::Vector3 velocity = outward * burst + Math::Vector3::Up * lift;
+
+			// 外向きと上向きの外積＝「外へ倒れ込む」向きの回転(乱数を使わずに自然に見せる)
+			const Math::Vector3 angularVelocity = outward.Cross(Math::Vector3::Up) * spin;
+
+			spDebris->SpawnPiece(frag.modelId, boneWorld, velocity, angularVelocity);
+		}
 	}
 
 	// 破片へ引き継いだので本体は退場する

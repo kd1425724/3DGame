@@ -34,6 +34,11 @@ public:
 	// 同じパスを2回渡しても同じIDを返す(読み込みは1回だけ)
 	int RegisterModel(const std::string& _modelPath);
 
+	// 登録済みモデルの頂点の中心(モデル座標)。
+	// 【何に使うか】全身破砕で破片を外向きに散らすとき、その破片が体のどのあたりに
+	//   あるかが要る。骨の位置で代用すると、同じ骨の破片が全部同じ向きへ飛んで束になる
+	Math::Vector3 GetModelCenter(int _modelId) const;
+
 	// 登録済みモデルの破片を1つ、指定の姿勢で出す。
 	// _world は拡大が入っていてよい(敵は等倍でないため)
 	void SpawnPiece(int _modelId, const Math::Matrix& _world,
@@ -57,6 +62,9 @@ private:
 	// 生成コストと破片の数をDebugWatchへ出す(Updateの末尾で毎フレーム呼ぶ)
 	void UpdateSpawnCostWatch();
 
+	// モデルの頂点の中心(モデル座標)を求める。登録時に1回だけ呼ぶ
+	static Math::Vector3 CalcModelCenter(const KdModelWork& _model);
+
 	// 破片1つぶん
 	struct Debris
 	{
@@ -77,6 +85,9 @@ private:
 		std::string						m_modelPath;
 		std::shared_ptr<KdModelWork>	m_spModelWork;
 		std::vector<Debris>				m_debris;
+
+		// 頂点の中心(モデル座標)。登録時に1回だけ求める
+		Math::Vector3					m_center = Math::Vector3::Zero;
 
 		// 描画のたびに作り直すワールド行列の配列(毎回確保しないよう持ち回す)
 		std::vector<Math::Matrix>		m_drawMatrices;
