@@ -46,6 +46,9 @@ static constexpr const char* kSlamLeftAnimName  = "slamL";
 // 待機アニメ。無いと止まったとき歩行を遅回しすることになり「歩いて見える」
 static constexpr const char* kIdleAnimName = "idle";
 
+// 被弾リアクション。素材は4.58秒あるが、頭から数フレームだけ見せて切り上げる
+static constexpr const char* kHitAnimName = "hit";
+
 // 掃引で刻む球の上限。増やすほど確実だが重くなる
 static constexpr int kMaxSweepSteps = 16;
 
@@ -467,9 +470,26 @@ float Enemy::GetAttackPower()
 	return DebugParams::Instance().Float(U8("プレイヤー/攻撃力"), 34.0f, 1.0f, 200.0f);
 }
 
+void Enemy::NotifyHitReaction()
+{
+	// 倒れている間は怯まない(倒れるモーションが上書きされてしまう)
+	if (m_state == State::Down) { return; }
+
+	// 🔴 攻撃中は怯ませない（ハイパーアーマー）。
+	//   振りかぶり〜硬直の間に怯むと、プレイヤーが殴り続けるだけで敵が何もできなくなる
+	//   （はめ殺し）。大型の敵が攻撃中に怯まないのは、アクションゲームで広く使われる作り。
+	//   避ける・待つという読み合いを残すために要る
+	if (m_state != State::Chase) { return; }
+
+	m_hitReactTimer = DebugParams::Instance().Float(U8("敵/被弾リアクションの秒数"), 0.6f, 0.0f, 3.0f);
+}
+
 void Enemy::ApplyBodyDamage(float _damage)
 {
 	m_hp -= _damage;
+
+	NotifyHitReaction();
+
 	if (m_hp > 0.0f) { return; }
 
 	m_hp = 0.0f;
@@ -734,6 +754,13 @@ void Enemy::Update()
 		m_attackCooldown -= dt;
 	}
 
+	// --- 怯んでいる間は動かず、攻撃も始めない ---
+	if (m_hitReactTimer > 0.0f)
+	{
+		m_hitReactTimer -= dt;
+		return;
+	}
+
 	// --- 攻撃中は移動しない(突進ではないため) ---
 	switch (m_state)
 	{
@@ -989,6 +1016,9 @@ std::string Enemy::SelectAnimation() const
 		return m_swingRight ? kSlamRightAnimName : kSlamLeftAnimName;
 	}
 
+	// 被弾リアクション。攻撃中は怯まないので、ここへは Chase のときしか来ない
+	if (m_hitReactTimer > 0.0f) { return kHitAnimName; }
+
 	// 止まっているときは待機。
 	// 【なぜ要るか】待機が無かった頃は歩行を遅回ししていたので、間合いで止まっても
 	//   「その場で歩いている」ように見えていた(再生倍率をどう詰めても直らない)
@@ -1004,6 +1034,7 @@ bool Enemy::SelectAnimationLoop() const
 	if (m_currentAnimName == kFallAnimName)      { return false; }
 	if (m_currentAnimName == kSlamRightAnimName) { return false; }
 	if (m_currentAnimName == kSlamLeftAnimName)  { return false; }
+	if (m_currentAnimName == kHitAnimName)       { return false; }
 
 	return true;
 }
