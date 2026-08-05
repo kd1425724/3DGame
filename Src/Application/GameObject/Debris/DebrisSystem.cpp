@@ -312,14 +312,26 @@ void DebrisSystem::PreDraw()
 
 void DebrisSystem::DrawLit()
 {
+	// 【計測】破片が出ている間だけFPSが落ちる件の切り分け用。
+	// 物理側(破片/物理の更新)と並べて、どちらが効いているかを数字で決める
+	const std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+
+	int drawCalls = 0;
 	for (Group& group : m_groups)
 	{
 		if (group.m_drawMatrices.empty()) { continue; }
 		if (!group.m_spModelWork) { continue; }
 
-		// 同じモデルなので、何個あっても「マテリアル数ぶん」のドローで済む
+		// 【全身破砕では効きが薄い】30種類が1個ずつなので、まとめる相手がいない。
+		// 同じ形が何個も出る使い方(gibや調整用の立方体)でだけ効く
 		KdShaderManager::Instance().m_StandardShader.DrawModelInstanced(*group.m_spModelWork, group.m_drawMatrices);
+		++drawCalls;
 	}
+
+	const std::chrono::duration<float, std::milli> elapsed =
+		std::chrono::steady_clock::now() - begin;
+	DebugWatch::Instance().Watch(U8("破片/描画(ms)"),       elapsed.count());
+	DebugWatch::Instance().Watch(U8("破片/ドロー呼び出し"), drawCalls);
 }
 
 void DebrisSystem::GenerateDepthMapFromLight()
