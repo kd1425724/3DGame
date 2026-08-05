@@ -793,11 +793,42 @@ void Enemy::Update()
 		break;
 	}
 
+	// --- 正面からどれだけズレているか ---
+	const float yawToTarget = MathAPI::DirToYawDeg(dirToTarget, m_modelForwardIsMinusZ);
+	const float offAngle    = std::abs(MathAPI::DeltaAngleDeg(GetRot().y, yawToTarget));
+
+	// 正面とみなす角度。これより外なら「まだこちらを向いていない」
+	const float facingDeg =
+		DebugParams::Instance().Float(U8("敵/正面とみなす角度"), 25.0f, 5.0f, 90.0f);
+
 	// --- 追う ---
 	if (distXZ > stopDist)
 	{
 		m_currentMoveSpeed = GetMoveSpeed();
 		pos += dirToTarget * m_currentMoveSpeed * dt;
+		SetPos(pos);
+		return;
+	}
+
+	// --- 🔴 その場で回らず、歩いて回り込む ---
+	// 【なぜ】旋回だけで向きを変えると足が動かないので、ターンテーブルに乗って回って
+	//   いるように見える(待機アニメを入れたことで目立つようになった)。
+	//   前へ歩きながら旋回すると軌跡が弧を描き、足も動くので「重い体を踏み替えて
+	//   向き直っている」ように見える。大型の敵らしさにもなる。
+	//
+	// 【背後を取られることは設計上の正解】25mのゴーレムが素早く振り向けないからこそ、
+	//   ワイヤーで回り込む機動力に意味が出る。ここを速くすると立体機動の価値が薄れる
+	if (offAngle > facingDeg)
+	{
+		// 自分の正面へ進む(対象の方向ではない)。だから弧を描く。
+		// 行列から取らずYawから作るのは、Forward()/Backward()の符号で迷わないため
+		const Math::Vector3 forward = MathAPI::YawDegToDir(GetRot().y, m_modelForwardIsMinusZ);
+
+		const float arcRate =
+			DebugParams::Instance().Float(U8("敵/回り込みの歩く速さの割合"), 0.55f, 0.0f, 1.0f);
+
+		m_currentMoveSpeed = GetMoveSpeed() * arcRate;
+		pos += forward * m_currentMoveSpeed * dt;
 		SetPos(pos);
 		return;
 	}
