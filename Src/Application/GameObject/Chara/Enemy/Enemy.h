@@ -253,9 +253,15 @@ private:
 	// これが無いと1回の振りで何度もノックバックする
 	bool m_hitDoneThisSwing = false;
 
-	// 前フレームの手の位置(ワールド)。1フレームの移動量を測ってすり抜けを検知する
-	Math::Vector3 m_prevHandPos = Math::Vector3::Zero;
-	bool          m_hasPrevHandPos = false;
+	// 右腕で振るか(振るたびに入れ替える)。判定球もアニメもこれで左右を切り替える。
+	// 食い違うと「当たっていないのに食らう」という一番たちの悪い状態になる
+	bool m_swingRight = false;
+
+	// 前フレームの判定球。掃引(すり抜け防止)で「どこからどこへ動いたか」に使う。
+	// 🔴 振り下ろしの最速時、手は1フレームで9.48m動く。判定球1.58m＋プレイヤー0.6mでは
+	//   その場の位置だけ見ても間にいたプレイヤーを飛び越す(2026-08-05にアニメを実測)
+	std::vector<std::pair<Math::Vector3, float>> m_prevSpheres;
+	bool m_hasPrevSpheres = false;
 
 	// 攻撃の状態へ入る
 	void EnterWindup();
