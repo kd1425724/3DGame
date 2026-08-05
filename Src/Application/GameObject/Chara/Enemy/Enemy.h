@@ -159,6 +159,13 @@ public:
 	// 部位を指定しないダメージ。本体HPだけを削り、0で消滅する
 	void ApplyBodyDamage(float _damage);
 
+	// 敵が使う破片(gib5個 + 全身破砕30個)をまとめて読み込ませる。
+	// 🔴 シーン構築時に【1回だけ】呼ぶこと。
+	//   敵はスポナーで後から湧くので、敵の生成を待つと35モデルの読み込みと凸包構築が
+	//   【ゲーム中に】走る。実測でFPSが5まで落ちた(2026-08-05)。
+	//   読み込み画面のうちに払っておけば、湧いた敵は登録済みIDを引くだけで済む
+	static void PreloadDebrisAssets(DebrisSystem& _debris);
+
 private:
 
 	// ※ 移動速度・旋回速度・攻撃系の数値はDebugParams("敵/…")で調整する
@@ -212,8 +219,9 @@ private:
 	//   コードに焼くと、ツールを流し直すたびに手で書き換えることになり、必ず食い違う
 	std::vector<FragmentDef> m_fragments;
 
-	// 破片の表を読む。読めなければfalse(その場合は破砕せず、従来どおり消えるだけ)
-	bool LoadFragmentTable();
+	// 破片の表(fragments.json)を読む。読めなければfalse
+	// (その場合は破砕せず、従来どおり消えるだけ)
+	static bool ReadFragmentTable(std::vector<FragmentDef>& _out);
 
 	// 体の当たり半径(m)。追従を止める間合いの基準とデバッグ表示に使う。
 	// 【2026/07/29】KdColliderへの登録をやめたので、用途はこの2つだけになった。

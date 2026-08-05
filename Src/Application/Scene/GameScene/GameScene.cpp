@@ -117,6 +117,12 @@ void GameScene::Init()
 	spDebris->Init();
 	AddObject(spDebris);
 
+	// 🔴 敵が使う破片(gib5個 + 全身破砕30個)は【ここで】読み込ませる。
+	//   敵はEnemySpawnerで後から湧くので、敵の生成を待つと35モデルの読み込みと
+	//   凸包の構築がゲーム中に走り、その1フレームでFPSが5まで落ちる(2026-08-05に実測)。
+	//   読み込みのうちに払っておけば、湧いた敵は登録済みIDを引くだけで済む
+	Enemy::PreloadDebrisAssets(*spDebris);
+
 	// 当たり判定のbroadphaseを、このシーンの静的コリジョン(地面/建物)で作り直させる。
 	// (シーンを切り替えても前シーンの内容が残らないよう、シーン構築のたびにdirtyにする)
 	CollisionGrid::Instance().MarkDirty();

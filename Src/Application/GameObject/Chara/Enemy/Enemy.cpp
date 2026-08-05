@@ -158,12 +158,12 @@ std::shared_ptr<DebrisSystem> Enemy::FindDebrisSystem()
 	return spDebris;
 }
 
-bool Enemy::LoadFragmentTable()
+bool Enemy::ReadFragmentTable(std::vector<FragmentDef>& _out)
 {
 	nlohmann::json json;
 	if (!JsonManager::Instance().Read(kFragmentTablePath, json)) { return false; }
 
-	m_fragments.clear();
+	_out.clear();
 
 	try
 	{
@@ -175,17 +175,35 @@ bool Enemy::LoadFragmentTable()
 			FragmentDef def;
 			def.modelPath = std::string(kFragmentDir) + item["name"].get<std::string>() + ".gltf";
 			def.bone      = item["bone"].get<std::string>();
-			m_fragments.push_back(def);
+			_out.push_back(def);
 		}
 	}
 	catch (const nlohmann::json::exception&)
 	{
 		// 壊れていたら破砕なしで通す。ここで落とすとゲームが起動しなくなる
-		m_fragments.clear();
+		_out.clear();
 		return false;
 	}
 
-	return !m_fragments.empty();
+	return !_out.empty();
+}
+
+void Enemy::PreloadDebrisAssets(DebrisSystem& _debris)
+{
+	// gib(部位破壊で落ちる5個)
+	for (int i = 0; i < kJointCount; ++i)
+	{
+		_debris.RegisterModel(kJointDefs[i].gibModel);
+	}
+
+	// 全身破砕の破片(30個)
+	std::vector<FragmentDef> fragments;
+	if (!ReadFragmentTable(fragments)) { return; }
+
+	for (const FragmentDef& frag : fragments)
+	{
+		_debris.RegisterModel(frag.modelPath);
+	}
 }
 
 void Enemy::PreloadDebrisModels()
@@ -197,19 +215,18 @@ void Enemy::PreloadDebrisModels()
 
 	m_debrisPreloaded = true;
 
-	// 【なぜ先に登録するか】RegisterModelはモデルの読み込みと凸包の構築を伴う。
-	//   壊れた瞬間に初めて登録すると、その1フレームに全部の costが乗る。
-	//   実測でDebug 140msかかった(1フレーム16.6msの約8.4倍)。
-	//   ここで払っておけば、出す瞬間はボディを作るだけになる
+	// 【ここは重くない】実体の読み込みと凸包の構築は Enemy::PreloadDebrisAssets が
+	//   シーン構築時に済ませてある。RegisterModel は同じパスなら登録済みのIDを返すだけ。
+	//   ここでやっているのは「自分用にIDを控える」だけ。
+	//
+	// 🔴 ここで初めて登録する形にしてはいけない。敵はスポナーで後から湧くので、
+	//   35モデルの読み込みがゲーム中に走ってFPSが5まで落ちる(2026-08-05に実測)
 	for (int i = 0; i < kJointCount; ++i)
 	{
 		m_gibModelIds[i] = spDebris->RegisterModel(kJointDefs[i].gibModel);
 	}
 
-	// 全身破砕の破片も同じ理由で先に登録する。
-	// 🔴 こちらは30種類が【全部違うモデル】なので、キャッシュでは初回に間に合わない。
-	//   ここで払うことに意味がある(gibは5種類なので影響が小さかった)
-	if (LoadFragmentTable())
+	if (ReadFragmentTable(m_fragments))
 	{
 		for (FragmentDef& frag : m_fragments)
 		{
