@@ -8,6 +8,8 @@
 #include "../../../Debug/DebugFlags/DebugFlags.h"
 #include "../../Debris/DebrisSystem.h"   // 関節が壊れたとき、その部位を落とすため
 #include "../../../Utility/JsonManager.h"   // 全身破砕の破片の表(fragments.json)を読むため
+#include "../Player/Player.h"                // 攻撃が当たったとき反撃/ノックバックを通知するため
+#include "../../../Debug/DebugWatch/DebugWatch.h"   // すり抜けの検知(手の1フレーム移動量)
 
 // 本体(部位を切り出した残り)のメッシュノード名。全身破砕でここを消す。
 // 分割ツールの設定(Cloude\Project\3DGame\GltfPartExtract\StoneGolem.parts.json の
@@ -16,6 +18,20 @@ static constexpr const char* kBodyNodeName = "Body";
 
 // 腰の骨。破片を外向きに散らすときの「体の中心」に使う
 static constexpr const char* kHipsBoneName = "mixamorig:Hips";
+
+// 攻撃に使う腕の骨。肩から手へ向かって並べる。
+// 【なぜ複数か】手だけに判定を付けると、腕の中ほどに当たっても素通りする。
+//   骨と骨の間も補間して球を置くので、腕全体が一本の当たり判定になる
+static constexpr const char* kAttackArmBones[] =
+{
+	"mixamorig:RightArm",       // 上腕
+	"mixamorig:RightForeArm",   // 前腕
+	"mixamorig:RightHand",      // 手
+};
+static constexpr int kAttackArmBoneCount = _countof(kAttackArmBones);
+
+// 骨と骨の間に追加で置く球の数。0なら骨の位置だけ
+static constexpr int kAttackSphereBetween = 2;
 
 // 全身破砕の破片の表と置き場所。破砕ツール(Cloude\GltfFracture)の出力。
 // 【コードに焼かない理由】破片の数も骨の割り当てもツールの出力で決まるので、
@@ -657,13 +673,31 @@ void Enemy::Update()
 	float distXZ = toTarget.Length();
 	Math::Vector3 dirToTarget = MathAPI::GetSafeNormal(toTarget, Math::Vector3::Backward);
 
-	// 対象の方を向く
+	// 対象の方を向く。
 	// 🔴 m_modelForwardIsMinusZ を必ず渡すこと。渡さないと既定の「正面＝+Z」で
 	//   計算され、モデルがずっと逆を向く(2026/07/31にこれで2回外した)
+	//
+	// 🔴 振り下ろしの間は【向きを固定する】。ここで追尾させると、横へ回避しても
+	//   敵が向き直って必ず当たる＝回避が成立しない。回避のiフレームは反撃の唯一の
+	//   入口なので、避けられない攻撃を作ると反撃システムごと死ぬ。
+	//   振りかぶり(Windup)の間だけは遅く向き直れる＝「狙いを付けている」ように見せる
 	float turnSpeedDeg = DebugParams::Instance().Float(U8("敵/旋回速度"), 180.0f, 0.0f, 720.0f);
-	Math::Vector3 rot = GetRot();
-	rot.y = MathAPI::RotateToDirection(rot.y, dirToTarget, turnSpeedDeg * dt, m_modelForwardIsMinusZ);
-	SetRot(rot);
+
+	if (m_state == State::Windup)
+	{
+		turnSpeedDeg *= DebugParams::Instance().Float(U8("敵/攻撃_振りかぶり中の旋回率"), 0.35f, 0.0f, 1.0f);
+	}
+	else if (m_state == State::Strike || m_state == State::Recover)
+	{
+		turnSpeedDeg = 0.0f;
+	}
+
+	if (turnSpeedDeg > 0.0f)
+	{
+		Math::Vector3 rot = GetRot();
+		rot.y = MathAPI::RotateToDirection(rot.y, dirToTarget, turnSpeedDeg * dt, m_modelForwardIsMinusZ);
+		SetRot(rot);
+	}
 
 	// 追従して、間合いまで来たら止まる。
 	//
@@ -679,17 +713,214 @@ void Enemy::Update()
 	// 状態から逆算すると「止まっているのに歩いている」ズレが出るので、結果を持たせる
 	m_currentMoveSpeed = 0.0f;
 
+	if (m_attackCooldown > 0.0f)
+	{
+		m_attackCooldown -= dt;
+	}
+
+	// --- 攻撃中は移動しない(突進ではないため) ---
+	switch (m_state)
+	{
+	case State::Windup:
+		m_stateTimer -= dt;
+		if (m_stateTimer <= 0.0f)
+		{
+			EnterStrike();
+		}
+		return;
+
+	case State::Strike:
+		m_stateTimer -= dt;
+		ResolveAttackHit(spTarget);
+		if (m_stateTimer <= 0.0f)
+		{
+			EnterRecover();
+		}
+		return;
+
+	case State::Recover:
+		m_stateTimer -= dt;
+		if (m_stateTimer <= 0.0f)
+		{
+			m_state = State::Chase;
+		}
+		return;
+
+	default:
+		break;
+	}
+
+	// --- 追う ---
 	if (distXZ > stopDist)
 	{
 		m_currentMoveSpeed = GetMoveSpeed();
 		pos += dirToTarget * m_currentMoveSpeed * dt;
 		SetPos(pos);
+		return;
+	}
+
+	// --- 間合いに入っていて、次の攻撃が撃てるなら振りかぶる ---
+	// 【間合いはstopDistより少し広く取る】ぴったりだと、プレイヤーが少し下がっただけで
+	//   攻撃に入れず、寄っては止まるだけの置物になる
+	const float attackRange = stopDist
+		+ DebugParams::Instance().Float(U8("敵/攻撃_届く余裕"), 3.0f, 0.0f, 20.0f);
+
+	if (m_attackCooldown <= 0.0f && distXZ <= attackRange)
+	{
+		EnterWindup();
 	}
 }
 
 float Enemy::GetMoveSpeed() const
 {
 	return DebugParams::Instance().Float(U8("敵/移動速度"), 1.5f, 0.0f, 40.0f);
+}
+
+//======================================================================
+//  攻撃（腕の振り下ろし）
+//
+//  Chase → Windup(振りかぶる) → Strike(振り下ろす) → Recover(硬直) → Chase
+//  突進ではないので、この間【敵は移動しない】。25mのゴーレムが突っ込むのは
+//  成立しなかったため(2026-08-04に撤去済み)
+//======================================================================
+
+void Enemy::EnterWindup()
+{
+	m_state      = State::Windup;
+	m_stateTimer = DebugParams::Instance().Float(U8("敵/攻撃_予備動作の秒数"), 0.9f, 0.1f, 3.0f);
+
+	// この振りぶんの当たりを解禁する
+	m_hitDoneThisSwing = false;
+	m_hasPrevHandPos   = false;
+}
+
+void Enemy::EnterStrike()
+{
+	m_state      = State::Strike;
+	m_stateTimer = DebugParams::Instance().Float(U8("敵/攻撃_当たる秒数"), 0.25f, 0.05f, 2.0f);
+}
+
+void Enemy::EnterRecover()
+{
+	m_state      = State::Recover;
+	m_stateTimer = DebugParams::Instance().Float(U8("敵/攻撃_硬直の秒数"), 0.7f, 0.0f, 3.0f);
+
+	// 次に殴れるまでの間。硬直とは別に持つ(硬直＝隙、クールダウン＝攻撃の頻度)
+	m_attackCooldown = DebugParams::Instance().Float(U8("敵/攻撃_間隔の秒数"), 1.5f, 0.0f, 10.0f);
+}
+
+void Enemy::BuildAttackSpheres(std::vector<std::pair<Math::Vector3, float>>& _out) const
+{
+	_out.clear();
+
+	// 半径は【モデル座標】で持ち、ワールドへ出すときに拡大率を掛ける。
+	// 関節の球と同じ流儀(中心側で掛けると足元補正と同じ二重掛け事故になる)
+	const float radius =
+		DebugParams::Instance().Float(U8("敵/攻撃_判定の半径"), 0.12f, 0.01f, 1.0f) * GetScale().y;
+
+	Math::Vector3 prev{};
+	bool hasPrev = false;
+
+	for (int i = 0; i < kAttackArmBoneCount; ++i)
+	{
+		Math::Vector3 p{};
+		if (!GetBoneWorldPos(kAttackArmBones[i], p)) { continue; }
+
+		// 骨と骨の間を埋める(隙間があると腕の途中が素通りする)
+		if (hasPrev)
+		{
+			for (int k = 1; k <= kAttackSphereBetween; ++k)
+			{
+				const float t = static_cast<float>(k) / static_cast<float>(kAttackSphereBetween + 1);
+				_out.emplace_back(Math::Vector3::Lerp(prev, p, t), radius);
+			}
+		}
+
+		_out.emplace_back(p, radius);
+		prev    = p;
+		hasPrev = true;
+	}
+}
+
+bool Enemy::ResolveAttackHit(const std::shared_ptr<KdGameObject>& _target)
+{
+	if (m_hitDoneThisSwing) { return false; }
+	if (!_target)           { return false; }
+
+	std::vector<std::pair<Math::Vector3, float>> spheres;
+	BuildAttackSpheres(spheres);
+	if (spheres.empty()) { return false; }
+
+	// --- すり抜けの検知 ---
+	// 【なぜ測るか】1フレームの手の移動量が球の半径を超えると、間にいたプレイヤーを
+	//   飛び越す。超えているなら経路に球を刻む必要がある(CharaBase::ResolveBumpSweepと同じ手)。
+	//   推測せず数字で判断できるよう、毎フレーム出しておく
+	const Math::Vector3& handPos = spheres.back().first;
+	if (m_hasPrevHandPos)
+	{
+		const float travel = (handPos - m_prevHandPos).Length();
+		DebugWatch::Instance().Watch(U8("敵/攻撃_手の1フレーム移動量"), travel);
+		DebugWatch::Instance().Watch(U8("敵/攻撃_判定球の半径"),       spheres.back().second);
+	}
+	m_prevHandPos    = handPos;
+	m_hasPrevHandPos = true;
+
+	// --- プレイヤーを包む球 ---
+	// 足元が原点なので、胴のあたりへ持ち上げてから当てる
+	const float bodyHeight = DebugParams::Instance().Float(U8("敵/攻撃_プレイヤーの高さ"), 1.0f, 0.0f, 3.0f);
+	const float bodyRadius = DebugParams::Instance().Float(U8("敵/攻撃_プレイヤーの半径"), 0.6f, 0.1f, 3.0f);
+	const Math::Vector3 targetCenter = _target->GetPos() + Math::Vector3::Up * bodyHeight;
+
+	for (const std::pair<Math::Vector3, float>& sphere : spheres)
+	{
+		const float reach = sphere.second + bodyRadius;
+		if ((sphere.first - targetCenter).LengthSquared() > reach * reach) { continue; }
+
+		// --- 命中 ---
+		// この振りではもう当てない(球は数フレーム重なり続けるので、
+		// これが無いと1回の振りで何度もノックバックする)
+		m_hitDoneThisSwing = true;
+
+		Player* pPlayer = dynamic_cast<Player*>(_target.get());
+		if (!pPlayer) { return true; }
+
+		if (pPlayer->IsInvincible())
+		{
+			// ジャスト回避成立 → Player側に反撃(スロー窓)を通知する。
+			// 🔴 回避の無敵は反撃システムの【唯一の入口】なので、ここを消さないこと
+			pPlayer->NotifyCounter();
+		}
+		else
+		{
+			// 無防備で被弾 → 外向きにノックバック(HPは無い＝勢いを崩すだけ)
+			const Math::Vector3 knockDir = _target->GetPos() - GetPos();
+			const float power = DebugParams::Instance().Float(U8("敵/ノックバック力"), 8.0f, 0.0f, 40.0f);
+			pPlayer->ApplyKnockback(knockDir, power);
+		}
+		return true;
+	}
+
+	return false;
+}
+
+void Enemy::DrawAttackDebug()
+{
+	if (!m_pDebugWire) { return; }
+	if (m_state != State::Windup && m_state != State::Strike) { return; }
+
+	// 予備動作は黄、当たる間は赤。攻撃の予告としてそのまま読める色にする
+	const bool striking = (m_state == State::Strike);
+	const Math::Color color = striking
+		? Math::Color(1.0f, 0.25f, 0.15f, 1.0f)
+		: Math::Color(1.0f, 0.85f, 0.2f, 1.0f);
+
+	std::vector<std::pair<Math::Vector3, float>> spheres;
+	BuildAttackSpheres(spheres);
+
+	for (const std::pair<Math::Vector3, float>& sphere : spheres)
+	{
+		m_pDebugWire->AddDebugSphere(sphere.first, sphere.second, color);
+	}
 }
 
 std::string Enemy::SelectAnimation() const
@@ -810,6 +1041,10 @@ void Enemy::PostUpdate()
 
 		// 狙える関節の球(半径を目で見て決めるため)
 		DrawJointDebug();
+
+		// 攻撃の判定球(振りかぶり=黄 / 当たる=赤)。
+		// 攻撃していない間は何も出ないので、開閉がそのまま目で見える
+		DrawAttackDebug();
 
 		// 体全体の接触判定(m_hitRadius)。身長25mだと半径6.25mの球になり、
 		// 関節の球(1.7〜2m)を完全に飲み込んで狙い分けが見えなくなるので既定はOFF
