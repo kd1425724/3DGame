@@ -16,6 +16,9 @@
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 
 #include <thread>
+#include <chrono>
+
+#include "../Debug/DebugWatch/DebugWatch.h"   // 破片が出ている間の負荷を切り分けるため
 
 // 【using namespace JPH を書かない理由】JoltにはColor/Vec3/Mat44など、
 //   このプロジェクトの Math 名前空間やDirectX側と名前がぶつかりやすい型が多い。
@@ -264,7 +267,17 @@ void PhysicsWorld::Update(float _deltaTime)
 	// 大きくするほど安定するが重くなる。破片程度なら1で足りる
 	constexpr int kCollisionSteps = 1;
 
+	const std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+
 	m_pImpl->m_physicsSystem.Update(_deltaTime, kCollisionSteps, &m_pImpl->m_tempAllocator, &m_pImpl->m_jobSystem);
+
+	// 【なぜ毎フレーム出すか】破片が出ている間だけFPSが落ちる件の切り分け用。
+	// 描画と物理のどちらが効いているかは、推測でなく数字で決める
+	const std::chrono::duration<float, std::milli> elapsed =
+		std::chrono::steady_clock::now() - begin;
+	DebugWatch::Instance().Watch(U8("破片/物理の更新(ms)"), elapsed.count());
+	DebugWatch::Instance().Watch(U8("破片/動く物体の数"),
+		static_cast<int>(m_pImpl->m_physicsSystem.GetNumActiveBodies(JPH::EBodyType::RigidBody)));
 }
 
 void PhysicsWorld::Release()
