@@ -3,6 +3,7 @@
 #include "../../Physics/PhysicsWorld.h"
 #include "../../Debug/DebugParams/DebugParams.h"
 #include "../../Debug/DebugWatch/DebugWatch.h"
+#include "../../Debug/DebugFlags/DebugFlags.h"
 #include "../../main.h"
 
 // 生成コストの計測用。Pch.hには入っていないのでここで読む
@@ -323,6 +324,11 @@ void DebrisSystem::DrawLit()
 
 void DebrisSystem::GenerateDepthMapFromLight()
 {
+	// 【切れるようにしてある理由】破片は種類ごとに1ドローなので、全身破砕の30種類が
+	//   出ている間は影パスにも30ドロー増える。破片の影は小さくて見えにくい割に高いので、
+	//   割に合わなければここを切れる。負荷の切り分けにも使う
+	if (!DebugFlags::Instance().Get(U8("破片/影を落とす"), true)) { return; }
+
 	for (Group& group : m_groups)
 	{
 		if (group.m_drawMatrices.empty()) { continue; }
