@@ -1,0 +1,137 @@
+{
+ "asset": {
+  "generator": "Khronos glTF Blender I/O v5.2.39",
+  "version": "2.0"
+ },
+ "scene": 0,
+ "scenes": [
+  {
+   "name": "Scene",
+   "nodes": [
+    0
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "mesh": 0,
+   "name": "Frag_29"
+  }
+ ],
+ "materials": [
+  {
+   "doubleSided": true,
+   "name": "StoneGolem",
+   "pbrMetallicRoughness": {
+    "metallicFactor": 0,
+    "roughnessFactor": 0.8899999856948853,
+    "baseColorTexture": {
+     "index": 0
+    }
+   }
+  }
+ ],
+ "meshes": [
+  {
+   "name": "Body_cell.028",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1,
+      "TEXCOORD_0": 2
+     },
+     "indices": 3,
+     "material": 0
+    }
+   ]
+  }
+ ],
+ "accessors": [
+  {
+   "bufferView": 0,
+   "componentType": 5126,
+   "count": 979,
+   "max": [
+    0.05785641074180603,
+    0.5042487382888794,
+    0.22387757897377014
+   ],
+   "min": [
+    -0.20715658366680145,
+    0.2630152106285095,
+    -0.07090345025062561
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 1,
+   "componentType": 5126,
+   "count": 979,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 2,
+   "componentType": 5126,
+   "count": 979,
+   "type": "VEC2"
+  },
+  {
+   "bufferView": 3,
+   "componentType": 5123,
+   "count": 2613,
+   "type": "SCALAR"
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteLength": 11748,
+   "byteOffset": 0,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 11748,
+   "byteOffset": 11748,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 7832,
+   "byteOffset": 23496,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 5226,
+   "byteOffset": 31328,
+   "target": 34963
+  }
+ ],
+ "buffers": [
+  {
+   "byteLength": 36556,
+   "uri": "Frag_29.bin"
+  }
+ ],
+ "images": [
+  {
+   "mimeType": "image/png",
+   "name": "base_color",
+   "uri": "base_color.png"
+  }
+ ],
+ "samplers": [
+  {
+   "magFilter": 9729,
+   "minFilter": 9987
+  }
+ ],
+ "textures": [
+  {
+   "sampler": 0,
+   "source": 0
+  }
+ ]
+}

@@ -1,0 +1,137 @@
+{
+ "asset": {
+  "generator": "Khronos glTF Blender I/O v5.2.39",
+  "version": "2.0"
+ },
+ "scene": 0,
+ "scenes": [
+  {
+   "name": "Scene",
+   "nodes": [
+    0
+   ]
+  }
+ ],
+ "nodes": [
+  {
+   "mesh": 0,
+   "name": "Frag_18"
+  }
+ ],
+ "materials": [
+  {
+   "doubleSided": true,
+   "name": "StoneGolem",
+   "pbrMetallicRoughness": {
+    "metallicFactor": 0,
+    "roughnessFactor": 0.8899999856948853,
+    "baseColorTexture": {
+     "index": 0
+    }
+   }
+  }
+ ],
+ "meshes": [
+  {
+   "name": "Body_cell.017",
+   "primitives": [
+    {
+     "attributes": {
+      "POSITION": 0,
+      "NORMAL": 1,
+      "TEXCOORD_0": 2
+     },
+     "indices": 3,
+     "material": 0
+    }
+   ]
+  }
+ ],
+ "accessors": [
+  {
+   "bufferView": 0,
+   "componentType": 5126,
+   "count": 1810,
+   "max": [
+    -0.012090584263205528,
+    0.36075320839881897,
+    0.17865078151226044
+   ],
+   "min": [
+    -0.26518359780311584,
+    0.011450509540736675,
+    -0.18893834948539734
+   ],
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 1,
+   "componentType": 5126,
+   "count": 1810,
+   "type": "VEC3"
+  },
+  {
+   "bufferView": 2,
+   "componentType": 5126,
+   "count": 1810,
+   "type": "VEC2"
+  },
+  {
+   "bufferView": 3,
+   "componentType": 5123,
+   "count": 6093,
+   "type": "SCALAR"
+  }
+ ],
+ "bufferViews": [
+  {
+   "buffer": 0,
+   "byteLength": 21720,
+   "byteOffset": 0,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 21720,
+   "byteOffset": 21720,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 14480,
+   "byteOffset": 43440,
+   "target": 34962
+  },
+  {
+   "buffer": 0,
+   "byteLength": 12186,
+   "byteOffset": 57920,
+   "target": 34963
+  }
+ ],
+ "buffers": [
+  {
+   "byteLength": 70108,
+   "uri": "Frag_18.bin"
+  }
+ ],
+ "images": [
+  {
+   "mimeType": "image/png",
+   "name": "base_color",
+   "uri": "base_color.png"
+  }
+ ],
+ "samplers": [
+  {
+   "magFilter": 9729,
+   "minFilter": 9987
+  }
+ ],
+ "textures": [
+  {
+   "sampler": 0,
+   "source": 0
+  }
+ ]
+}

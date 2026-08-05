@@ -1,0 +1,122 @@
+[
+ {
+  "name": "Frag_00",
+  "bone": "mixamorig:LeftArm"
+ },
+ {
+  "name": "Frag_01",
+  "bone": "mixamorig:LeftUpLeg"
+ },
+ {
+  "name": "Frag_02",
+  "bone": "mixamorig:LeftArm"
+ },
+ {
+  "name": "Frag_03",
+  "bone": "mixamorig:Hips"
+ },
+ {
+  "name": "Frag_04",
+  "bone": "mixamorig:RightArm"
+ },
+ {
+  "name": "Frag_05",
+  "bone": "mixamorig:LeftUpLeg"
+ },
+ {
+  "name": "Frag_06",
+  "bone": "mixamorig:LeftUpLeg"
+ },
+ {
+  "name": "Frag_07",
+  "bone": "mixamorig:LeftUpLeg"
+ },
+ {
+  "name": "Frag_08",
+  "bone": "mixamorig:RightUpLeg"
+ },
+ {
+  "name": "Frag_09",
+  "bone": "mixamorig:Hips"
+ },
+ {
+  "name": "Frag_10",
+  "bone": "mixamorig:RightUpLeg"
+ },
+ {
+  "name": "Frag_11",
+  "bone": "mixamorig:LeftUpLeg"
+ },
+ {
+  "name": "Frag_12",
+  "bone": "mixamorig:LeftUpLeg"
+ },
+ {
+  "name": "Frag_13",
+  "bone": "mixamorig:RightArm"
+ },
+ {
+  "name": "Frag_14",
+  "bone": "mixamorig:LeftUpLeg"
+ },
+ {
+  "name": "Frag_15",
+  "bone": "mixamorig:RightUpLeg"
+ },
+ {
+  "name": "Frag_16",
+  "bone": "mixamorig:LeftUpLeg"
+ },
+ {
+  "name": "Frag_17",
+  "bone": "mixamorig:LeftArm"
+ },
+ {
+  "name": "Frag_18",
+  "bone": "mixamorig:RightArm"
+ },
+ {
+  "name": "Frag_19",
+  "bone": "mixamorig:LeftArm"
+ },
+ {
+  "name": "Frag_20",
+  "bone": "mixamorig:LeftUpLeg"
+ },
+ {
+  "name": "Frag_21",
+  "bone": "mixamorig:RightArm"
+ },
+ {
+  "name": "Frag_22",
+  "bone": "mixamorig:LeftUpLeg"
+ },
+ {
+  "name": "Frag_23",
+  "bone": "mixamorig:RightArm"
+ },
+ {
+  "name": "Frag_24",
+  "bone": "mixamorig:LeftUpLeg"
+ },
+ {
+  "name": "Frag_25",
+  "bone": "mixamorig:RightArm"
+ },
+ {
+  "name": "Frag_26",
+  "bone": "mixamorig:RightUpLeg"
+ },
+ {
+  "name": "Frag_27",
+  "bone": "mixamorig:RightUpLeg"
+ },
+ {
+  "name": "Frag_28",
+  "bone": "mixamorig:RightArm"
+ },
+ {
+  "name": "Frag_29",
+  "bone": "mixamorig:Hips"
+ }
+]
