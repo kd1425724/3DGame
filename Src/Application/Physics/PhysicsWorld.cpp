@@ -210,6 +210,14 @@ struct PhysicsWorld::Impl
 	// (InstancedPropRendererが描画でやっているのと同じ考え方)。
 	// KdModelDataはKdAssetsが持ち続けるので、生ポインタをキーにしてよい
 	std::unordered_map<const KdModelData*, JPH::RefConst<JPH::Shape>> m_shapeCache;
+
+	// 破片(動く剛体)の凸包キャッシュ。上とキーは同じだが【中身が別物】なので分ける。
+	// m_shapeCacheは地形の三角形メッシュ、こちらは凸包。同じモデルを両方で使うと
+	// 取り違えるので、混ぜてはいけない
+	std::unordered_map<const KdModelData*, JPH::RefConst<JPH::Shape>> m_convexCache;
+
+	// モデルの凸包を作って返す(2回目以降はキャッシュから返す)。等倍で作る
+	JPH::RefConst<JPH::Shape> BuildOrGetConvexShape(const KdModelWork& _model);
 };
 
 // 【なぜここで定義するか】Implが完全型として見えるのはこの.cppだけ。
@@ -458,27 +466,24 @@ uint32_t PhysicsWorld::SpawnDebrisBox(const Math::Vector3& _pos, const Math::Vec
 	return id.GetIndexAndSequenceNumber();
 }
 
-uint32_t PhysicsWorld::SpawnDebrisConvex(const KdModelWork& _model, const Math::Matrix& _world,
-	const Math::Vector3& _velocity, const Math::Vector3& _angularVelocity)
+JPH::RefConst<JPH::Shape> PhysicsWorld::Impl::BuildOrGetConvexShape(const KdModelWork& _model)
 {
-	if (!m_pImpl) { return kInvalidBodyId; }
-
 	const std::shared_ptr<KdModelData> spData = _model.GetData();
-	if (!spData) { return kInvalidBodyId; }
+	if (!spData) { return nullptr; }
 
-	// 姿勢を「拡大」と「位置＋回転」に分ける。
-	// 【なぜ拡大だけ頂点へ焼くか】凸包はScaledShapeでも包めるが、gibはモデルごとに
-	//   1回しか作らないので共有の利点が無い。焼いてしまうほうが単純で速い
-	Math::Vector3		scale;
-	Math::Quaternion	rotation;
-	Math::Vector3		translation;
-
-	Math::Matrix world = _world;
-	if (!world.Decompose(scale, rotation, translation)) { return kInvalidBodyId; }
+	// 【2026-08-05】キャッシュを入れた。以前は「gibはモデルごとに1回しか作らないので
+	//   共有の利点が無い」として毎回作り直していたが、全身破砕で30個を1フレームに出すと
+	//   Debugビルドで【140ms】かかった(1フレーム16.6msの約8.4倍)。前提が変わったので直した
+	const auto cached = m_convexCache.find(spData.get());
+	if (cached != m_convexCache.end()) { return cached->second; }
 
 	// --- 頂点を集める ---
 	// 当たり判定メッシュがあればそれを、無ければ描画メッシュを使う。
-	// gibは当たり専用ノードを持たないので、実際には描画メッシュが使われる
+	// gibは当たり専用ノードを持たないので、実際には描画メッシュが使われる。
+	//
+	// 【拡大は焼かない】キャッシュを効かせるため、形は等倍のまま作って
+	//   使うときに ScaledShape で包む(静的形状と同じやり方)。
+	//   焼き込むと拡大ごとに別の形になり、キャッシュが当たらなくなる
 	const std::vector<KdModelData::Node>& dataNodes = _model.GetDataNodes();
 	const std::vector<KdModelWork::Node>& workNodes = _model.GetNodes();
 
@@ -499,39 +504,72 @@ uint32_t PhysicsWorld::SpawnDebrisConvex(const KdModelWork& _model, const Math::
 
 		const Math::Matrix& mNode = workNodes[index].m_worldTransform;
 
-		for (const Math::Vector3& local : pMesh->GetVertexPositions())
+		// 【間引きは変換の前】凸包は256点までしか持てないので、1万点を変換してから
+		//   捨てるのは丸損になる。先に間引いてから変換する
+		const std::vector<Math::Vector3>& positions = pMesh->GetVertexPositions();
+
+		constexpr size_t kMaxHullPoints = 256;
+		const size_t step = (positions.size() > kMaxHullPoints)
+			? (positions.size() / kMaxHullPoints + 1)
+			: 1;
+
+		for (size_t i = 0; i < positions.size(); i += step)
 		{
-			const Math::Vector3 p = Math::Vector3::Transform(local, mNode) * scale;
+			const Math::Vector3 p = Math::Vector3::Transform(positions[i], mNode);
 			points.push_back(JPH::Vec3(p.x, p.y, p.z));
 		}
 	}
 
-	if (points.empty()) { return kInvalidBodyId; }
-
-	// 【頂点数を減らす理由】Joltの凸包は既定で256点までしか持てず、それ以上渡すと
-	//   内部で間引かれる。1万点を渡すと構築だけ無駄に重くなるので、こちらで先に間引く。
-	//   凸包は「一番外側の点」しか使わないので、間引いても形はほとんど変わらない
-	constexpr size_t kMaxHullPoints = 256;
-	if (points.size() > kMaxHullPoints)
-	{
-		const size_t step = points.size() / kMaxHullPoints + 1;
-
-		JPH::Array<JPH::Vec3> thinned;
-		for (size_t i = 0; i < points.size(); i += step)
-		{
-			thinned.push_back(points[i]);
-		}
-		points = std::move(thinned);
-	}
+	if (points.empty()) { return nullptr; }
 
 	JPH::ConvexHullShapeSettings hullSettings(points);
 	hullSettings.SetEmbedded();
 
 	JPH::ShapeSettings::ShapeResult hullResult = hullSettings.Create();
-	if (hullResult.HasError()) { return kInvalidBodyId; }
+	if (hullResult.HasError()) { return nullptr; }
+
+	JPH::RefConst<JPH::Shape> shape = hullResult.Get();
+	m_convexCache[spData.get()] = shape;
+	return shape;
+}
+
+void PhysicsWorld::PrepareDebrisConvex(const KdModelWork& _model)
+{
+	if (!m_pImpl) { return; }
+
+	m_pImpl->BuildOrGetConvexShape(_model);
+}
+
+uint32_t PhysicsWorld::SpawnDebrisConvex(const KdModelWork& _model, const Math::Matrix& _world,
+	const Math::Vector3& _velocity, const Math::Vector3& _angularVelocity)
+{
+	if (!m_pImpl) { return kInvalidBodyId; }
+
+	// 姿勢を「拡大」と「位置＋回転」に分ける
+	Math::Vector3		scale;
+	Math::Quaternion	rotation;
+	Math::Vector3		translation;
+
+	Math::Matrix world = _world;
+	if (!world.Decompose(scale, rotation, translation)) { return kInvalidBodyId; }
+
+	JPH::RefConst<JPH::Shape> shape = m_pImpl->BuildOrGetConvexShape(_model);
+	if (!shape) { return kInvalidBodyId; }
+
+	// 等倍でなければScaledShapeで包む(形の実体は共有したまま拡大だけ変えられる)
+	if (scale != Math::Vector3::One)
+	{
+		JPH::ScaledShapeSettings scaledSettings(shape, JPH::Vec3(scale.x, scale.y, scale.z));
+		scaledSettings.SetEmbedded();
+
+		JPH::ShapeSettings::ShapeResult scaledResult = scaledSettings.Create();
+		if (scaledResult.HasError()) { return kInvalidBodyId; }
+
+		shape = scaledResult.Get();
+	}
 
 	JPH::BodyCreationSettings bodySettings(
-		hullResult.Get(),
+		shape,
 		JPH::RVec3(translation.x, translation.y, translation.z),
 		JPH::Quat(rotation.x, rotation.y, rotation.z, rotation.w),
 		JPH::EMotionType::Dynamic,

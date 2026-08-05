@@ -70,6 +70,14 @@ public:
 	uint32_t SpawnDebrisBox(const Math::Vector3& _pos, const Math::Vector3& _halfExtent,
 		const Math::Vector3& _velocity, const Math::Vector3& _angularVelocity);
 
+	// 破片に使うモデルの凸包を【先に】作ってキャッシュしておく。
+	//
+	// 【なぜ要るか】凸包の構築は1個あたり数msかかる。全身破砕のように数十個を同じ
+	//   フレームで出すと、その場で作っていては間に合わない(実測でDebug 140ms)。
+	//   しかも破片は1種類につき1回しか出さないので、生成時のキャッシュでは初回に間に合わない。
+	//   読み込みの時点で呼んでおき、出す瞬間はボディを作るだけにする
+	void PrepareDebrisConvex(const KdModelWork& _model);
+
 	// モデルの形から凸包を作って破片を1つ生む(箱より本物に近い当たりになる)。
 	// 【なぜ凸包か】動く剛体に三角形メッシュは使えない(Joltが許さない/重い)。
 	//   凹んだ形は再現できないが、もげた腕や脚なら見た目との差はほぼ分からない
@@ -101,6 +109,9 @@ private:
 
 	// Joltの型をヘッダへ出さないための隠し場所(実体は.cpp)。
 	// unique_ptrなのでデストラクタは.cpp側で定義する必要がある
+	//
+	// ※ 凸包を作る/キャッシュから返す処理は Impl 側のメンバにしてある。
+	//   戻り値が JPH::Shape なので、ここに置くとヘッダがJoltを読む羽目になる
 	struct Impl;
 	std::unique_ptr<Impl> m_pImpl;
 };

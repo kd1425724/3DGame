@@ -148,6 +148,25 @@ std::shared_ptr<DebrisSystem> Enemy::FindDebrisSystem()
 	return spDebris;
 }
 
+void Enemy::PreloadDebrisModels()
+{
+	if (m_debrisPreloaded) { return; }
+
+	std::shared_ptr<DebrisSystem> spDebris = FindDebrisSystem();
+	if (!spDebris) { return; }   // シーン構築が済むまでは何度でも試す
+
+	m_debrisPreloaded = true;
+
+	// 【なぜ先に登録するか】RegisterModelはモデルの読み込みと凸包の構築を伴う。
+	//   壊れた瞬間に初めて登録すると、その1フレームに全部の costが乗る。
+	//   全身破砕では30個ぶんが同時に来るので、実測でDebug 140msかかった。
+	//   ここで払っておけば、出す瞬間はボディを作るだけになる
+	for (int i = 0; i < kJointCount; ++i)
+	{
+		m_gibModelIds[i] = spDebris->RegisterModel(kJointDefs[i].gibModel);
+	}
+}
+
 void Enemy::SpawnGib(int _index)
 {
 	if (_index < 0 || _index >= kJointCount) { return; }
@@ -512,6 +531,10 @@ void Enemy::Update()
 			m_wpTarget = spPlayer;
 		}
 	}
+
+	// 破片のモデルと凸包を先に用意しておく(壊れた瞬間に払わないため)。
+	// シーン構築が済むまでDebrisSystemが見つからないので、Init()ではなくここで行う
+	PreloadDebrisModels();
 
 	// 【確認用】F4で即死させる。倒れ方と全身破砕を何度も見比べるための入口。
 	// 通常の経路(ロックオン→突撃→命中)は手順が長く、見た目の詰めに向かないため
