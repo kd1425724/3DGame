@@ -72,6 +72,12 @@ int DebrisSystem::RegisterModel(const std::string& _modelPath)
 	group.m_spModelWork = std::make_shared<KdModelWork>();
 	group.m_spModelWork->SetModelData(KdAssets::Instance().m_modeldatas.GetData(_modelPath));
 
+	// 【ここで凸包も作っておく】出す瞬間に作ると、全身破砕のように数十個を同じ
+	//   フレームで出したとき間に合わない(実測でDebug 140ms)。破片は1種類につき
+	//   1回しか出さないので「生成時にキャッシュ」では初回に効かない。登録＝読み込みの
+	//   時点で払っておき、出す瞬間はボディを作るだけにする
+	PhysicsWorld::Instance().PrepareDebrisConvex(*group.m_spModelWork);
+
 	m_groups.push_back(group);
 	return static_cast<int>(m_groups.size() - 1);
 }

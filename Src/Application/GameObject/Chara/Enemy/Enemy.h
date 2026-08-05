@@ -194,6 +194,12 @@ private:
 	//   一度見つけたら m_wpDebrisSystem にキャッシュする
 	std::shared_ptr<DebrisSystem> FindDebrisSystem();
 
+	// gibのモデルと凸包を先に読み込んでおく。Updateから毎フレーム呼んでよい(1回で済む)
+	void PreloadDebrisModels();
+
+	// 上を済ませたか
+	bool m_debrisPreloaded = false;
+
 	// 体の当たり半径(m)。追従を止める間合いの基準とデバッグ表示に使う。
 	// 【2026/07/29】KdColliderへの登録をやめたので、用途はこの2つだけになった。
 	// 【2026/08/04】突進を撤去したので、命中判定の用途は無くなった。
