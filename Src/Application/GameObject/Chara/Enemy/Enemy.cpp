@@ -513,20 +513,29 @@ void Enemy::Update()
 		}
 	}
 
-	// 【確認用】動いていると関節の球を見比べられないので、その場に固定できるようにする。
-	// AIと移動だけを止め、接地(PostUpdateのGroundCheck)は生かして立たせたままにする。
-	// ※ アニメはSelectAnimationSpeedが0を返して凍る。呼ぶのをやめてはいけない → そちらのコメント
-	if (IsFrozenForDebug()) { return; }
+	// 【確認用】F4で即死させる。倒れ方と全身破砕を何度も見比べるための入口。
+	// 通常の経路(ロックオン→突撃→命中)は手順が長く、見た目の詰めに向かないため
+	if (KdInputManager::Instance().IsPress("KillEnemy"))
+	{
+		ApplyBodyDamage(m_hp);
+	}
 
 	const float dt = Application::Instance().GetDeltaTime();
 
-	// 倒れている間は追従も攻撃もしない。向き直りと消滅の管理だけ行う。
-	// ※ 対象を見失っていても消滅までは進めたいので、targetの取得より【前】に置く
+	// 倒れている間は追従も攻撃もしない。向き直りと破砕の管理だけ行う。
+	// ※ 対象を見失っていても破砕までは進めたいので、targetの取得より【前】に置く
+	// ※ 凍結(下)より【前】に置く。「動きを止める」はAIと移動を止めるための旗であって、
+	//   倒れ切る・砕けるまで進まなくなるのは意図ではない(F4で確認するときに詰まる)
 	if (m_state == State::Down)
 	{
 		UpdateDown(dt);
 		return;
 	}
+
+	// 【確認用】動いていると関節の球を見比べられないので、その場に固定できるようにする。
+	// AIと移動だけを止め、接地(PostUpdateのGroundCheck)は生かして立たせたままにする。
+	// ※ アニメはSelectAnimationSpeedが0を返して凍る。呼ぶのをやめてはいけない → そちらのコメント
+	if (IsFrozenForDebug()) { return; }
 
 	std::shared_ptr<KdGameObject> spTarget = m_wpTarget.lock();
 	if (!spTarget) { return; }

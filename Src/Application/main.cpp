@@ -366,6 +366,11 @@ bool Application::Init(int w, int h)
 		// 破片をカメラの前方にばら撒く(物理の見た目を調整するための確認用)
 		pKeyboardMouse->AddButton("SpawnDebris", new KdInputButtonForWindows(VK_F2));
 
+		// 敵の本体HPを0にして「倒れる→全身破砕」を出す(確認用)。
+		// 【なぜ要るか】通常の経路はロックオン→突撃→命中と手順が長く、
+		//   倒れ方や破砕の見た目を何度も見比べる作業に向かないため
+		pKeyboardMouse->AddButton("KillEnemy", new KdInputButtonForWindows(VK_F4));
+
 		// その他
 		pKeyboardMouse->AddButton("Escape", new KdInputButtonForWindows(VK_ESCAPE));
 		pKeyboardMouse->AddButton("SwitchScene", new KdInputButtonForWindows('T'));
