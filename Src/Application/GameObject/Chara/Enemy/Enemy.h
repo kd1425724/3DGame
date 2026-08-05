@@ -233,12 +233,45 @@ private:
 	// 追従・攻撃の対象
 	std::weak_ptr<KdGameObject> m_wpTarget;
 
-	// --- 状態：追従 / 倒れている ---
+	// --- 状態 ---
+	// Chase(追う) → Windup(振りかぶる) → Strike(振り下ろす) → Recover(硬直) → Chase
 	// Down は片道。膝を壊されるか本体HPが尽きると入り、二度と出てこない
 	// (「片膝を斬られた時点で立ち上がれない」という仕様)
-	// ※ Windup(予備動作)/Strike(突進)/Recover(硬直) は 2026-08-04 に撤去した
-	enum class State { Chase, Down };
+	//
+	// ※ 2026-08-04に立方体時代の「予備動作→突進→硬直」を撤去したが、
+	//   2026-08-05に【腕の振り下ろし】として作り直した。突進ではないので敵は動かない
+	enum class State { Chase, Windup, Strike, Recover, Down };
 	State m_state = State::Chase;
+
+	// 今の状態の残り秒数(Windup/Strike/Recoverで使う)
+	float m_stateTimer = 0.0f;
+
+	// 次に攻撃できるまでの残り秒数。連続で殴り続けないための間
+	float m_attackCooldown = 0.0f;
+
+	// この振りで既に当てたか。判定球は数フレーム重なり続けるので、
+	// これが無いと1回の振りで何度もノックバックする
+	bool m_hitDoneThisSwing = false;
+
+	// 前フレームの手の位置(ワールド)。1フレームの移動量を測ってすり抜けを検知する
+	Math::Vector3 m_prevHandPos = Math::Vector3::Zero;
+	bool          m_hasPrevHandPos = false;
+
+	// 攻撃の状態へ入る
+	void EnterWindup();
+	void EnterStrike();
+	void EnterRecover();
+
+	// 攻撃の判定球(腕に沿って数個)をワールドで作る。
+	// 【なぜ複数か】手だけに付けると腕の中ほどが素通りする
+	void BuildAttackSpheres(std::vector<std::pair<Math::Vector3, float>>& _out) const;
+
+	// 判定球がプレイヤーに当たっているか調べ、当たっていれば反撃/ノックバックへ回す。
+	// 当てたらtrue(1回の振りで1度だけ)
+	bool ResolveAttackHit(const std::shared_ptr<KdGameObject>& _target);
+
+	// 攻撃の判定球をデバッグ表示する
+	void DrawAttackDebug();
 
 	// 直近のUpdateで実際に出した水平の速さ。SelectAnimationSpeedが足を滑らせない倍率に使う。
 	// 状態から逆算すると「間合いで止まっているのに歩いている」ズレが出るので、結果を持たせる
