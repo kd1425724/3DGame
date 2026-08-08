@@ -37,23 +37,6 @@ void TPSCamera::PostUpdate()
 		UpdateRotateByMouse();
 	}
 
-	// ロックオン中はマウス操作より優先して、ロックオン対象の方向を向く
-	if (m_isLockOn)
-	{
-		const std::shared_ptr<const KdGameObject> spLockOnTarget = m_wpLockOnTarget.lock();
-		if (spLockOnTarget)
-		{
-			Math::Vector3 targetPos = spLockOnTarget->GetPos();
-			targetPos.y += 0.75f;
-
-			Math::Vector3 dir = MathAPI::GetSafeNormal(targetPos - GetPos());
-
-			// カメラの回転は m_rot ではなく m_DegAng で管理されている(GetRotationMatrix参照)
-			// ※ ヨー(左右)のみロックオン対象方向に固定し、ピッチ(上下)はマウス操作のまま残す
-			m_DegAng.y = MathAPI::DirToYawDeg(dir);
-		}
-	}
-
 	// === 追従対象の位置と移動速度 ===
 	Math::Vector3 targetPos = Math::Vector3::Zero;
 	if (_spTarget)
@@ -82,6 +65,30 @@ void TPSCamera::PostUpdate()
 	// === A: 追従スムージング(注視点をLerpで遅れて寄せる=振り子軌道の急な揺れを吸収) ===
 	float followK = DebugParams::Instance().Float(U8("カメラ/追従スムーズ"), 12.0f, 1.0f, 60.0f);   // 値が大きいほど追従が速い(=スムージング弱)
 	m_smoothFollowPos = MathAPI::InterpTo(m_smoothFollowPos, targetPos, dt, followK);
+
+	// === ロックオン中は、マウス操作より優先して狙っている点を向く ===
+	//
+	// 【なぜ追従スムージング(A)の後に置くのか】カメラは m_smoothFollowPos を中心に
+	//   周回するので、向きもその中心から測らないと注視点が画面中央からずれる。
+	//   以前はマウス処理の直後にあり、しかも GetPos()(＝1フレーム前のカメラ位置)から
+	//   測っていた
+	// ※ ここで書き込むのは目標角(m_DegAng)。実際に使われるのは下のBで平滑化した
+	//   m_smoothDegAng なので、急に敵を向いても既存のスムージングが吸収する
+	if (m_hasLockOnAim)
+	{
+		const Math::Vector3 dir = MathAPI::GetSafeNormal(m_lockOnAimPos - m_smoothFollowPos);
+		if (dir.LengthSquared() > 0.0f)
+		{
+			m_DegAng.y = MathAPI::DirToYawDeg(dir);
+
+			// 🔴 ピッチもロックする。ヨーだけだとゴーレム(身長25m)の頭は画面の外に出る。
+			//   10m手前から高さ20mの首を見るには約62度要るが、UpdateRotateByMouse の
+			//   制限は±45度しかないので、ロック中だけ上限を広げる
+			const float lockPitchLimit =
+				DebugParams::Instance().Float(U8("カメラ/ロック中のピッチ上限"), 75.0f, 45.0f, 89.0f);
+			m_DegAng.x = std::clamp(MathAPI::DirToPitchDeg(dir), -lockPitchLimit, lockPitchLimit);
+		}
+	}
 
 	// === B: 回転スムージング(視点角度を最短経路でLerp=ロックオンのスナップやマウス急変を和らげる) ===
 	// ※ InterpAngleTo が角度差を[-180,180]に畳むので、ヨーが720度等に累積してもクルッと回らない

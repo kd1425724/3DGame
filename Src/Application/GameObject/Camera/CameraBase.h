@@ -37,6 +37,14 @@ public:
 			   DirectX::XMConvertToRadians(m_DegAng.y));
 	}
 
+	// ロックオン中の注視点(ワールド座標)。実装しているのはTPSCameraだけで、
+	// 他のカメラでは何もしない。
+	// 【なぜ基底に口を開けるか】Playerは weak_ptr<CameraBase> しか持っていないので、
+	//   ここに無いと呼ぶ側で dynamic_cast が要る。カメラにはオブジェクトタグのような
+	//   見分け方が無いため、仮想関数にしておくのが素直
+	virtual void SetLockOnAim(const Math::Vector3&)	{}
+	virtual void ClearLockOnAim()					{}
+
 	// 【現在未使用】カメラの当たり判定を「登録したオブジェクトだけ」に当てるための登録口。
 	// TPSCamera側をSceneManagerの全オブジェクト走査(TypeGround|TypeBump)に変更したため呼ばれなくなった。
 	// (レベルエディタでLevel.jsonから後ロードされる塔などを取りこぼす問題への対応)

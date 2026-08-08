@@ -16,34 +16,31 @@ public:
 	// 他のデバッグ表示と一緒くたにすると邪魔になるため独立したカテゴリにしてある
 	void DrawDebug()		override;
 
-	// ロックオン状態を設定する(falseにするとロックオン対象も解除される)
-	void SetLockOn(bool isLockOn)
+	// ロックオン中の注視点(ワールド座標)を設定する。毎フレーム呼ぶこと。
+	//
+	// 【なぜ「対象」ではなく「点」を渡すのか】狙っているのは敵そのものではなく
+	//   敵の【関節】(首・肘×2・膝×2。ホイールで切替)で、その位置を知っているのは
+	//   Player 側だけ。以前は対象オブジェクトを渡して camera 側で
+	//   「原点 + 0.75m」を見ていたが、ゴーレムは身長25mで原点が足元なので
+	//   足首を見ることになっていた(この経路は誰も呼んでおらず死んでいた)。
+	//   点を渡す形にすれば、カメラは敵も関節も知らなくて済む。
+	void SetLockOnAim(const Math::Vector3& aimPos) override
 	{
-		m_isLockOn = isLockOn;
-
-		if (!isLockOn)
-		{
-			m_wpLockOnTarget.reset();
-		}
+		m_lockOnAimPos = aimPos;
+		m_hasLockOnAim = true;
 	}
+
+	// ロックオンを解除する(以降はマウス操作だけで回る)
+	void ClearLockOnAim() override { m_hasLockOnAim = false; }
 
 	// 現在ロックオン中かどうか
-	bool IsLockOn() const { return m_isLockOn; }
-
-	// ロックオン対象を設定する
-	// ※ 追従対象(m_wpTarget、プレイヤー)はそのままで、向きの計算にだけ使う
-	void SetLockOnTarget(const std::shared_ptr<KdGameObject>& target)
-	{
-		m_wpLockOnTarget = target;
-	}
+	bool IsLockOn() const { return m_hasLockOnAim; }
 
 private:
 
-	// ロックオン中かどうか
-	bool m_isLockOn = false;
-
-	// ロックオン対象(向きの計算専用。追従対象とは別)
-	std::weak_ptr<KdGameObject> m_wpLockOnTarget;
+	// ロックオン中の注視点と、その有無
+	Math::Vector3 m_lockOnAimPos = {};
+	bool          m_hasLockOnAim = false;
 
 	// === スイング酔い対策のスムージング用の内部状態(すべてDebugParamsで強さ調整) ===
 	// 初回フレームだけ現在値に合わせる(起動直後のスムージング暴れ防止)
