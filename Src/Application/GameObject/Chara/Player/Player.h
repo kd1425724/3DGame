@@ -131,6 +131,11 @@ private:
 	Enemy* GetLockedEnemy() const;
 	// 今狙っている関節の球の中心(ワールド)。関節が取れなければfalse
 	bool GetLockedJointPos(Math::Vector3& _outPos) const;
+	// ロックオン中にカメラが見るべき点(ワールド)。
+	// 🔴 狙っている関節をそのまま見せるとカメラが振り回される(5関節のうち4つが四肢で、
+	//   振り下ろし中の手は1フレームに9.48m動く)。敵の【胴】を基準にして、そこから
+	//   関節へ少しだけ寄せた点を返す。寄せる割合はDebugParamsで調整する
+	bool GetLockOnCameraAim(Math::Vector3& _outPos) const;
 	// ホイールの入力ぶん、狙う関節を切り替える。壊れた関節は飛ばす
 	void CycleLockedJoint(int _step);
 

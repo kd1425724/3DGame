@@ -820,6 +820,43 @@ bool Player::GetLockedJointPos(Math::Vector3& _outPos) const
 	return pEnemy->GetJointSphereAt(m_lockedJointIndex, _outPos, radius);
 }
 
+bool Player::GetLockOnCameraAim(Math::Vector3& _outPos) const
+{
+	Enemy* pEnemy = GetLockedEnemy();
+	if (!pEnemy) { return false; }
+
+	Math::Vector3 bodyPos{};
+	const bool hasBody = pEnemy->GetCameraLockPos(bodyPos);
+
+	Math::Vector3 jointPos{};
+	const bool hasJoint = GetLockedJointPos(jointPos);
+
+	// 胴が取れないモデルなら関節をそのまま見るしかない(揺れるが、何も見ないよりはよい)
+	if (!hasBody)
+	{
+		if (!hasJoint) { return false; }
+
+		_outPos = jointPos;
+		return true;
+	}
+
+	if (!hasJoint)
+	{
+		_outPos = bodyPos;
+		return true;
+	}
+
+	// 胴から関節へどれだけ寄せるか。
+	//   0.0 … 完全に胴だけを見る(揺れゼロ。ダークソウル方式)
+	//   1.0 … 関節をそのまま見る(腕を追ってカメラが振り回される)
+	// 既定0.25は「揺れを1/4に抑えつつ、身長25mの相手でも膝が画面に入る」ねらい
+	const float weight =
+		DebugParams::Instance().Float(U8("カメラ/ロック注視点の部位寄せ"), 0.25f, 0.0f, 1.0f);
+
+	_outPos = Math::Vector3::Lerp(bodyPos, jointPos, weight);
+	return true;
+}
+
 void Player::UpdateMove(float dt)
 {
 	// === 通常移動(velocityベース。接地=キビキビ、空中=勢いを保つ) ===
@@ -1399,16 +1436,18 @@ void Player::PostUpdate()
 		m_upTargeting->ClearMarkerOverridePos();
 	}
 
-	// カメラにも同じ点を渡して、ロックオン中はそこを注視させる。
-	// 【なぜ「点」を渡すのか】狙っているのは敵そのものではなく関節(ホイールで切替)で、
-	//   その位置を知っているのはここだけ。カメラに敵や関節を知らせずに済む
-	// ※ 関節が取れないときはロックしない。マーカーも出ていない状態でカメラだけ
-	//   固定されると、何を見ているのか分からないまま操作を奪うことになる
+	// カメラの注視点はレティクルとは【別に】決める。
+	// 🔴 レティクルは狙っている関節にピタリと付く必要があるが、カメラが同じ点を
+	//   追うと振り回されて酔う(5関節のうち4つが四肢。手は1フレームに9.48m動く)。
+	//   カメラは敵の胴を基準にした点を見る(→ GetLockOnCameraAim)
+	// 【なぜ「点」を渡すのか】その点を計算できるのはここだけ。カメラに敵や関節を
+	//   知らせずに済む
 	if (std::shared_ptr<CameraBase> spCamera = m_wpCamera.lock())
 	{
-		if (m_isLockedOn && hasJoint)
+		Math::Vector3 camAim{};
+		if (m_isLockedOn && GetLockOnCameraAim(camAim))
 		{
-			spCamera->SetLockOnAim(jointPos);
+			spCamera->SetLockOnAim(camAim);
 		}
 		else
 		{
