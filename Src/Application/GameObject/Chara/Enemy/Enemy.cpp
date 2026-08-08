@@ -111,6 +111,24 @@ bool Enemy::GetJointSphereAt(int _index, Math::Vector3& _outCenter, float& _outR
 	return GetJointSphere(kJointDefs[_index], _outCenter, _outRadius);
 }
 
+bool Enemy::GetCameraLockPos(Math::Vector3& _outPos) const
+{
+	// 胸(Spine1)を第一候補にする。頭だと首を振ったぶん動き、腰だと低すぎて
+	// 身長25mのゴーレムでは上半身が画面から切れる
+	static const char* const kLockBones[] =
+	{
+		"mixamorig:Spine1",
+		"mixamorig:Hips",     // 胸が無いモデルへの保険
+	};
+
+	for (const char* bone : kLockBones)
+	{
+		if (GetBoneWorldPos(bone, _outPos)) { return true; }
+	}
+
+	return false;
+}
+
 void Enemy::ApplyJointDamage(int _index, float _damage)
 {
 	if (_index < 0 || _index >= kJointCount) { return; }

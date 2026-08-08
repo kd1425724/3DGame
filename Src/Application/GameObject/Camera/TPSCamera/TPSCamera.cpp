@@ -76,7 +76,21 @@ void TPSCamera::PostUpdate()
 	//   m_smoothDegAng なので、急に敵を向いても既存のスムージングが吸収する
 	if (m_hasLockOnAim)
 	{
-		const Math::Vector3 dir = MathAPI::GetSafeNormal(m_lockOnAimPos - m_smoothFollowPos);
+		// 注視点そのものも平滑化する。胴を基準にしてもモーションで多少は動くので、
+		// ここで一段吸収しておくと残りの揺れが消える。
+		// 🔴 掛け直したときは平滑化を【リセット】する。前の対象から新しい対象へ
+		//   Lerpさせると、カメラが街を横切って舐めるように回ってしまう
+		if (!m_lockAimInit)
+		{
+			m_smoothLockAim = m_lockOnAimPos;
+			m_lockAimInit   = true;
+		}
+
+		const float aimK =
+			DebugParams::Instance().Float(U8("カメラ/ロック注視点スムーズ"), 8.0f, 1.0f, 60.0f);
+		m_smoothLockAim = MathAPI::InterpTo(m_smoothLockAim, m_lockOnAimPos, dt, aimK);
+
+		const Math::Vector3 dir = MathAPI::GetSafeNormal(m_smoothLockAim - m_smoothFollowPos);
 		if (dir.LengthSquared() > 0.0f)
 		{
 			m_DegAng.y = MathAPI::DirToYawDeg(dir);
@@ -88,6 +102,10 @@ void TPSCamera::PostUpdate()
 				DebugParams::Instance().Float(U8("カメラ/ロック中のピッチ上限"), 75.0f, 45.0f, 89.0f);
 			m_DegAng.x = std::clamp(MathAPI::DirToPitchDeg(dir), -lockPitchLimit, lockPitchLimit);
 		}
+	}
+	else
+	{
+		m_lockAimInit = false;
 	}
 
 	// === B: 回転スムージング(視点角度を最短経路でLerp=ロックオンのスナップやマウス急変を和らげる) ===

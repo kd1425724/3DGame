@@ -42,6 +42,11 @@ private:
 	Math::Vector3 m_lockOnAimPos = {};
 	bool          m_hasLockOnAim = false;
 
+	// 注視点の平滑化用。掛け直したときにリセットするので、前の対象から
+	// Lerpして街を舐めるように回ることがない
+	Math::Vector3 m_smoothLockAim = {};
+	bool          m_lockAimInit   = false;
+
 	// === スイング酔い対策のスムージング用の内部状態(すべてDebugParamsで強さ調整) ===
 	// 初回フレームだけ現在値に合わせる(起動直後のスムージング暴れ防止)
 	bool          m_smoothInit     = false;
