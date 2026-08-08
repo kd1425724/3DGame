@@ -1389,13 +1389,31 @@ void Player::PostUpdate()
 
 	// マーカーは狙っている関節に出す。関節が取れないとき(敵でない等)は敵の中心に出る
 	Math::Vector3 jointPos{};
-	if (GetLockedJointPos(jointPos))
+	const bool hasJoint = GetLockedJointPos(jointPos);
+	if (hasJoint)
 	{
 		m_upTargeting->SetMarkerOverridePos(jointPos);
 	}
 	else
 	{
 		m_upTargeting->ClearMarkerOverridePos();
+	}
+
+	// カメラにも同じ点を渡して、ロックオン中はそこを注視させる。
+	// 【なぜ「点」を渡すのか】狙っているのは敵そのものではなく関節(ホイールで切替)で、
+	//   その位置を知っているのはここだけ。カメラに敵や関節を知らせずに済む
+	// ※ 関節が取れないときはロックしない。マーカーも出ていない状態でカメラだけ
+	//   固定されると、何を見ているのか分からないまま操作を奪うことになる
+	if (std::shared_ptr<CameraBase> spCamera = m_wpCamera.lock())
+	{
+		if (m_isLockedOn && hasJoint)
+		{
+			spCamera->SetLockOnAim(jointPos);
+		}
+		else
+		{
+			spCamera->ClearLockOnAim();
+		}
 	}
 
 	// 着地した瞬間を捉えて、着地モーションを流す時間を確保する。

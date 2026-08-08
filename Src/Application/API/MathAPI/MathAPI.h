@@ -179,6 +179,18 @@ namespace MathAPI
 		return Math::Vector3(s * std::sin(rad), 0.0f, s * std::cos(rad));
 	}
 
+	// 向きベクトルから、見下ろし角(ピッチ・度)を求める。DirToYawDeg と対で使う
+	//
+	// 【符号の約束】このエンジンのカメラは CreateFromYawPitchRoll(yaw, pitch, roll) で
+	//   回すので、+Z は pitch θ で (0, -sinθ, cosθ) へ移る。つまり
+	//   【正のピッチ＝下を向く】。マウスを手前(画面下)へ動かすと m_DegAng.x が
+	//   増える既存の挙動とも一致する
+	// ※ _dir は正規化済みであること。長さが1でないと角度がずれる
+	inline float DirToPitchDeg(const Math::Vector3& _dir)
+	{
+		return DirectX::XMConvertToDegrees(-std::asin(std::clamp(_dir.y, -1.0f, 1.0f)));
+	}
+
 	//------------------------------------------------
 	// 面に対する分解
 	//------------------------------------------------
